@@ -32,6 +32,7 @@ export default {
 					}),
 					{
 						headers: {
+							'Content-Length': file.arrayBuffer.byteLength,
 							'Content-Type': file.type,
 						},
 					}
@@ -50,16 +51,26 @@ export default {
 };
 
 // bytes to base64
-function arrayBufferToBase64(bytes) {
-	return btoa(String.fromCharCode(...new Uint8Array(bytes)));
+function arrayBufferToBase64(buffer, chunkSize = 1024) {
+	const bytes = new Uint8Array(buffer);
+	let binary = '';
+	for (let i = 0; i < bytes.length; i += chunkSize) {
+		const chunk = bytes.subarray(i, i + chunkSize);
+		let chunkBinary = '';
+		for (let j = 0; j < chunk.length; j++) {
+			chunkBinary += String.fromCharCode(chunk[j]);
+		}
+		binary += chunkBinary;
+	}
+	return btoa(binary);
 }
 
 // base64 to bytes
 function base64ToArrayBuffer(base64) {
-	var binary_string = atob(base64);
-	var len = binary_string.length;
-	var bytes = new Uint8Array(len);
-	for (var i = 0; i < len; i++) {
+	let binary_string = atob(base64);
+	const len = binary_string.length;
+	let bytes = new Uint8Array(len);
+	for (let i = 0; i < len; i++) {
 		bytes[i] = binary_string.charCodeAt(i);
 	}
 	return bytes.buffer;

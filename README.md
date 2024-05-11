@@ -60,7 +60,7 @@ response
 
 ## Deploy 😋
 
-> You can refer to <@owenyoung>'s blog <https://www.owenyoung.com/blog/jsonbin/>. [I am looking forward] Of course, I also hope that someone can contribute deployment documents or blogs
+> You can refer to [@owenyoung](https://github.com/theowenyoung)'s blog <https://www.owenyoung.com/blog/jsonbin/>. [I am looking forward] Of course, I also hope that someone can contribute deployment documents or blogs
 
 ## Features 🎉
 
