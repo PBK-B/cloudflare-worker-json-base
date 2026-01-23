@@ -109,6 +109,7 @@ web_modules/
 
 .next
 out
+dist-webui
 
 # Nuxt.js build / generate output
 
