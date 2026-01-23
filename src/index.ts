@@ -1,9 +1,8 @@
 /*
  * @Author: Bin
  * @Date: 2024-05-10
- * @FilePath: /worker-json-base/src/index.js
+ * @FilePath: /worker-json-base/src/index.ts
  */
-// @ts-nocheck
 /**
  * Welcome to Cloudflare Workers! This is your first worker.
  *
@@ -19,8 +18,12 @@
 // Modify this
 const APIKEY = 'MYDATABASEKEY';
 
+interface Env {
+	JSONBIN: KVNamespace;
+}
+
 export default {
-	async fetch(request, env) {
+	async fetch(request: Request, env: Env): Promise<Response> {
 		try {
 			const responseBody = await handleRequest(request, env);
 			// 判断是否为文件类型
@@ -32,7 +35,7 @@ export default {
 					}),
 					{
 						headers: {
-							'Content-Length': file.arrayBuffer.byteLength,
+							'Content-Length': file.arrayBuffer.byteLength.toString(),
 							'Content-Type': file.type,
 						},
 					}
@@ -51,7 +54,7 @@ export default {
 };
 
 // bytes to base64
-function arrayBufferToBase64(buffer, chunkSize = 1024) {
+function arrayBufferToBase64(buffer: ArrayBuffer, chunkSize: number = 1024): string {
 	const bytes = new Uint8Array(buffer);
 	let binary = '';
 	for (let i = 0; i < bytes.length; i += chunkSize) {
@@ -66,7 +69,7 @@ function arrayBufferToBase64(buffer, chunkSize = 1024) {
 }
 
 // base64 to bytes
-function base64ToArrayBuffer(base64) {
+function base64ToArrayBuffer(base64: string): ArrayBuffer {
 	let binary_string = atob(base64);
 	const len = binary_string.length;
 	let bytes = new Uint8Array(len);
@@ -76,7 +79,12 @@ function base64ToArrayBuffer(base64) {
 	return bytes.buffer;
 }
 
-async function dataUrlToBytes(dataUrl) {
+interface DataUrlResult {
+	type: string;
+	arrayBuffer: ArrayBuffer;
+}
+
+async function dataUrlToBytes(dataUrl: string): Promise<DataUrlResult> {
 	let url = new URL(dataUrl);
 	if (url.protocol !== 'data:') {
 		throw Error('url not is DataURL');
@@ -95,12 +103,12 @@ async function dataUrlToBytes(dataUrl) {
 	};
 }
 
-function bytesToDataUrl(bytes, type = 'application/octet-stream') {
+function bytesToDataUrl(bytes: ArrayBuffer, type: string = 'application/octet-stream'): string {
 	let base64 = arrayBufferToBase64(bytes);
 	return `data:${type};base64,${base64}`;
 }
 
-async function handleRequest(request, env) {
+async function handleRequest(request: Request, env: Env): Promise<string> {
 	if (!env.JSONBIN) {
 		throw new HTTPError('kvNotFound', 'Not Found KV Database Bind', 500, 'Internal Server Error');
 	}
@@ -141,7 +149,7 @@ async function handleRequest(request, env) {
 				let base64Url = bytesToDataUrl(arrayBuffer, blob.type);
 				json = base64Url;
 			} else {
-				throw new HTTPError('jsonParseError', 'request body JSON is not valid, ' + e.message, 400, 'Bad Request');
+				throw new HTTPError('jsonParseError', 'request body JSON is not valid, ' + (e as Error).message, 400, 'Bad Request');
 			}
 		}
 		await env.JSONBIN.put(pathname, json);
@@ -158,8 +166,14 @@ async function handleRequest(request, env) {
 	}
 }
 
-function errorToResponse(error) {
-	const bodyJson = {
+interface ErrorResponseBody {
+	ok: false;
+	error: string;
+	message: string;
+}
+
+function errorToResponse(error: unknown): Response {
+	const bodyJson: ErrorResponseBody = {
 		ok: false,
 		error: 'Internal Server Error',
 		message: 'Internal Server Error',
@@ -171,10 +185,8 @@ function errorToResponse(error) {
 		bodyJson.message = error.message;
 		bodyJson.error = error.name;
 
-		if (error.status) {
+		if (error instanceof HTTPError) {
 			status = error.status;
-		}
-		if (error.statusText) {
 			statusText = error.statusText;
 		}
 	}
@@ -188,10 +200,12 @@ function errorToResponse(error) {
 }
 
 class HTTPError extends Error {
-	constructor(name, message, status, statusText) {
+	constructor(
+		public name: string,
+		message: string,
+		public status: number,
+		public statusText: string
+	) {
 		super(message);
-		this.name = name;
-		this.status = status;
-		this.statusText = statusText;
 	}
 }
