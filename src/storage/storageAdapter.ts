@@ -11,12 +11,6 @@ import { D1StorageProvider } from './providers/d1StorageProvider';
 import { D1MetadataManager } from './metadata/metadataManager';
 import { Config } from '../utils/config';
 
-interface PathMapping {
-  path: string;
-  file_id: string;
-  created_at: string;
-}
-
 export interface StorageAdapterConfig {
   env: WorkerEnv;
   defaultContentType?: string;
@@ -273,41 +267,39 @@ export class StorageAdapter {
     const { search, page = 1, limit = 20 } = params;
     const offset = (page - 1) * limit;
 
-    if (search) {
-      const allPaths = await this.pathMapper.listPaths(100000, 0);
-      const searchLower = search.toLowerCase();
-      const matchedMappings: Array<{ mapping: PathMapping; metadata: FileMetadata; data: Uint8Array }> = [];
+    let allPaths = await this.pathMapper.listPaths(100000, 0);
+    let total = allPaths.length;
 
-      for (const mapping of allPaths) {
-        try {
-          const data = await this.storageService.readData(mapping.file_id);
-          const metadata = await this.storageService.getMetadata(mapping.file_id);
-          if (data && metadata) {
-            let value: any;
-            if (metadata.contentType === 'application/json') {
-              try {
-                value = JSON.parse(this.uint8ArrayToText(data));
-              } catch {
-                value = '[Binary data]';
-              }
-            } else {
-              value = this.uint8ArrayToText(data).substring(0, 100);
-            }
-            const matchesPath = mapping.path.toLowerCase().includes(searchLower);
-            const matchesValue = String(value).toLowerCase().includes(searchLower);
-            if (matchesPath || matchesValue) {
-              matchedMappings.push({ mapping, metadata, data });
-            }
-          }
-        } catch (error) {
-          Logger.warn('Failed to load data for path', { path: mapping.path, error });
+    const items: StoredData[] = [];
+
+    for (const mapping of allPaths) {
+      try {
+        const metadata = await this.storageService.getMetadata(mapping.file_id);
+        if (!metadata) {
+          Logger.warn('Metadata not found for file_id', { file_id: mapping.file_id, path: mapping.path });
+          continue;
         }
-      }
 
-      const total = matchedMappings.length;
-      const pageMappings = matchedMappings.slice(offset, offset + limit);
+        Logger.debug('Found metadata', { 
+          path: mapping.path, 
+          file_id: mapping.file_id,
+          size: metadata.size,
+          contentType: metadata.contentType,
+          storageBackend: metadata.storageBackend
+        });
 
-      const items: StoredData[] = pageMappings.map(({ mapping, metadata, data }) => {
+        const data = await this.storageService.readData(mapping.file_id);
+        if (!data || data.length === 0) {
+          Logger.warn('Data not found or empty for file_id', { file_id: mapping.file_id, path: mapping.path });
+          continue;
+        }
+
+        Logger.debug('Read data', { 
+          path: mapping.path, 
+          dataLength: data.length,
+          dataPreview: data.slice(0, 20)
+        });
+
         let value: any;
         let type: 'json' | 'binary' | 'text' = 'text';
         if (metadata.contentType === 'application/json') {
@@ -325,7 +317,17 @@ export class StorageAdapter {
           value = '[Binary data]';
           type = 'binary';
         }
-        return {
+
+        if (search) {
+          const searchLower = search.toLowerCase();
+          const matchesPath = mapping.path.toLowerCase().includes(searchLower);
+          const matchesValue = String(value).toLowerCase().includes(searchLower);
+          if (!matchesPath && !matchesValue) {
+            continue;
+          }
+        }
+
+        items.push({
           id: mapping.path,
           value,
           type,
@@ -337,71 +339,18 @@ export class StorageAdapter {
           storage_location: (metadata.storageBackend === 'd1' || metadata.storageBackend === 'kv') 
             ? metadata.storageBackend 
             : 'd1' as 'd1' | 'kv'
-        };
-      });
-
-      const hasMore = offset + items.length < total;
-
-      return {
-        items,
-        total,
-        page,
-        limit,
-        hasMore
-      };
-    }
-
-    const paths = await this.pathMapper.listPaths(limit, offset);
-    const total = await this.pathMapper.getTotalPaths();
-
-    const items: StoredData[] = [];
-
-    for (const mapping of paths) {
-      try {
-        const data = await this.storageService.readData(mapping.file_id);
-        const metadata = await this.storageService.getMetadata(mapping.file_id);
-
-        if (data && metadata) {
-          let value: any;
-          let type: 'json' | 'binary' | 'text' = 'text';
-          if (metadata.contentType === 'application/json') {
-            try {
-              value = JSON.parse(this.uint8ArrayToText(data));
-              type = 'json';
-            } catch {
-              value = '[Binary data]';
-              type = 'binary';
-            }
-          } else if (metadata.contentType.startsWith('text/')) {
-            value = this.uint8ArrayToText(data).substring(0, 100);
-            type = 'text';
-          } else {
-            value = '[Binary data]';
-            type = 'binary';
-          }
-          items.push({
-            id: mapping.path,
-            value,
-            type,
-            created_at: metadata.createdAt,
-            updated_at: metadata.updatedAt,
-            size: metadata.size,
-            content_type: metadata.contentType,
-            path: mapping.path,
-            storage_location: (metadata.storageBackend === 'd1' || metadata.storageBackend === 'kv') 
-              ? metadata.storageBackend 
-              : 'd1' as 'd1' | 'kv'
-          });
-        }
+        });
       } catch (error) {
         Logger.warn('Failed to load data for path', { path: mapping.path, error });
       }
     }
 
+    total = items.length;
     const hasMore = offset + items.length < total;
+    const resultItems = items.slice(offset, offset + limit);
 
     return {
-      items,
+      items: resultItems,
       total,
       page,
       limit,
@@ -412,12 +361,24 @@ export class StorageAdapter {
   async getStats(): Promise<{ total: number; totalSize: number }> {
     await this.ensureInitialized();
 
-    const stats = await this.storageService.getStats();
-    const totalPaths = await this.pathMapper.getTotalPaths();
+    const allPaths = await this.pathMapper.listPaths(100000, 0);
+    let total = 0;
+    let totalSize = 0;
+
+    for (const mapping of allPaths) {
+      try {
+        const metadata = await this.storageService.getMetadata(mapping.file_id);
+        if (metadata) {
+          total++;
+          totalSize += metadata.size;
+        }
+      } catch {
+      }
+    }
 
     return {
-      total: totalPaths,
-      totalSize: stats.totalSize
+      total,
+      totalSize
     };
   }
 }

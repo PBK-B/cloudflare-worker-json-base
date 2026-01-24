@@ -2,7 +2,7 @@
 
 export interface FileMetadata {
   id: string;
-  name?: string;
+  name: string | null;
   contentType: string;
   size: number;
   createdAt: string;

@@ -64,7 +64,7 @@ export class D1MetadataManager implements MetadataStorage {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       metadata.id,
-      metadata.name,
+      metadata.name ?? null,
       metadata.contentType,
       metadata.size,
       metadata.createdAt,
@@ -73,7 +73,7 @@ export class D1MetadataManager implements MetadataStorage {
       metadata.chunkCount,
       metadata.chunkSize,
       metadata.storageBackend,
-      metadata.id // Use id as handle for reference
+      metadata.id
     ).run();
 
     Logger.debug('Metadata saved', { id: metadata.id, size: metadata.size });
@@ -143,7 +143,7 @@ export class D1MetadataManager implements MetadataStorage {
   private rowToMetadata(row: any): FileMetadata {
     return {
       id: row.id,
-      name: row.name,
+      name: row.name ?? null,
       contentType: row.content_type,
       size: row.size,
       createdAt: row.created_at,

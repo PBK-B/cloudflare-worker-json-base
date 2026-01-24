@@ -124,8 +124,9 @@ export const useApi = () => {
 				const formData = new FormData();
 				formData.append('file', file);
 				formData.append('type', type);
+				formData.append('path', path);
 				
-				const response = await axiosInstance.post(`/data${path}`, formData);
+				const response = await axiosInstance.post(`/storage${path}`, formData);
 				return response.data;
 			} catch (error) {
 				if (axios.isAxiosError(error)) {

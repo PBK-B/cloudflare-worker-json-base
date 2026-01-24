@@ -1,6 +1,6 @@
 import React from 'react';
 import { Modal, Form, Input, InputPicker, Button, Uploader } from 'rsuite';
-import { Plus, Edit, Upload, File } from 'lucide-react';
+import { Plus, Edit, Upload, File, X } from 'lucide-react';
 
 interface FormData {
 	path: string;
@@ -34,7 +34,7 @@ export const ModalForm: React.FC<ModalFormProps> = ({
 			path: '',
 			value: '',
 			type: initialType,
-		}
+		},
 	);
 	const [uploadedFile, setUploadedFile] = React.useState<File | null>(null);
 	const [isUploading, setIsUploading] = React.useState(false);
@@ -89,17 +89,36 @@ export const ModalForm: React.FC<ModalFormProps> = ({
 	};
 
 	const handleFileUpload = (fileList: any[]) => {
-		if (fileList.length > 0) {
-			const file = fileList[0].blobFile as File;
-			setUploadedFile(file);
-			setFormData((prev) => ({ ...prev, value: file.name }));
+		if (!fileList || fileList.length === 0) {
+			return false;
 		}
+
+		const fileObj = fileList[0];
+
+		if (fileObj?.blobFile) {
+			const blobFile = fileObj.blobFile as File;
+			if (blobFile.size > 0) {
+				setUploadedFile(blobFile);
+				setFormData((prev) => ({ ...prev, value: blobFile.name }));
+			}
+		} else if (fileObj.file) {
+			const file = fileObj.file as File;
+			if (file.size > 0) {
+				setUploadedFile(file);
+				setFormData((prev) => ({ ...prev, value: file.name }));
+			}
+		}
+
 		return false;
 	};
 
 	const handleRemoveFile = () => {
 		setUploadedFile(null);
 		setFormData((prev) => ({ ...prev, value: '' }));
+		const fileInput = document.querySelector('.rs-uploader input[type="file"]') as HTMLInputElement;
+		if (fileInput) {
+			fileInput.value = '';
+		}
 	};
 
 	const renderValueInput = () => {
@@ -117,43 +136,70 @@ export const ModalForm: React.FC<ModalFormProps> = ({
 						size="lg"
 						action=""
 						disabled={isUploading}
+						fileListVisible={false}
 					>
-						<div style={{ padding: '20px', textAlign: 'center', border: '1px dashed #d9d9d9', borderRadius: '4px' }}>
-							<Upload size={32} style={{ color: '#999', marginBottom: '8px' }} />
-							<p style={{ color: '#666', margin: 0 }}>
-								{isUploading ? '文件处理中...' : '点击或拖拽文件到此处上传'}
-							</p>
-							<p style={{ color: '#999', fontSize: '12px', margin: '4px 0 0 0' }}>支持任意文件格式</p>
-						</div>
-					</Uploader>
-					{uploadedFile && (
 						<div
 							style={{
-								marginTop: '12px',
 								display: 'flex',
-								alignItems: 'center',
+								flexDirection: uploadedFile ? 'row' : 'column',
+								alignItems: uploadedFile ? 'flex-start' : 'center',
 								gap: '8px',
-								padding: '8px',
-								background: '#f5f5f5',
+								padding: uploadedFile ? '8px 12px' : '20px',
+								textAlign: 'center',
+								border: '1px dashed #d9d9d9',
 								borderRadius: '4px',
+								boxSizing: 'border-box',
+								height: '100%',
+								justifyContent: uploadedFile ? 'flex-start' : 'center',
 							}}
 						>
-							<File size={18} />
-							<span
-								style={{
-									flex: 1,
-									overflow: 'hidden',
-									textOverflow: 'ellipsis',
-									whiteSpace: 'nowrap',
-								}}
-							>
-								{uploadedFile.name}
-							</span>
-							<span style={{ color: '#999', fontSize: '12px' }}>
-								{uploadedFile ? (uploadedFile.size / 1024).toFixed(1) : 0} KB
-							</span>
+							{uploadedFile ? (
+								<>
+									<File size={18} />
+									<span
+										style={{
+											flex: 1,
+											overflow: 'hidden',
+											textOverflow: 'ellipsis',
+											whiteSpace: 'nowrap',
+											textAlign: 'start',
+										}}
+										title={uploadedFile.webkitRelativePath || uploadedFile.name}
+									>
+										{uploadedFile.webkitRelativePath || uploadedFile.name}
+									</span>
+									<span style={{ color: '#999', fontSize: '12px', marginLeft: '8px' }}>
+										{uploadedFile ? (uploadedFile.size / 1024).toFixed(1) : 0} KB
+									</span>
+									<button
+										type="button"
+										onClick={(e) => {
+											e.stopPropagation();
+											handleRemoveFile();
+										}}
+										style={{
+											background: 'none',
+											border: 'none',
+											cursor: 'pointer',
+											padding: '2px',
+											display: 'flex',
+											alignItems: 'center',
+											justifyContent: 'center',
+											marginLeft: '8px',
+										}}
+									>
+										<X size={16} style={{ color: '#999' }} />
+									</button>
+								</>
+							) : (
+								<>
+									<Upload size={32} style={{ color: '#999', marginBottom: '8px' }} />
+									<p style={{ color: '#666', margin: 0 }}>{isUploading ? '文件处理中...' : '点击或拖拽文件到此处上传'}</p>
+									<p style={{ color: '#999', fontSize: '12px', margin: '4px 0 0 0' }}>支持任意文件格式</p>
+								</>
+							)}
 						</div>
-					)}
+					</Uploader>
 					<div className="form-hint">文件将在后端自动转换为 Base64 编码存储</div>
 				</div>
 			);

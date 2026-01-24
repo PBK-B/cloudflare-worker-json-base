@@ -72,7 +72,7 @@ export class FileStorageService {
 
       const metadata: FileMetadata = {
         id,
-        name: options.name,
+        name: options.name || null,
         contentType: options.contentType || 'application/octet-stream',
         size: data.length,
         createdAt: now,

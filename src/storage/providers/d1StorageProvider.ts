@@ -51,17 +51,22 @@ export class D1StorageProvider implements ChunkStorageProvider {
 
     const now = new Date().toISOString();
     const totalSize = data.length;
-    const value = new TextDecoder().decode(data);
-
 
     try {
-      await this.db
-        .prepare(
-          `INSERT INTO data_chunks (handle, chunk_index, data, size, total_chunks, created_at)
-           VALUES (?, ?, ?, ?, ?, ?)`
-        )
-        .bind(handle, 0, value, totalSize, chunkCount, now)
-        .run();
+      for (let i = 0; i < chunkCount; i++) {
+        const start = i * this.chunkSize;
+        const end = Math.min(start + this.chunkSize, data.length);
+        const chunkData = data.slice(start, end);
+        const base64Value = this.uint8ArrayToBase64(chunkData);
+
+        await this.db
+          .prepare(
+            `INSERT INTO data_chunks (handle, chunk_index, data, size, total_chunks, created_at)
+             VALUES (?, ?, ?, ?, ?, ?)`
+          )
+          .bind(handle, i, base64Value, chunkData.length, chunkCount, now)
+          .run();
+      }
 
       return handle;
     } catch (error) {
@@ -71,14 +76,14 @@ export class D1StorageProvider implements ChunkStorageProvider {
   }
 
   async writeChunk(handle: string, chunkIndex: number, data: Uint8Array): Promise<void> {
-    const value = new TextDecoder().decode(data);
+    const base64Value = this.uint8ArrayToBase64(data);
     
     await this.db
       .prepare(
         `INSERT INTO data_chunks (handle, chunk_index, data, size, created_at)
          VALUES (?, ?, ?, ?, ?)`
       )
-      .bind(handle, chunkIndex, value, data.length, new Date().toISOString())
+      .bind(handle, chunkIndex, base64Value, data.length, new Date().toISOString())
       .run();
   }
 
@@ -101,8 +106,7 @@ export class D1StorageProvider implements ChunkStorageProvider {
       const chunks: Uint8Array[] = [];
 
       for (const row of result.results) {
-        const encoder = new TextEncoder();
-        const chunk = encoder.encode(row.data);
+        const chunk = this.base64ToUint8Array(row.data);
         chunks.push(chunk);
       }
 
@@ -123,8 +127,24 @@ export class D1StorageProvider implements ChunkStorageProvider {
       throw ApiError.notFound(`Chunk ${chunkIndex} not found for handle ${handle}`);
     }
 
-    const encoder = new TextEncoder();
-    return encoder.encode(result.data);
+    return this.base64ToUint8Array(result.data);
+  }
+
+  private uint8ArrayToBase64(data: Uint8Array): string {
+    let binary = '';
+    for (let i = 0; i < data.length; i++) {
+      binary += String.fromCharCode(data[i]);
+    }
+    return btoa(binary);
+  }
+
+  private base64ToUint8Array(base64: string): Uint8Array {
+    const binaryString = atob(base64);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes;
   }
 
   async delete(handle: string): Promise<void> {

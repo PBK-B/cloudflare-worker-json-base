@@ -7,11 +7,13 @@ import { FileStorageService } from '../storage/fileStorageService';
 import { KVStorageProvider } from '../storage/providers/kvStorageProvider';
 import { D1StorageProvider } from '../storage/providers/d1StorageProvider';
 import { D1MetadataManager } from '../storage/metadata/metadataManager';
+import { PathMapper } from '../storage/pathMapper';
 import { FileMetadata } from '../storage/interfaces';
 import { Config } from '../utils/config';
 
 export class StorageController {
   private storageService: FileStorageService;
+  private pathMapper: PathMapper;
 
   constructor(env: WorkerEnv) {
     Config.getInstance(env);
@@ -28,6 +30,8 @@ export class StorageController {
       d1Provider,
       metadataStore
     });
+
+    this.pathMapper = new PathMapper(env);
 
     AuthMiddleware.initialize(env);
     RateLimiter.initialize(env);
@@ -67,6 +71,9 @@ export class StorageController {
       if (contentType.includes('multipart/form-data')) {
         const formData = await request.formData();
         const file = formData.get('file') as File;
+        const pathParam = formData.get('path') as string | null;
+
+        const targetPath = pathParam || pathname;
 
         if (!file) {
           throw ApiError.badRequest('File is required');
@@ -89,19 +96,23 @@ export class StorageController {
           contentType: file.type || 'application/octet-stream'
         });
 
-        if (!result.success) {
+        if (!result.success || !result.fileId) {
           throw ApiError.internal(result.error || 'Failed to store file');
         }
+
+        await this.pathMapper.setMapping(targetPath, result.fileId);
 
         Logger.info('File uploaded', {
           id: result.fileId,
           filename: file.name,
           size: file.size,
+          path: targetPath,
           auth: auth.apiKey.substring(0, 8)
         });
 
         return ResponseBuilder.created({
-          id: result.fileId,
+          id: targetPath,
+          fileId: result.fileId,
           name: file.name,
           contentType: file.type || 'application/octet-stream',
           size: file.size,
