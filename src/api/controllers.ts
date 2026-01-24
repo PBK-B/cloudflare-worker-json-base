@@ -75,10 +75,19 @@ export class DataController {
       if (contentType.includes('multipart/form-data')) {
         const formData = await request.formData()
         const file = formData.get('file') as File
-        const type = formData.get('type') as string || 'binary'
+        const type = (formData.get('type') as string) || 'binary'
 
-        if (!file || file.size === 0) {
+        if (!file) {
           throw ApiError.badRequest('File is required')
+        }
+
+        if (file.size === 0) {
+          throw ApiError.badRequest('File is empty')
+        }
+
+        const maxSize = 100 * 1024 * 1024 // 100MB limit
+        if (file.size > maxSize) {
+          throw ApiError.badRequest(`File size exceeds maximum limit of ${maxSize / 1024 / 1024}MB`)
         }
 
         const arrayBuffer = await file.arrayBuffer()

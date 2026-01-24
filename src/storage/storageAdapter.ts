@@ -134,7 +134,9 @@ export class StorageAdapter {
       size: metadata.size,
       content_type: metadata.contentType,
       path: pathname,
-      storage_location: metadata.storageBackend as 'd1' | 'kv'
+      storage_location: (metadata.storageBackend === 'd1' || metadata.storageBackend === 'kv') 
+        ? metadata.storageBackend 
+        : 'd1' as 'd1' | 'kv'
     };
   }
 
@@ -205,7 +207,9 @@ export class StorageAdapter {
       size: data.length,
       content_type: contentType,
       path: pathname,
-      storage_location: result.metadata?.storageBackend as 'd1' | 'kv' | undefined
+      storage_location: result.metadata?.storageBackend === 'd1' || result.metadata?.storageBackend === 'kv' 
+        ? result.metadata.storageBackend 
+        : 'd1' as 'd1' | 'kv'
     };
   }
 
@@ -314,7 +318,9 @@ export class StorageAdapter {
             size: metadata.size,
             content_type: metadata.contentType,
             path: mapping.path,
-            storage_location: metadata.storageBackend as 'd1' | 'kv'
+            storage_location: (metadata.storageBackend === 'd1' || metadata.storageBackend === 'kv') 
+              ? metadata.storageBackend 
+              : 'd1' as 'd1' | 'kv'
           });
         }
       } catch (error) {

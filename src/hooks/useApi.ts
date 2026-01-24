@@ -125,17 +125,26 @@ export const useApi = () => {
 				formData.append('file', file);
 				formData.append('type', type);
 				
-				const response = await axiosInstance.post(`/data${path}`, formData, {
-					headers: {
-						'Content-Type': 'multipart/form-data',
-					},
-				});
+				const response = await axiosInstance.post(`/data${path}`, formData);
 				return response.data;
 			} catch (error) {
 				if (axios.isAxiosError(error)) {
+					const statusCode = error.response?.status;
+					let errorMessage = '上传失败';
+					
+					if (statusCode === 400) {
+						errorMessage = error.response?.data?.error || '请求参数错误，请检查文件格式';
+					} else if (statusCode === 401 || statusCode === 403) {
+						errorMessage = 'API Key 无效，请重新登录';
+					} else if (statusCode === 413) {
+						errorMessage = '文件过大，无法上传';
+					} else if (statusCode === 500) {
+						errorMessage = error.response?.data?.error || '服务器内部错误';
+					}
+					
 					return {
 						success: false,
-						error: error.response?.data?.error || '上传失败',
+						error: errorMessage,
 						timestamp: new Date().toISOString(),
 					};
 				}

@@ -68,8 +68,17 @@ export class StorageController {
         const formData = await request.formData();
         const file = formData.get('file') as File;
 
-        if (!file || file.size === 0) {
+        if (!file) {
           throw ApiError.badRequest('File is required');
+        }
+
+        if (file.size === 0) {
+          throw ApiError.badRequest('File is empty');
+        }
+
+        const maxSize = 100 * 1024 * 1024; // 100MB limit
+        if (file.size > maxSize) {
+          throw ApiError.badRequest(`File size exceeds maximum limit of ${maxSize / 1024 / 1024}MB`);
         }
 
         const arrayBuffer = await file.arrayBuffer();
@@ -77,7 +86,7 @@ export class StorageController {
 
         const result = await this.storageService.write(data, {
           name: file.name,
-          contentType: file.type
+          contentType: file.type || 'application/octet-stream'
         });
 
         if (!result.success) {
@@ -94,7 +103,7 @@ export class StorageController {
         return ResponseBuilder.created({
           id: result.fileId,
           name: file.name,
-          contentType: file.type,
+          contentType: file.type || 'application/octet-stream',
           size: file.size,
           checksum: result.metadata?.checksum,
           chunkCount: result.metadata?.chunkCount,
