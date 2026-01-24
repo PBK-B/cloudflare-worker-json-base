@@ -12,7 +12,7 @@ interface AdminContext {
 
 const AdminConsolePage: React.FC = () => {
 	const { onOpenCreateModal, refreshKey } = useOutletContext<AdminContext>();
-	const { listData, loading } = useApi();
+	const { listData, getConsoleStats, loading } = useApi();
 
 	const [stats, setStats] = useState({
 		totalCount: 0,
@@ -22,18 +22,18 @@ const AdminConsolePage: React.FC = () => {
 
 	const loadStats = useCallback(async () => {
 		try {
-			const response = await listData(1, 1000);
+			const response = await getConsoleStats();
 			if (response.success && response.data) {
 				setStats({
-					totalCount: response.data.total,
+					totalCount: response.data.totalCount || response.data.totalFiles || 0,
 					totalSize: response.data.totalSize || 0,
-					pageCount: Math.ceil(response.data.total / 20),
+					pageCount: response.data.pageCount || Math.ceil((response.data.totalCount || 0) / 20),
 				});
 			}
 		} catch (err) {
 			console.error('加载统计数据失败:', err);
 		}
-	}, [listData]);
+	}, [getConsoleStats]);
 
 	useEffect(() => {
 		loadStats();

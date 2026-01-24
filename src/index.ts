@@ -19,11 +19,14 @@ export default {
       Logger.info('Request completed', {
         method: request.method,
         url: request.url,
-        status: response.status,
+        status: response?.status ?? 0,
         duration: `${duration}ms`
       })
 
-      return response
+      return response || new Response(JSON.stringify({
+        success: false,
+        error: 'No response generated'
+      }), { status: 500, headers: { 'Content-Type': 'application/json' } })
     } catch (error) {
       const duration = Date.now() - startTime
       Logger.error('Worker error', {

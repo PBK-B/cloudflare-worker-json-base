@@ -23,21 +23,42 @@ export class AuthMiddleware {
       if (!match) {
         throw ApiError.unauthorized('Invalid Authorization header format')
       }
-      apiKey = match[1]
+      apiKey = match[1].trim()
       method = 'bearer'
     } else if (queryKey) {
-      apiKey = queryKey
+      apiKey = queryKey.trim()
       method = 'query'
     } else {
       throw ApiError.unauthorized('API key required. Use Authorization: Bearer <key> or ?key=<key>')
     }
 
-    if (!apiKey || apiKey !== AuthMiddleware.config.apiKey) {
+    if (!apiKey) {
+      throw ApiError.unauthorized('API key cannot be empty')
+    }
+
+    if (!AuthMiddleware.config) {
+      Logger.error('AuthMiddleware.config not initialized')
+      throw ApiError.internal('Authentication system not initialized')
+    }
+
+    const expectedKey = AuthMiddleware.config.apiKey
+
+    if (!expectedKey) {
+      Logger.error('API_KEY not configured in environment')
+      throw ApiError.internal('API key not configured on server')
+    }
+
+    if (apiKey !== expectedKey) {
+      Logger.warn('API key mismatch', {
+        receivedKeyPrefix: apiKey.substring(0, 8),
+        expectedKeyPrefix: expectedKey.substring(0, 8),
+        method
+      })
       throw ApiError.forbidden('Invalid API key')
     }
 
     return {
-      apiKey: apiKey!,
+      apiKey,
       method,
       valid: true
     }
@@ -61,6 +82,10 @@ export class ValidationMiddleware {
     if (!/^\/[a-zA-Z0-9\-._~:/?#[\]@!$&'()*+,;=%]*$/.test(pathname)) {
       throw ApiError.badRequest('Invalid pathname format')
     }
+
+    if (pathname.startsWith('/._jsondb_/')) {
+      throw ApiError.forbidden('Pathname cannot start with /._jsondb_/ - this prefix is reserved for system use')
+    }
   }
 
   static validateApiKey(apiKey: string): void {
@@ -74,12 +99,18 @@ export class ValidationMiddleware {
   }
 
   static validateDataSize(data: string): void {
-    const size = new Blob([data]).size
-    const maxSize = 25 * 1024 * 1024 // 25MB
+    // No size limit - using hybrid storage (D1 + KV) for all file sizes
+    Logger.debug('Data size validation skipped - using hybrid storage')
+  }
 
-    if (size > maxSize) {
-      throw ApiError.badRequest(`Data too large (max ${maxSize / 1024 / 1024}MB)`)
-    }
+  static validateFileSize(fileSize: number): void {
+    // No size limit - using hybrid storage (D1 + KV) for all file sizes
+    Logger.debug('File size validation skipped', { fileSize })
+  }
+
+  static validateBase64Size(base64String: string): void {
+    // No size limit - using hybrid storage (D1 + KV) for all file sizes
+    Logger.debug('Base64 size validation skipped', { size: new Blob([base64String]).size })
   }
 
   static validateContentType(contentType: string): void {

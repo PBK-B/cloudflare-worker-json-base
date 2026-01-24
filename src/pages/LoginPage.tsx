@@ -36,12 +36,12 @@ const LoginPage: React.FC = () => {
 		setLoading(true);
 		setError('');
 
-		const success = await login(apiKey);
+		const result = await login(apiKey);
 
-		if (success) {
+		if (result.success) {
 			navigate('/admin');
 		} else {
-			setError('API Key 无效，请检查后重试');
+			setError(result.error || '登录失败，请检查 API Key 后重试');
 		}
 
 		setLoading(false);

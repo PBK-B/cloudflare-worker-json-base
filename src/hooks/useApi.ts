@@ -3,13 +3,21 @@ import axios, { AxiosError } from 'axios';
 import useAxios, { configure } from 'axios-hooks';
 import { ApiResponse, StorageData, CreateDataRequest, UpdateDataRequest, PaginatedResponse } from '../types';
 
-const API_BASE_URL = '/api';
+const API_BASE_URL = '/._jsondb_/api';
 
 const axiosInstance = axios.create({
 	baseURL: API_BASE_URL,
 	headers: {
 		'Content-Type': 'application/json',
 	},
+});
+
+axiosInstance.interceptors.request.use((config) => {
+	const savedApiKey = localStorage.getItem('jsonbase-api-key');
+	if (savedApiKey) {
+		config.headers.set('Authorization', `Bearer ${savedApiKey}`);
+	}
+	return config;
 });
 
 axiosInstance.interceptors.response.use(
@@ -49,10 +57,32 @@ export const useApi = () => {
 	const testConnection = useCallback(async (): Promise<ApiResponse<any>> => {
 		setLoading(true);
 		try {
-			const response = await axiosInstance.get('/data/test');
-			return response.data;
+			const response = await axiosInstance.get('/health');
+			if (response.data.data?.apiKey?.valid) {
+				return {
+					success: true,
+					message: 'API Key 有效',
+					timestamp: new Date().toISOString(),
+					data: response.data.data
+				};
+			}
+			return {
+				success: false,
+				error: 'API Key 无效',
+				timestamp: new Date().toISOString(),
+			};
 		} catch (error) {
 			if (axios.isAxiosError(error)) {
+				const statusCode = error.response?.status;
+				
+				if (statusCode === 401 || statusCode === 403) {
+					return {
+						success: false,
+						error: 'API Key 无效，请检查后重试',
+						timestamp: new Date().toISOString(),
+					};
+				}
+				
 				return {
 					success: false,
 					error: error.response?.data?.error || '连接失败',
@@ -79,6 +109,33 @@ export const useApi = () => {
 					return {
 						success: false,
 						error: error.response?.data?.error || '创建失败',
+						timestamp: new Date().toISOString(),
+					};
+				}
+				throw error;
+			}
+		},
+		[]
+	);
+
+	const uploadFile = useCallback(
+		async (path: string, file: File, type: string): Promise<ApiResponse<StorageData>> => {
+			try {
+				const formData = new FormData();
+				formData.append('file', file);
+				formData.append('type', type);
+				
+				const response = await axiosInstance.post(`/data${path}`, formData, {
+					headers: {
+						'Content-Type': 'multipart/form-data',
+					},
+				});
+				return response.data;
+			} catch (error) {
+				if (axios.isAxiosError(error)) {
+					return {
+						success: false,
+						error: error.response?.data?.error || '上传失败',
 						timestamp: new Date().toISOString(),
 					};
 				}
@@ -165,6 +222,70 @@ export const useApi = () => {
 		[]
 	);
 
+	const getConsoleStats = useCallback(async (): Promise<ApiResponse<any>> => {
+		try {
+			const response = await axiosInstance.get('/console/stats');
+			return response.data;
+		} catch (error) {
+			if (axios.isAxiosError(error)) {
+				return {
+					success: false,
+					error: error.response?.data?.error || '获取控制台统计失败',
+					timestamp: new Date().toISOString(),
+				};
+			}
+			throw error;
+		}
+	}, []);
+
+	const getConsoleInfo = useCallback(async (): Promise<ApiResponse<any>> => {
+		try {
+			const response = await axiosInstance.get('/console');
+			return response.data;
+		} catch (error) {
+			if (axios.isAxiosError(error)) {
+				return {
+					success: false,
+					error: error.response?.data?.error || '获取控制台信息失败',
+					timestamp: new Date().toISOString(),
+				};
+			}
+			throw error;
+		}
+	}, []);
+
+	const getConsoleHealth = useCallback(async (): Promise<ApiResponse<any>> => {
+		try {
+			const response = await axiosInstance.get('/console/health');
+			return response.data;
+		} catch (error) {
+			if (axios.isAxiosError(error)) {
+				return {
+					success: false,
+					error: error.response?.data?.error || '获取控制台健康状态失败',
+					timestamp: new Date().toISOString(),
+				};
+			}
+			throw error;
+		}
+	}, []);
+
+	const getConsoleConfig = useCallback(async (): Promise<ApiResponse<any>> => {
+		try {
+			const response = await axiosInstance.get('/console/config');
+			return response.data;
+		} catch (error) {
+			if (axios.isAxiosError(error)) {
+				return {
+					success: false,
+					error: error.response?.data?.error || '获取控制台配置失败',
+					timestamp: new Date().toISOString(),
+				};
+			}
+			throw error;
+		}
+	}, []);
+
 	return {
 		apiKey,
 		setApiKey,
@@ -172,9 +293,14 @@ export const useApi = () => {
 		loading,
 		testConnection,
 		createData,
+		uploadFile,
 		updateData,
 		deleteData,
 		listData,
+		getConsoleStats,
+		getConsoleInfo,
+		getConsoleHealth,
+		getConsoleConfig,
 	};
 };
 

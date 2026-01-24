@@ -1,6 +1,6 @@
 import React from 'react';
-import { Modal, Form, Input, InputPicker, Button } from 'rsuite';
-import { Plus, Edit } from 'lucide-react';
+import { Modal, Form, Input, InputPicker, Button, Uploader } from 'rsuite';
+import { Plus, Edit, Upload, File } from 'lucide-react';
 
 interface FormData {
 	path: string;
@@ -11,7 +11,7 @@ interface FormData {
 interface ModalFormProps {
 	show: boolean;
 	onClose: () => void;
-	onSubmit: (data: FormData) => Promise<void>;
+	onSubmit: (data: FormData, file?: File) => Promise<void>;
 	title: string;
 	initialData?: FormData;
 	initialType?: 'json' | 'text' | 'binary';
@@ -36,16 +36,20 @@ export const ModalForm: React.FC<ModalFormProps> = ({
 			type: initialType,
 		}
 	);
+	const [uploadedFile, setUploadedFile] = React.useState<File | null>(null);
+	const [isUploading, setIsUploading] = React.useState(false);
 
 	React.useEffect(() => {
 		if (initialData) {
 			setFormData(initialData);
+			setUploadedFile(null);
 		} else if (show) {
 			setFormData({
 				path: '',
 				value: '',
 				type: initialType,
 			});
+			setUploadedFile(null);
 		}
 	}, [initialData, show, initialType]);
 
@@ -55,9 +59,16 @@ export const ModalForm: React.FC<ModalFormProps> = ({
 			return;
 		}
 
-		if (!formData.value.trim()) {
-			alert('请输入数据内容');
-			return;
+		if (formData.type === 'binary') {
+			if (!uploadedFile && !formData.value) {
+				alert('请上传文件');
+				return;
+			}
+		} else {
+			if (!formData.value.trim()) {
+				alert('请输入数据内容');
+				return;
+			}
 		}
 
 		if (formData.type === 'json') {
@@ -69,11 +80,95 @@ export const ModalForm: React.FC<ModalFormProps> = ({
 			}
 		}
 
-		await onSubmit(formData);
+		await onSubmit(formData, uploadedFile || undefined);
 	};
 
 	const handleTypeChange = (value: unknown) => {
-		setFormData((prev) => ({ ...prev, type: value as 'json' | 'text' | 'binary' }));
+		setFormData((prev) => ({ ...prev, type: value as 'json' | 'text' | 'binary', value: '' }));
+		setUploadedFile(null);
+	};
+
+	const handleFileUpload = (fileList: any[]) => {
+		if (fileList.length > 0) {
+			const file = fileList[0].blobFile as File;
+			setUploadedFile(file);
+			setFormData((prev) => ({ ...prev, value: file.name }));
+		}
+		return false;
+	};
+
+	const handleRemoveFile = () => {
+		setUploadedFile(null);
+		setFormData((prev) => ({ ...prev, value: '' }));
+	};
+
+	const renderValueInput = () => {
+		if (formData.type === 'binary') {
+			return (
+				<div>
+					<Uploader
+						fileList={uploadedFile ? [{ name: uploadedFile.name, fileKey: uploadedFile.name }] : []}
+						onChange={handleFileUpload}
+						onRemove={handleRemoveFile}
+						accept="*"
+						autoUpload={false}
+						multiple={false}
+						draggable
+						size="lg"
+						action=""
+						disabled={isUploading}
+					>
+						<div style={{ padding: '20px', textAlign: 'center', border: '1px dashed #d9d9d9', borderRadius: '4px' }}>
+							<Upload size={32} style={{ color: '#999', marginBottom: '8px' }} />
+							<p style={{ color: '#666', margin: 0 }}>
+								{isUploading ? '文件处理中...' : '点击或拖拽文件到此处上传'}
+							</p>
+							<p style={{ color: '#999', fontSize: '12px', margin: '4px 0 0 0' }}>支持任意文件格式</p>
+						</div>
+					</Uploader>
+					{uploadedFile && (
+						<div
+							style={{
+								marginTop: '12px',
+								display: 'flex',
+								alignItems: 'center',
+								gap: '8px',
+								padding: '8px',
+								background: '#f5f5f5',
+								borderRadius: '4px',
+							}}
+						>
+							<File size={18} />
+							<span
+								style={{
+									flex: 1,
+									overflow: 'hidden',
+									textOverflow: 'ellipsis',
+									whiteSpace: 'nowrap',
+								}}
+							>
+								{uploadedFile.name}
+							</span>
+							<span style={{ color: '#999', fontSize: '12px' }}>
+								{uploadedFile ? (uploadedFile.size / 1024).toFixed(1) : 0} KB
+							</span>
+						</div>
+					)}
+					<div className="form-hint">文件将在后端自动转换为 Base64 编码存储</div>
+				</div>
+			);
+		}
+
+		return (
+			<Input
+				as="textarea"
+				rows={10}
+				value={formData.value}
+				onChange={(value) => setFormData((prev) => ({ ...prev, value }))}
+				placeholder={formData.type === 'json' ? '输入 JSON 数据，例如: {"key": "value"}' : '输入文本内容'}
+				size="lg"
+			/>
+		);
 	};
 
 	return (
@@ -115,20 +210,7 @@ export const ModalForm: React.FC<ModalFormProps> = ({
 
 					<Form.Group>
 						<Form.ControlLabel>数据内容</Form.ControlLabel>
-						<Input
-							as="textarea"
-							rows={10}
-							value={formData.value}
-							onChange={(value) => setFormData((prev) => ({ ...prev, value }))}
-							placeholder={
-								formData.type === 'json'
-									? '输入 JSON 数据，例如: {"key": "value"}'
-									: formData.type === 'text'
-									? '输入文本内容'
-									: '输入 Base64 编码的二进制数据'
-							}
-							size="lg"
-						/>
+						{renderValueInput()}
 					</Form.Group>
 				</Form>
 			</Modal.Body>

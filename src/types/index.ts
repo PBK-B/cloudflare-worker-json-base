@@ -1,4 +1,5 @@
 // Shared type definitions
+export * from './storage';
 export interface ApiResponse<T = any> {
   success: boolean
   data?: T
@@ -15,6 +16,7 @@ export interface StorageData {
   updated_at: string
   size: number
   content_type?: string
+  storage_location?: 'd1' | 'kv'
 }
 
 export interface CreateDataRequest {
@@ -44,6 +46,17 @@ export interface HealthResponse {
   timestamp: string
   uptime: number
   environment: string
+  services?: {
+    storage?: boolean
+    d1?: boolean
+    totalFiles?: number
+    totalSize?: number
+  }
+  apiKey?: {
+    valid: boolean
+    method?: 'bearer' | 'query'
+  }
+  error?: string
 }
 
 export interface AuthContext {
@@ -59,6 +72,7 @@ export interface WorkerEnv {
 	API_KEY?: string
 	ENVIRONMENT?: string
 	VERSION?: string
+	STORAGE_BACKEND?: string
 }
 
 declare module '@cloudflare/workers-types' {

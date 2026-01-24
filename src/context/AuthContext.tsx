@@ -7,9 +7,9 @@ interface AuthContextType {
 	isLoading: boolean;
 	apiKey: string;
 	setApiKey: (key: string) => void;
-	login: (key: string) => Promise<boolean>;
+	login: (key: string) => Promise<{ success: boolean; error?: string }>;
 	logout: () => void;
-	testConnection: () => Promise<ApiResponse<any>>;
+	testConnection: (key?: string) => Promise<ApiResponse<any>>;
 	onAuthError: () => void;
 }
 
@@ -38,8 +38,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 		localStorage.setItem('jsonbase-api-key', key);
 	}, []);
 
-	const testConnection = useCallback(async (): Promise<ApiResponse<any>> => {
-		if (!apiKey.trim()) {
+	const testConnection = useCallback(async (key?: string): Promise<ApiResponse<any>> => {
+		const apiKeyToUse = key !== undefined ? key : apiKey;
+		
+		if (!apiKeyToUse.trim()) {
 			return {
 				success: false,
 				error: 'API Key 不能为空',
@@ -47,40 +49,101 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 			};
 		}
 		try {
-			const response = await axios.get('/api/data/test');
-			return response.data;
+			const response = await axios.get('/._jsondb_/api/health', {
+				headers: {
+					'Authorization': `Bearer ${apiKeyToUse}`
+				}
+			});
+			
+			if (response.data.data?.apiKey?.valid) {
+				return {
+					success: true,
+					message: 'API Key 有效',
+					timestamp: new Date().toISOString(),
+					data: response.data.data
+				};
+			}
+			
+			return {
+				success: false,
+				error: 'API Key 无效，请检查后重试',
+				timestamp: new Date().toISOString()
+			};
 		} catch (error) {
 			if (axios.isAxiosError(error)) {
+				const statusCode = error.response?.status;
+				
+				if (statusCode === 401 || statusCode === 403) {
+					return {
+						success: false,
+						error: 'API Key 无效，请检查后重试',
+						timestamp: new Date().toISOString(),
+					};
+				}
+				
+				if (statusCode === 404) {
+					return {
+						success: false,
+						error: 'API 接口不存在，请确认服务地址是否正确',
+						timestamp: new Date().toISOString(),
+					};
+				}
+				
+				if (statusCode === 429) {
+					return {
+						success: false,
+						error: '请求过于频繁，请稍后再试',
+						timestamp: new Date().toISOString(),
+					};
+				}
+				
+				if (statusCode && statusCode >= 500) {
+					return {
+						success: false,
+						error: '服务器暂时无法访问，请稍后再试',
+						timestamp: new Date().toISOString(),
+					};
+				}
+				
 				return {
 					success: false,
-					error: error.response?.data?.error || '连接失败',
+					error: error.response?.data?.error || `请求失败 (${statusCode || '未知'})`,
 					timestamp: new Date().toISOString(),
 				};
 			}
+			
+			if (error instanceof Error && error.message.includes('Network Error')) {
+				return {
+					success: false,
+					error: '无法连接到服务器，请检查网络连接或服务地址',
+					timestamp: new Date().toISOString(),
+				};
+			}
+			
 			return {
 				success: false,
-				error: '未知错误',
+				error: '未知错误，请稍后重试',
 				timestamp: new Date().toISOString(),
 			};
 		}
 	}, [apiKey]);
 
-	const login = useCallback(async (key: string): Promise<boolean> => {
+	const login = useCallback(async (key: string): Promise<{ success: boolean; error?: string }> => {
 		setIsLoading(true);
 		setApiKey(key);
 
-		const response = await testConnection();
+		const response = await testConnection(key);
 
 		if (response.success) {
 			localStorage.setItem('jsonbase-verified', 'true');
 			setIsAuthenticated(true);
 			setIsLoading(false);
-			return true;
+			return { success: true };
 		} else {
 			localStorage.removeItem('jsonbase-verified');
 			setIsAuthenticated(false);
 			setIsLoading(false);
-			return false;
+			return { success: false, error: response.error };
 		}
 	}, [setApiKey, testConnection]);
 

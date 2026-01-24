@@ -1,22 +1,34 @@
 import { ResponseBuilder, ApiError } from '../utils/response'
 import { CorsHandler } from '../utils/response'
 import { AuthMiddleware, ValidationMiddleware, RateLimiter, Logger } from '../utils/middleware'
-import { D1StorageService } from '../database/d1Service'
+import { StorageAdapter } from '../storage/storageAdapter'
 import { WorkerEnv } from '../types'
+import { Config } from '../utils/config'
 
 export class DataController {
-  private storageService: D1StorageService
+  private storageAdapter: StorageAdapter
 
   constructor(env: WorkerEnv) {
-    this.storageService = new D1StorageService(env)
+    (globalThis as any).ENV = env;
+    Config.getInstance(env);
+    this.storageAdapter = new StorageAdapter({ env })
     AuthMiddleware.initialize(env)
     RateLimiter.initialize(env)
+  }
+
+  private arrayBufferToBase64(buffer: ArrayBuffer): string {
+    const bytes = new Uint8Array(buffer)
+    let binary = ''
+    for (let i = 0; i < bytes.byteLength; i++) {
+      binary += String.fromCharCode(bytes[i])
+    }
+    return btoa(binary)
   }
 
   async get(request: Request): Promise<Response> {
     try {
       const url = new URL(request.url)
-      const pathname = url.pathname.replace('/api/data', '') || '/'
+      const pathname = url.pathname.replace('/._jsondb_/api/data', '') || '/'
 
       ValidationMiddleware.validatePathname(pathname)
       
@@ -31,7 +43,7 @@ export class DataController {
         })
       }
 
-      const data = await this.storageService.getData(pathname)
+      const data = await this.storageAdapter.get(pathname)
 
       if (data.type === 'binary') {
         return ResponseBuilder.binary(
@@ -51,17 +63,45 @@ export class DataController {
   async post(request: Request): Promise<Response> {
     try {
       const url = new URL(request.url)
-      const pathname = url.pathname.replace('/api/data', '') || '/'
+      const pathname = url.pathname.replace('/._jsondb_/api/data', '') || '/'
 
       ValidationMiddleware.validatePathname(pathname)
       
       const auth = await AuthMiddleware.requireAuth(request)
       await RateLimiter.checkLimit(auth.apiKey, 100, 3600)
 
-      const requestData = await this.parseRequestBody(request)
-      ValidationMiddleware.validateDataSize(JSON.stringify(requestData))
+      const contentType = request.headers.get('Content-Type') || ''
 
-      const data = await this.storageService.createData(pathname, requestData)
+      if (contentType.includes('multipart/form-data')) {
+        const formData = await request.formData()
+        const file = formData.get('file') as File
+        const type = formData.get('type') as string || 'binary'
+
+        if (!file || file.size === 0) {
+          throw ApiError.badRequest('File is required')
+        }
+
+        const arrayBuffer = await file.arrayBuffer()
+        const base64 = this.arrayBufferToBase64(arrayBuffer)
+        const mimeType = file.type || 'application/octet-stream'
+        const dataUrl = `data:${mimeType};base64,${base64}`
+
+        const data = await this.storageAdapter.create(pathname, {
+          value: dataUrl,
+          type: type as 'json' | 'text' | 'binary',
+          content_type: mimeType
+        })
+
+        Logger.info('Data created from file', { pathname, filename: file.name, size: file.size, auth: auth.apiKey.substring(0, 8) })
+        return ResponseBuilder.created(data, 'Data created successfully')
+      }
+
+      const requestData = await this.parseRequestBody(request)
+
+      const data = await this.storageAdapter.create(pathname, {
+        value: requestData,
+        type: 'json'
+      })
       Logger.info('Data created', { pathname, auth: auth.apiKey.substring(0, 8) })
 
       return ResponseBuilder.created(data, 'Data created successfully')
@@ -74,7 +114,7 @@ export class DataController {
   async put(request: Request): Promise<Response> {
     try {
       const url = new URL(request.url)
-      const pathname = url.pathname.replace('/api/data', '') || '/'
+      const pathname = url.pathname.replace('/._jsondb_/api/data', '') || '/'
 
       ValidationMiddleware.validatePathname(pathname)
       
@@ -82,9 +122,8 @@ export class DataController {
       await RateLimiter.checkLimit(auth.apiKey, 100, 3600)
 
       const requestData = await this.parseRequestBody(request)
-      ValidationMiddleware.validateDataSize(JSON.stringify(requestData))
 
-      const data = await this.storageService.updateData(pathname, requestData)
+      const data = await this.storageAdapter.update(pathname, requestData)
       Logger.info('Data updated', { pathname, auth: auth.apiKey.substring(0, 8) })
 
       return ResponseBuilder.success(data, 'Data updated successfully')
@@ -97,14 +136,14 @@ export class DataController {
   async delete(request: Request): Promise<Response> {
     try {
       const url = new URL(request.url)
-      const pathname = url.pathname.replace('/api/data', '') || '/'
+      const pathname = url.pathname.replace('/._jsondb_/api/data', '') || '/'
 
       ValidationMiddleware.validatePathname(pathname)
       
       const auth = await AuthMiddleware.requireAuth(request)
       await RateLimiter.checkLimit(auth.apiKey, 50, 3600)
 
-      await this.storageService.deleteData(pathname)
+      await this.storageAdapter.delete(pathname)
       Logger.info('Data deleted', { pathname, auth: auth.apiKey.substring(0, 8) })
 
       return ResponseBuilder.noContent()
@@ -126,17 +165,13 @@ export class DataController {
 
       const auth = await AuthMiddleware.requireAuth(request)
 
-      const result = await this.storageService.listData({
-        prefix,
+      const result = await this.storageAdapter.list({
         search,
         page,
-        limit: Math.min(limit, 1000),
-        sort,
-        order: order as 'asc' | 'desc'
+        limit: Math.min(limit, 1000)
       })
       
       Logger.info('Data listed', { 
-        prefix, 
         search, 
         page, 
         limit, 
@@ -156,14 +191,16 @@ export class DataController {
     const contentType = request.headers.get('Content-Type') || ''
     
     if (contentType.includes('application/json')) {
-      return await request.json()
+      const json = await request.json();
+      return json;
     }
 
-    const body = await request.text()
+    const body = await request.text();
     
     if (body.trim().startsWith('{') || body.trim().startsWith('[')) {
       try {
-        return JSON.parse(body)
+        const parsed = JSON.parse(body);
+        return parsed;
       } catch {
         throw ApiError.badRequest('Invalid JSON format')
       }
@@ -215,28 +252,72 @@ export class DataController {
 }
 
 export class HealthController {
-  private storageService: D1StorageService
+  private storageAdapter: StorageAdapter | null = null;
+  private initError: Error | null = null;
 
   constructor(env: WorkerEnv) {
-    this.storageService = new D1StorageService(env)
+    try {
+      (globalThis as any).ENV = env;
+      Config.getInstance(env);
+      AuthMiddleware.initialize(env);
+      this.storageAdapter = new StorageAdapter({ env })
+    } catch (error) {
+      this.initError = error instanceof Error ? error : new Error('Unknown initialization error');
+    }
   }
 
-  async health(): Promise<Response> {
+  async health(request?: Request): Promise<Response> {
     try {
-      const health = await this.storageService.getHealth()
+      if (this.initError) {
+        throw this.initError;
+      }
+      
+      if (!this.storageAdapter) {
+        throw new Error('StorageAdapter not initialized');
+      }
+
+      if (request) {
+        try {
+          const auth = await AuthMiddleware.requireAuth(request);
+          const stats = await this.storageAdapter.getStats();
+          
+          return ResponseBuilder.success({
+            status: 'healthy',
+            version: '2.0.0',
+            timestamp: new Date().toISOString(),
+            uptime: 0,
+            environment: 'production',
+            services: {
+              storage: true,
+              totalFiles: stats.total,
+              totalSize: stats.totalSize
+            },
+            apiKey: {
+              valid: true,
+              method: auth.method
+            }
+          }, 'API key is valid');
+        } catch (authError) {
+          if (authError instanceof ApiError && authError.statusCode === 401) {
+          }
+        }
+      }
+      
+      const stats = await this.storageAdapter.getStats()
       
       return ResponseBuilder.success({
-        status: health.status,
+        status: 'healthy',
         version: '2.0.0',
         timestamp: new Date().toISOString(),
         uptime: 0,
         environment: 'production',
         services: {
-          d1: health.db
+          storage: true,
+          totalFiles: stats.total,
+          totalSize: stats.totalSize
         }
       })
     } catch (error) {
-      Logger.error('Health check failed', error)
       const healthData = {
         status: 'unhealthy' as const,
         version: '2.0.0',
@@ -246,7 +327,7 @@ export class HealthController {
         services: {
           d1: false
         },
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : String(error)
       }
       
       return ResponseBuilder.success(healthData, 'Health check completed with issues')

@@ -19,13 +19,14 @@ const DATA_REFRESH_EVENT = 'jsonbase-data-refresh';
 const AdminLayout: React.FC = () => {
 	const { logout } = useAuth();
 	const navigate = useNavigate();
-	const { createData, updateData } = useApi();
+	const { createData, uploadFile, updateData } = useApi();
 
 	const [showCreateModal, setShowCreateModal] = useState(false);
 	const [showEditModal, setShowEditModal] = useState(false);
 	const [selectedData, setSelectedData] = useState<StorageData | null>(null);
 	const [refreshKey, setRefreshKey] = useState(0);
 	const [createDefaultType, setCreateDefaultType] = useState<'json' | 'text' | 'binary'>('json');
+	const [submitLoading, setSubmitLoading] = useState(false);
 
 	const handleLogout = () => {
 		logout();
@@ -53,43 +54,69 @@ const AdminLayout: React.FC = () => {
 		localStorage.setItem(DATA_REFRESH_EVENT, Date.now().toString());
 	};
 
-	const handleCreateSubmit = async (data: FormData) => {
-		let processedValue = data.value;
-		if (data.type === 'json') {
-			processedValue = JSON.parse(data.value);
-		}
+	const handleCreateSubmit = async (data: FormData, file?: File) => {
+		setSubmitLoading(true);
+		try {
+			if (file) {
+				const response = await uploadFile(data.path, file, data.type);
+				if (response.success) {
+					handleCloseModals();
+					notifyRefresh();
+				} else {
+					alert(`创建失败: ${response.error}`);
+				}
+			} else {
+				let processedValue = data.value;
+				if (data.type === 'json') {
+					processedValue = JSON.parse(data.value);
+				}
 
-		const response = await createData(data.path, {
-			value: processedValue,
-			type: data.type,
-		});
+				const response = await createData(data.path, {
+					value: processedValue,
+					type: data.type,
+				});
 
-		if (response.success) {
-			handleCloseModals();
-			notifyRefresh();
-		} else {
-			alert(`创建失败: ${response.error}`);
+				if (response.success) {
+					handleCloseModals();
+					notifyRefresh();
+				} else {
+					alert(`创建失败: ${response.error}`);
+				}
+			}
+		} catch (error) {
+			alert('创建失败');
+			console.error('Create error:', error);
+		} finally {
+			setSubmitLoading(false);
 		}
 	};
 
 	const handleEditSubmit = async (data: FormData) => {
-		if (!selectedData) return;
+		setSubmitLoading(true);
+		try {
+			if (!selectedData) return;
 
-		let processedValue = data.value;
-		if (data.type === 'json') {
-			processedValue = JSON.parse(data.value);
-		}
+			let processedValue = data.value;
+			if (data.type === 'json') {
+				processedValue = JSON.parse(data.value);
+			}
 
-		const response = await updateData(selectedData.id, {
-			value: processedValue,
-			type: data.type,
-		});
+			const response = await updateData(selectedData.id, {
+				value: processedValue,
+				type: data.type,
+			});
 
-		if (response.success) {
-			handleCloseModals();
-			notifyRefresh();
-		} else {
-			alert(`更新失败: ${response.error}`);
+			if (response.success) {
+				handleCloseModals();
+				notifyRefresh();
+			} else {
+				alert(`更新失败: ${response.error}`);
+			}
+		} catch (error) {
+			alert('更新失败');
+			console.error('Update error:', error);
+		} finally {
+			setSubmitLoading(false);
 		}
 	};
 
@@ -138,7 +165,7 @@ const AdminLayout: React.FC = () => {
 				onClose={handleCloseModals}
 				onSubmit={handleCreateSubmit}
 				title="创建数据"
-				loading={false}
+				loading={submitLoading}
 				mode="create"
 				initialType={createDefaultType}
 			/>
@@ -149,12 +176,12 @@ const AdminLayout: React.FC = () => {
 					onClose={handleCloseModals}
 					onSubmit={handleEditSubmit}
 					title="编辑数据"
+					loading={submitLoading}
 					initialData={{
 						path: selectedData.id,
 						value: typeof selectedData.value === 'string' ? selectedData.value : JSON.stringify(selectedData.value),
 						type: selectedData.type,
 					}}
-					loading={false}
 					mode="edit"
 				/>
 			)}

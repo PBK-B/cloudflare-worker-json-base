@@ -1,20 +1,42 @@
 import { DataController, HealthController } from './controllers'
+import { StorageController } from './storageController'
+import { ConsoleController } from './consoleController'
 import { CorsHandler } from '../utils/response'
 import { Logger } from '../utils/middleware'
 import { WorkerEnv } from '../types'
 
 export class Router {
-  private dataController: DataController
-  private healthController: HealthController
+  private dataController!: DataController
+  private healthController!: HealthController
+  private storageController!: StorageController
+  private consoleController!: ConsoleController
+  private initError: Error | null = null;
 
   constructor(env: WorkerEnv) {
-    this.dataController = new DataController(env)
-    this.healthController = new HealthController(env)
+    try {
+      this.dataController = new DataController(env)
+      this.healthController = new HealthController(env)
+      this.storageController = new StorageController(env)
+      this.consoleController = new ConsoleController(env)
+    } catch (error) {
+      this.initError = error instanceof Error ? error : new Error('Unknown initialization error');
+    }
   }
 
   async handle(request: Request): Promise<Response> {
     const url = new URL(request.url)
     const { pathname, method } = { pathname: url.pathname, method: request.method }
+
+    if (this.initError) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: this.initError.message,
+        timestamp: new Date().toISOString()
+      }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
 
     try {
       Logger.info(`Incoming request`, { method, pathname, userAgent: request.headers.get('User-Agent') })
@@ -26,12 +48,17 @@ export class Router {
 
       let response: Response
 
-      if (pathname.startsWith('/api/')) {
-        if (pathname === '/api/health' || pathname === '/api/test') {
-          response = await this.healthController.health()
-        } else if (pathname.startsWith('/api/data')) {
+      if (pathname.startsWith('/._jsondb_/api/')) {
+        const path = pathname.replace('/._jsondb_/api', '')
+        if (path === '/health' || path === '/test') {
+          response = await this.healthController.health(request)
+        } else if (path.startsWith('/storage')) {
+          response = await this.handleStorageRoutes(request, pathname, method)
+        } else if (path.startsWith('/data')) {
           response = await this.handleDataRoutes(request, pathname, method)
-        } else if (pathname === '/api/') {
+        } else if (path.startsWith('/console')) {
+          response = await this.handleConsoleRoutes(request, pathname, method)
+        } else if (path === '/' || path === '') {
           response = await this.handleApiRoot()
         } else {
           response = new Response('API Endpoint Not Found', { status: 404 })
@@ -39,7 +66,6 @@ export class Router {
       } else if (pathname === '/') {
         response = await this.handleRoot()
       } else if (pathname.startsWith('/assets/') || pathname === '/vite.svg') {
-        // During development, let Vite handle static assets
         response = new Response('Static asset - handled by Vite', { status: 404 })
       } else {
         response = new Response('Not Found', { status: 404 })
@@ -48,14 +74,49 @@ export class Router {
       return CorsHandler.addHeaders(response, request)
     } catch (error) {
       Logger.error('Router error', { pathname, method, error })
-      return new Response('Internal Server Error', { status: 500 })
+      return new Response(JSON.stringify({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        timestamp: new Date().toISOString()
+      }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      })
+    }
+  }
+
+  private async handleStorageRoutes(request: Request, pathname: string, method: string): Promise<Response> {
+    const path = pathname.replace('/._jsondb_/api', '')
+    switch (method) {
+      case 'GET':
+        if (path === '/storage') {
+          return await this.storageController.list(request)
+        } else if (path.endsWith('/verify')) {
+          return await this.storageController.verify(request)
+        } else if (path.endsWith('/meta') || path.endsWith('/metadata')) {
+          return await this.storageController.getMetadata(request)
+        }
+        return await this.storageController.download(request)
+
+      case 'POST':
+        return await this.storageController.upload(request)
+
+      case 'DELETE':
+        return await this.storageController.delete(request)
+
+      default:
+        return new Response('Method Not Allowed', {
+          status: 405,
+          headers: { 'Allow': 'GET, POST, DELETE' }
+        })
     }
   }
 
   private async handleDataRoutes(request: Request, pathname: string, method: string): Promise<Response> {
+    const path = pathname.replace('/._jsondb_/api', '')
     switch (method) {
       case 'GET':
-        if (pathname === '/api/data') {
+        if (path === '/data') {
           return await this.dataController.list(request)
         }
         return await this.dataController.get(request)
@@ -77,6 +138,28 @@ export class Router {
     }
   }
 
+  private async handleConsoleRoutes(request: Request, pathname: string, method: string): Promise<Response> {
+    switch (method) {
+      case 'GET':
+        if (pathname === '/._jsondb_/api/console' || pathname === '/._jsondb_/api/console/') {
+          return await this.consoleController.info(request)
+        } else if (pathname.endsWith('/stats')) {
+          return await this.consoleController.stats(request)
+        } else if (pathname.endsWith('/health')) {
+          return await this.consoleController.health(request)
+        } else if (pathname.endsWith('/config')) {
+          return await this.consoleController.config(request)
+        }
+        return new Response('Console Endpoint Not Found', { status: 404 })
+
+      default:
+        return new Response('Method Not Allowed', {
+          status: 405,
+          headers: { 'Allow': 'GET' }
+        })
+    }
+  }
+
   private async handleApiRoot(): Promise<Response> {
     return new Response(JSON.stringify({
       name: 'JSON Base API',
@@ -85,6 +168,7 @@ export class Router {
       endpoints: {
         health: '/api/health',
         data: '/api/data',
+        storage: '/api/storage',
         test: '/api/data/test'
       },
       documentation: '/api/docs',
@@ -101,119 +185,11 @@ export class Router {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>JSON Base API</title>
-  <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      max-width: 800px;
-      margin: 0 auto;
-      padding: 20px;
-      line-height: 1.6;
-      color: #333;
-    }
-    .header {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      padding: 30px;
-      border-radius: 10px;
-      margin-bottom: 30px;
-      text-align: center;
-    }
-    .endpoint {
-      background: #f8f9fa;
-      border-left: 4px solid #007bff;
-      padding: 15px;
-      margin: 10px 0;
-      border-radius: 5px;
-    }
-    .method {
-      display: inline-block;
-      padding: 3px 8px;
-      border-radius: 3px;
-      font-weight: bold;
-      font-size: 12px;
-    }
-    .get { background: #28a745; color: white; }
-    .post { background: #007bff; color: white; }
-    .put { background: #ffc107; color: black; }
-    .delete { background: #dc3545; color: white; }
-    code {
-      background: #f1f3f4;
-      padding: 2px 5px;
-      border-radius: 3px;
-      font-family: 'Monaco', 'Menlo', monospace;
-    }
-    pre {
-      background: #f1f3f4;
-      padding: 15px;
-      border-radius: 5px;
-      overflow-x: auto;
-    }
-  </style>
 </head>
 <body>
-  <div class="header">
-    <h1>🚀 JSON Base API</h1>
-    <p>Cloudflare Workers JSON Storage Service</p>
-    <p>Version 2.0.0</p>
-  </div>
-
-  <h2>📋 API Endpoints</h2>
-  
-  <div class="endpoint">
-    <span class="method get">GET</span> <code>/api/health</code>
-    <p>Check API health status</p>
-  </div>
-
-  <div class="endpoint">
-    <span class="method get">GET</span> <code>/api/data</code>
-    <p>List all stored data (with pagination)</p>
-  </div>
-
-  <div class="endpoint">
-    <span class="method get">GET</span> <code>/api/data/{path}</code>
-    <p>Retrieve data from specific path</p>
-  </div>
-
-  <div class="endpoint">
-    <span class="method post">POST</span> <code>/api/data/{path}</code>
-    <p>Create new data at specified path</p>
-  </div>
-
-  <div class="endpoint">
-    <span class="method put">PUT</span> <code>/api/data/{path}</code>
-    <p>Update existing data at specified path</p>
-  </div>
-
-  <div class="endpoint">
-    <span class="method delete">DELETE</span> <code>/api/data/{path}</code>
-    <p>Delete data at specified path</p>
-  </div>
-
-  <h2>🔐 Authentication</h2>
-  <p>Include your API key in one of these ways:</p>
-  <ul>
-    <li>Header: <code>Authorization: Bearer YOUR_API_KEY</code></li>
-    <li>Query: <code>?key=YOUR_API_KEY</code></li>
-  </ul>
-
-  <h2>💡 Usage Examples</h2>
-  <div class="endpoint">
-    <h4>Store JSON data:</h4>
-    <pre><code>curl -X POST "https://your-worker.workers.dev/api/data/demo/user" \\
-  -H "Authorization: Bearer YOUR_API_KEY" \\
-  -H "Content-Type: application/json" \\
-  -d '{"name": "John", "age": 30}'</code></pre>
-  </div>
-
-  <div class="endpoint">
-    <h4>Retrieve data:</h4>
-    <pre><code>curl -X GET "https://your-worker.workers.dev/api/data/demo/user" \\
-  -H "Authorization: Bearer YOUR_API_KEY"</code></pre>
-  </div>
-
-  <footer style="margin-top: 50px; text-align: center; color: #666;">
-    <p>Powered by Cloudflare Workers • Version 2.0.0</p>
-  </footer>
+  <h1>JSON Base API</h1>
+  <p>Version 2.0.0</p>
+  <p>Cloudflare Workers JSON Storage Service</p>
 </body>
 </html>`
     
