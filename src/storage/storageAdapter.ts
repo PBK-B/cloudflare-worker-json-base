@@ -11,6 +11,12 @@ import { D1StorageProvider } from './providers/d1StorageProvider';
 import { D1MetadataManager } from './metadata/metadataManager';
 import { Config } from '../utils/config';
 
+interface PathMapping {
+  path: string;
+  file_id: string;
+  created_at: string;
+}
+
 export interface StorageAdapterConfig {
   env: WorkerEnv;
   defaultContentType?: string;
@@ -267,8 +273,85 @@ export class StorageAdapter {
     const { search, page = 1, limit = 20 } = params;
     const offset = (page - 1) * limit;
 
-    // Get path mappings
-    const paths = await this.pathMapper.listPaths(limit * 2, offset);
+    if (search) {
+      const allPaths = await this.pathMapper.listPaths(100000, 0);
+      const searchLower = search.toLowerCase();
+      const matchedMappings: Array<{ mapping: PathMapping; metadata: FileMetadata; data: Uint8Array }> = [];
+
+      for (const mapping of allPaths) {
+        try {
+          const data = await this.storageService.readData(mapping.file_id);
+          const metadata = await this.storageService.getMetadata(mapping.file_id);
+          if (data && metadata) {
+            let value: any;
+            if (metadata.contentType === 'application/json') {
+              try {
+                value = JSON.parse(this.uint8ArrayToText(data));
+              } catch {
+                value = '[Binary data]';
+              }
+            } else {
+              value = this.uint8ArrayToText(data).substring(0, 100);
+            }
+            const matchesPath = mapping.path.toLowerCase().includes(searchLower);
+            const matchesValue = String(value).toLowerCase().includes(searchLower);
+            if (matchesPath || matchesValue) {
+              matchedMappings.push({ mapping, metadata, data });
+            }
+          }
+        } catch (error) {
+          Logger.warn('Failed to load data for path', { path: mapping.path, error });
+        }
+      }
+
+      const total = matchedMappings.length;
+      const pageMappings = matchedMappings.slice(offset, offset + limit);
+
+      const items: StoredData[] = pageMappings.map(({ mapping, metadata, data }) => {
+        let value: any;
+        let type: 'json' | 'binary' | 'text' = 'text';
+        if (metadata.contentType === 'application/json') {
+          try {
+            value = JSON.parse(this.uint8ArrayToText(data));
+            type = 'json';
+          } catch {
+            value = '[Binary data]';
+            type = 'binary';
+          }
+        } else if (metadata.contentType.startsWith('text/')) {
+          value = this.uint8ArrayToText(data).substring(0, 100);
+          type = 'text';
+        } else {
+          value = '[Binary data]';
+          type = 'binary';
+        }
+        return {
+          id: mapping.path,
+          value,
+          type,
+          created_at: metadata.createdAt,
+          updated_at: metadata.updatedAt,
+          size: metadata.size,
+          content_type: metadata.contentType,
+          path: mapping.path,
+          storage_location: (metadata.storageBackend === 'd1' || metadata.storageBackend === 'kv') 
+            ? metadata.storageBackend 
+            : 'd1' as 'd1' | 'kv'
+        };
+      });
+
+      const hasMore = offset + items.length < total;
+
+      return {
+        items,
+        total,
+        page,
+        limit,
+        hasMore
+      };
+    }
+
+    const paths = await this.pathMapper.listPaths(limit, offset);
     const total = await this.pathMapper.getTotalPaths();
 
     const items: StoredData[] = [];
@@ -281,7 +364,6 @@ export class StorageAdapter {
         if (data && metadata) {
           let value: any;
           let type: 'json' | 'binary' | 'text' = 'text';
-
           if (metadata.contentType === 'application/json') {
             try {
               value = JSON.parse(this.uint8ArrayToText(data));
@@ -297,18 +379,6 @@ export class StorageAdapter {
             value = '[Binary data]';
             type = 'binary';
           }
-
-          // Filter by search term if provided
-          if (search) {
-            const searchLower = search.toLowerCase();
-            const matchesPath = mapping.path.toLowerCase().includes(searchLower);
-            const matchesValue = String(value).toLowerCase().includes(searchLower);
-
-            if (!matchesPath && !matchesValue) {
-              continue;
-            }
-          }
-
           items.push({
             id: mapping.path,
             value,
@@ -331,7 +401,7 @@ export class StorageAdapter {
     const hasMore = offset + items.length < total;
 
     return {
-      items: items.slice(0, limit),
+      items,
       total,
       page,
       limit,

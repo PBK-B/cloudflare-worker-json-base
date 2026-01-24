@@ -107,9 +107,11 @@ export class DataController {
 
       const requestData = await this.parseRequestBody(request)
 
+      const type = (requestData as any)?.type || (requestData as any)?.dataType || 'json'
+      
       const data = await this.storageAdapter.create(pathname, {
-        value: requestData,
-        type: 'json'
+        value: (requestData as any)?.value ?? requestData,
+        type: type as 'json' | 'text' | 'binary'
       })
       Logger.info('Data created', { pathname, auth: auth.apiKey.substring(0, 8) })
 
