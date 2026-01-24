@@ -7,10 +7,11 @@ import '../../styles/WebUIConsole.less';
 interface AdminContext {
 	onOpenCreateModal: () => void;
 	onOpenEditModal: (data: any) => void;
+	refreshKey?: number;
 }
 
 const AdminConsolePage: React.FC = () => {
-	const { onOpenCreateModal } = useOutletContext<AdminContext>();
+	const { onOpenCreateModal, refreshKey } = useOutletContext<AdminContext>();
 	const { listData, loading } = useApi();
 
 	const [stats, setStats] = useState({
@@ -36,7 +37,7 @@ const AdminConsolePage: React.FC = () => {
 
 	useEffect(() => {
 		loadStats();
-	}, [loadStats]);
+	}, [loadStats, refreshKey]);
 
 	const formatSize = (bytes: number) => {
 		if (bytes === 0) return '0 B';

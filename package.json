@@ -19,10 +19,15 @@
     "webui:build": "vite build",
     "webui:preview": "vite preview",
     "webui:serve": "vite preview --port 3000",
-    "clean": "rm -rf dist dist-webui"
+    "clean": "rm -rf dist dist-webui",
+    "d1:init": "npx wrangler d1 create jsonbase --local",
+    "d1:migrate": "npx wrangler d1 execute jsonbase --local --file=./src/database/schema.sql",
+    "d1:reset": "npx wrangler d1 execute jsonbase --local --command=\"DROP TABLE IF EXISTS data_items; DROP TABLE IF EXISTS schema_migrations;\" && npm run d1:migrate",
+    "d1:view": "npx wrangler d1 execute jsonbase --local --command=\"SELECT * FROM data_items ORDER BY updated_at DESC\"",
+    "d1:stats": "npx wrangler d1 execute jsonbase --local --command=\"SELECT COUNT(*) as total, SUM(size) as total_size FROM data_items\""
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260123.0",
+    "@cloudflare/workers-types": "^4.20260124.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@types/inquirer": "^9.0.0",

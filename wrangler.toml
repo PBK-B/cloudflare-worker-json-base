@@ -8,16 +8,15 @@ compatibility_flags = ["nodejs_compat"]
 ENVIRONMENT = "development"
 VERSION = "2.0.0"
 
-[[kv_namespaces]]
-binding = "JSONBIN"
-id = "jsonbin"
-preview_id = "jsonbin_preview"
+[[d1_databases]]
+binding = "JSONBASE_DB"
+database_name = "jsonbase"
+database_id = "your-database-id"
 
-# Rate limit configuration (requests per window)
-[vars.RATE_LIMITS]
-GET_LIMIT = 1000
-POST_LIMIT = 100
-PUT_LIMIT = 100
-DELETE_LIMIT = 50
-LIST_LIMIT = 10
-LIST_WINDOW = 60
+# 本地开发配置
+[env.dev]
+name = "worker-json-base-dev"
+
+# 生产环境配置
+[env.production]
+name = "worker-json-base"

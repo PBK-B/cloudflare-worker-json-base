@@ -1,14 +1,14 @@
 import { ResponseBuilder, ApiError } from '../utils/response'
 import { CorsHandler } from '../utils/response'
 import { AuthMiddleware, ValidationMiddleware, RateLimiter, Logger } from '../utils/middleware'
-import { StorageService } from '../services/storage'
+import { D1StorageService } from '../database/d1Service'
 import { WorkerEnv } from '../types'
 
 export class DataController {
-  private storageService: StorageService
+  private storageService: D1StorageService
 
   constructor(env: WorkerEnv) {
-    this.storageService = new StorageService(env)
+    this.storageService = new D1StorageService(env)
     AuthMiddleware.initialize(env)
     RateLimiter.initialize(env)
   }
@@ -21,7 +21,6 @@ export class DataController {
       ValidationMiddleware.validatePathname(pathname)
       
       const auth = await AuthMiddleware.requireAuth(request)
-      await RateLimiter.checkLimit(auth.apiKey)
 
       if (pathname === '/test') {
         return ResponseBuilder.success({
@@ -126,7 +125,6 @@ export class DataController {
       const order = url.searchParams.get('order') || 'desc'
 
       const auth = await AuthMiddleware.requireAuth(request)
-      await RateLimiter.checkLimit(auth.apiKey, 10, 60)
 
       const result = await this.storageService.listData({
         prefix,
@@ -217,10 +215,10 @@ export class DataController {
 }
 
 export class HealthController {
-  private storageService: StorageService
+  private storageService: D1StorageService
 
   constructor(env: WorkerEnv) {
-    this.storageService = new StorageService(env)
+    this.storageService = new D1StorageService(env)
   }
 
   async health(): Promise<Response> {
@@ -234,7 +232,7 @@ export class HealthController {
         uptime: 0,
         environment: 'production',
         services: {
-          kv: health.kv
+          d1: health.db
         }
       })
     } catch (error) {
@@ -246,7 +244,7 @@ export class HealthController {
         uptime: 0,
         environment: 'production',
         services: {
-          kv: false
+          d1: false
         },
         error: error instanceof Error ? error.message : 'Unknown error'
       }

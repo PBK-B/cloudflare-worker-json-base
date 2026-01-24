@@ -11,10 +11,11 @@ const { Column, HeaderCell, Cell } = Table;
 interface AdminContext {
 	onOpenCreateModal: () => void;
 	onOpenEditModal: (data: StorageData) => void;
+	refreshKey?: number;
 }
 
 const AdminDataPage: React.FC = () => {
-	const { onOpenEditModal } = useOutletContext<AdminContext>();
+	const { onOpenEditModal, refreshKey } = useOutletContext<AdminContext>();
 	const { listData, deleteData } = useApi();
 
 	const [dataList, setDataList] = useState<StorageData[]>([]);
@@ -58,6 +59,16 @@ const AdminDataPage: React.FC = () => {
 				abortRef.current.abort();
 			}
 		};
+	}, [loadData, refreshKey]);
+
+	useEffect(() => {
+		const handleStorageChange = (e: StorageEvent) => {
+			if (e.key === 'jsonbase-data-refresh') {
+				loadData();
+			}
+		};
+		window.addEventListener('storage', handleStorageChange);
+		return () => window.removeEventListener('storage', handleStorageChange);
 	}, [loadData]);
 
 	const handleSearch = () => {

@@ -39,7 +39,9 @@ export class ApiError extends Error {
       status: this.statusCode,
       headers: {
         'Content-Type': CONTENT_TYPES.JSON,
-        'Cache-Control': 'no-store'
+        'Cache-Control': 'no-store, no-cache, must-revalidate, private',
+        'Pragma': 'no-cache',
+        'Expires': '0'
       }
     })
   }
@@ -86,7 +88,9 @@ export class ResponseBuilder {
       status: HTTP_STATUS.OK,
       headers: {
         'Content-Type': CONTENT_TYPES.JSON,
-        'Cache-Control': 'public, max-age=300'
+        'Cache-Control': 'no-store, no-cache, must-revalidate, private',
+        'Pragma': 'no-cache',
+        'Expires': '0'
       }
     })
   }
@@ -103,7 +107,9 @@ export class ResponseBuilder {
       status: HTTP_STATUS.CREATED,
       headers: {
         'Content-Type': CONTENT_TYPES.JSON,
-        'Cache-Control': 'no-store'
+        'Cache-Control': 'no-store, no-cache, must-revalidate, private',
+        'Pragma': 'no-cache',
+        'Expires': '0'
       }
     })
   }
@@ -112,7 +118,9 @@ export class ResponseBuilder {
     return new Response(null, {
       status: HTTP_STATUS.NO_CONTENT,
       headers: {
-        'Cache-Control': 'no-store'
+        'Cache-Control': 'no-store, no-cache, must-revalidate, private',
+        'Pragma': 'no-cache',
+        'Expires': '0'
       }
     })
   }
@@ -122,7 +130,9 @@ export class ResponseBuilder {
       status: HTTP_STATUS.OK,
       headers: {
         'Content-Type': CONTENT_TYPES.HTML,
-        'Cache-Control': 'public, max-age=3600'
+        'Cache-Control': 'no-store, no-cache, must-revalidate, private',
+        'Pragma': 'no-cache',
+        'Expires': '0'
       }
     })
   }
@@ -130,7 +140,9 @@ export class ResponseBuilder {
   static binary(data: ArrayBuffer, contentType: string, filename?: string): Response {
     const headers: Record<string, string> = {
       'Content-Type': contentType,
-      'Cache-Control': 'public, max-age=86400'
+      'Cache-Control': 'no-store, no-cache, must-revalidate, private',
+      'Pragma': 'no-cache',
+      'Expires': '0'
     }
 
     if (filename) {

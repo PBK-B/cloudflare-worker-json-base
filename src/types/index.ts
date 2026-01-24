@@ -53,11 +53,16 @@ export interface AuthContext {
 }
 
 export interface WorkerEnv {
-  JSONBIN: KVNamespace
-  JSONBIN_PREVIEW: KVNamespace
-  API_KEY?: string
-  ENVIRONMENT?: string
-  VERSION?: string
+	JSONBASE_DB: D1Database
+	JSONBIN: KVNamespace
+	JSONBIN_PREVIEW: KVNamespace
+	API_KEY?: string
+	ENVIRONMENT?: string
+	VERSION?: string
+}
+
+declare module '@cloudflare/workers-types' {
+	interface D1Database {}
 }
 
 export interface ErrorDetail {

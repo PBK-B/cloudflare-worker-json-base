@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { Container, Header, Content, Button } from 'rsuite';
 import { Settings, Database, RefreshCw, LogOut, LayoutDashboard } from 'lucide-react';
@@ -14,6 +14,8 @@ interface FormData {
 	type: 'json' | 'text' | 'binary';
 }
 
+const DATA_REFRESH_EVENT = 'jsonbase-data-refresh';
+
 const AdminLayout: React.FC = () => {
 	const { logout } = useAuth();
 	const navigate = useNavigate();
@@ -22,6 +24,7 @@ const AdminLayout: React.FC = () => {
 	const [showCreateModal, setShowCreateModal] = useState(false);
 	const [showEditModal, setShowEditModal] = useState(false);
 	const [selectedData, setSelectedData] = useState<StorageData | null>(null);
+	const [refreshKey, setRefreshKey] = useState(0);
 
 	const handleLogout = () => {
 		logout();
@@ -43,6 +46,11 @@ const AdminLayout: React.FC = () => {
 		setSelectedData(null);
 	};
 
+	const notifyRefresh = () => {
+		setRefreshKey(prev => prev + 1);
+		localStorage.setItem(DATA_REFRESH_EVENT, Date.now().toString());
+	};
+
 	const handleCreateSubmit = async (data: FormData) => {
 		let processedValue = data.value;
 		if (data.type === 'json') {
@@ -56,8 +64,7 @@ const AdminLayout: React.FC = () => {
 
 		if (response.success) {
 			handleCloseModals();
-			await new Promise(resolve => setTimeout(resolve, 100));
-			window.location.reload();
+			notifyRefresh();
 		} else {
 			alert(`创建失败: ${response.error}`);
 		}
@@ -78,8 +85,7 @@ const AdminLayout: React.FC = () => {
 
 		if (response.success) {
 			handleCloseModals();
-			await new Promise(resolve => setTimeout(resolve, 100));
-			window.location.reload();
+			notifyRefresh();
 		} else {
 			alert(`更新失败: ${response.error}`);
 		}
@@ -122,7 +128,7 @@ const AdminLayout: React.FC = () => {
 				</div>
 			</Header>
 			<Content className="admin-content">
-				<Outlet context={{ onOpenCreateModal: handleOpenCreateModal, onOpenEditModal: handleOpenEditModal }} />
+				<Outlet context={{ onOpenCreateModal: handleOpenCreateModal, onOpenEditModal: handleOpenEditModal, refreshKey }} />
 			</Content>
 
 			<ModalForm
