@@ -1,4 +1,4 @@
-import { StorageData, CreateDataRequest, UpdateDataRequest, WorkerEnv } from '../types'
+import { StorageData, CreateDataRequest, UpdateDataRequest, WorkerEnv, PaginatedResponse, PaginationParams } from '../types'
 import { Config } from '../utils/config'
 import { ApiError } from '../utils/response'
 import { Logger } from '../utils/middleware'
@@ -82,32 +82,75 @@ export class StorageService {
     Logger.info('Data deleted', { pathname })
   }
 
-  async listData(prefix?: string, limit: number = 100): Promise<StorageData[]> {
+  async listData(params: PaginationParams = {}): Promise<PaginatedResponse<StorageData>> {
     const kvNamespace = getKvNamespace(this.env)
     if (!kvNamespace) {
       throw ApiError.internal('KV namespace not available')
     }
 
-    const list = await kvNamespace.list({ prefix, limit })
-    const data: StorageData[] = []
+    const { prefix, search, page = 1, limit = 20, sort = 'updatedAt', order = 'desc' } = params
+
+    const list = await kvNamespace.list({
+      prefix: prefix || '',
+      limit: Math.min(limit * 2, 1000)
+    })
+
+    let allData: StorageData[] = []
 
     for (const key of list.keys) {
       try {
-        const value = await this.env.JSONBIN.get(key.name)
-      if (value) {
-        try {
+        const value = await kvNamespace.get(key.name)
+        if (value) {
           const parsed = JSON.parse(value)
-          data.push(parsed)
-        } catch (error) {
-          Logger.warn('Failed to parse list item', { key: key.name, error })
+          if (parsed && typeof parsed === 'object' && parsed.id) {
+            allData.push({
+              id: parsed.id || key.name,
+              value: parsed.value ?? '',
+              type: parsed.type || 'json',
+              createdAt: parsed.createdAt || new Date().toISOString(),
+              updatedAt: parsed.updatedAt || new Date().toISOString(),
+              size: parsed.size || 0,
+              contentType: parsed.contentType
+            })
+          }
         }
-      }
       } catch (error) {
         Logger.warn('Failed to parse list item', { key: key.name, error })
       }
     }
 
-    return data
+    if (search) {
+      const searchLower = search.toLowerCase()
+      allData = allData.filter(item =>
+        item.id.toLowerCase().includes(searchLower) ||
+        (typeof item.value === 'string' && item.value.toLowerCase().includes(searchLower))
+      )
+    }
+
+    allData.sort((a, b) => {
+      const aVal = a[sort as keyof StorageData]
+      const bVal = b[sort as keyof StorageData]
+
+      if (typeof aVal === 'string' && typeof bVal === 'string') {
+        return order === 'asc'
+          ? aVal.localeCompare(bVal)
+          : bVal.localeCompare(aVal)
+      }
+
+      if (typeof aVal === 'number' && typeof bVal === 'number') {
+        return order === 'asc' ? aVal - bVal : bVal - aVal
+      }
+
+      return 0
+    })
+
+    const total = allData.length
+    const startIndex = (page - 1) * limit
+    const endIndex = startIndex + limit
+    const items = allData.slice(startIndex, endIndex)
+    const hasMore = endIndex < total
+
+    return { items, total, page, limit, hasMore }
   }
 
   private async saveData(

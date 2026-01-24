@@ -102,10 +102,58 @@ export class ValidationMiddleware {
   }
 }
 
+interface RateLimitEntry {
+  count: number
+  resetTime: number
+}
+
 export class RateLimiter {
+  private static kvNamespace: KVNamespace | null = null
   private static limits = new Map<string, { count: number; resetTime: number }>()
 
+  static initialize(env: WorkerEnv): void {
+    RateLimiter.kvNamespace = env.JSONBIN as KVNamespace
+  }
+
   static async checkLimit(key: string, limit: number = 1000, window: number = 3600): Promise<void> {
+    if (!RateLimiter.kvNamespace) {
+      Logger.warn('RateLimiter not initialized, using memory fallback')
+      return RateLimiter.memoryCheckLimit(key, limit, window)
+    }
+
+    const now = Date.now()
+    const rateLimitKey = `ratelimit:${key}:${Math.floor(now / (window * 1000))}`
+
+    try {
+      const existing = await RateLimiter.kvNamespace.get(rateLimitKey, 'json') as RateLimitEntry | null
+
+      if (!existing || now > existing.resetTime) {
+        await RateLimiter.kvNamespace.put(rateLimitKey, JSON.stringify({
+          count: 1,
+          resetTime: now + window * 1000
+        }), { expirationTtl: window * 2 })
+        return
+      }
+
+      if (existing.count >= limit) {
+        const retryAfter = Math.ceil((existing.resetTime - now) / 1000)
+        throw ApiError.tooManyRequests('Rate limit exceeded', { retryAfter })
+      }
+
+      const newCount = existing.count + 1
+      await RateLimiter.kvNamespace.put(rateLimitKey, JSON.stringify({
+        count: newCount,
+        resetTime: existing.resetTime
+      }), { expirationTtl: window * 2 })
+
+    } catch (error) {
+      if (error instanceof ApiError) throw error
+      Logger.error('Rate limit check failed', error)
+      throw ApiError.serviceUnavailable('Rate limit service unavailable')
+    }
+  }
+
+  private static memoryCheckLimit(key: string, limit: number, window: number): void {
     const now = Date.now()
     const current = RateLimiter.limits.get(key)
 
@@ -115,7 +163,7 @@ export class RateLimiter {
     }
 
     if (current.count >= limit) {
-      throw ApiError.badRequest('Rate limit exceeded')
+      throw ApiError.tooManyRequests('Rate limit exceeded')
     }
 
     current.count++

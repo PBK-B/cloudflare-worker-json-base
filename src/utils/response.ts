@@ -63,6 +63,14 @@ export class ApiError extends Error {
   static internal(message: string = 'Internal server error', details?: any): ApiError {
     return new ApiError(ERROR_CODES.INTERNAL_ERROR, message, HTTP_STATUS.INTERNAL_SERVER_ERROR, details)
   }
+
+  static tooManyRequests(message: string = 'Rate limit exceeded', details?: any): ApiError {
+    return new ApiError(ERROR_CODES.RATE_LIMIT_EXCEEDED, message, HTTP_STATUS.TOO_MANY_REQUESTS, details)
+  }
+
+  static serviceUnavailable(message: string = 'Service unavailable'): ApiError {
+    return new ApiError('SERVICE_UNAVAILABLE', message, HTTP_STATUS.SERVICE_UNAVAILABLE)
+  }
 }
 
 export class ResponseBuilder {

@@ -1,41 +1,791 @@
-// WebUI Console styles
+@import 'grid.less';
+
+// ============================================
+// WebUI Console specific styles
+// 基于统一栅格系统布局
+// ============================================
+
+// 控制台头部
 .console-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px 0;
+  .container-responsive();
+  .flex-between();
+  padding: @space-md @grid-gutter-md;
   border-bottom: 1px solid #e8e8e8;
-  margin-bottom: 20px;
 }
 
+// 标签页
 .header-tabs {
   display: flex;
-  gap: 10px;
+  gap: @space-sm;
 }
 
+// 数据管理区域容器
+.data-section {
+  .container-responsive();
+  padding: @space-lg @grid-gutter-md;
+}
+
+// 数据头部
 .data-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
+  .flex-between();
+  margin-bottom: @space-lg;
+  width: 100%;
 }
 
+// 数据头部标题
+.data-header-title {
+  .container-responsive();
+  padding: 0;
+  width: 100%;
+  margin: 0;
+
+  h4 {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: @space-sm;
+  }
+}
+
+// 数据控制区
+.data-controls {
+  .container-responsive();
+  padding: @space-xl 0 0;
+  width: 100%;
+}
+
+// 控制行
+.data-controls-row {
+  .flex-between();
+  margin-bottom: @space-lg;
+  width: 100%;
+  padding: 0;
+  max-width: none;
+  margin-left: 0;
+  margin-right: 0;
+
+  &-search {
+    flex: 1;
+  }
+}
+
+// 排序控制行
+.data-controls-row-sort {
+  .flex-start();
+  gap: @space-md;
+  width: 100%;
+  padding: 0;
+  max-width: none;
+  margin-left: 0;
+  margin-right: 0;
+
+  > span {
+    flex-shrink: 0;
+  }
+}
+
+// 表格容器
+.data-table-container {
+  .container-responsive();
+  background: white;
+  border: @card-border;
+  border-radius: @card-radius;
+  overflow: hidden;
+  padding: 0;
+  width: 100%;
+  max-width: none;
+  margin: 0 auto;
+}
+
+// 分页
+.data-pagination {
+  .container-responsive();
+  .flex-between();
+  padding: @space-lg 0;
+  margin: 0;
+  width: 100%;
+}
+
+// 统计区域
+.stats-container {
+  display: flex;
+  justify-content: center;
+  gap: @space-xxl;
+  padding: @space-xl 0;
+  margin-bottom: @space-xl;
+}
+
+.stat-item {
+  text-align: center;
+
+  .stat-number {
+    font-size: 24px;
+    font-weight: 600;
+    color: #1890ff;
+    display: block;
+    margin-bottom: @space-xs;
+  }
+
+  .stat-label {
+    font-size: 14px;
+    color: #666;
+  }
+}
+
+// 快捷操作区 - 栅格对齐
+.quick-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: @space-md;
+  width: 100%;
+}
+
+.action-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  border: @card-border;
+  border-radius: @card-radius;
+  padding: @space-lg;
+  text-align: center;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  min-height: 120px;
+
+  &:hover {
+    border-color: #1890ff;
+    background: #f0f7ff;
+  }
+
+  .action-icon {
+    flex-shrink: 0;
+    font-size: 28px;
+    margin-bottom: @space-sm;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .action-title {
+    flex-shrink: 0;
+    font-size: 15px;
+    font-weight: 600;
+    color: #262626;
+    margin-bottom: @space-xs;
+    line-height: 1.3;
+    text-align: center;
+  }
+
+  .action-description {
+    flex-shrink: 0;
+    font-size: 13px;
+    color: #666;
+    line-height: 1.5;
+    margin: 0;
+    text-align: center;
+  }
+}
+
+// 控制台内容区
+.console-section {
+  .container-responsive();
+  padding: @space-xl @grid-gutter-md;
+}
+
+// 卡片
+.console-card {
+  background: white;
+  border: @card-border;
+  border-radius: @card-radius;
+  padding: @space-lg;
+  margin-top: @space-lg;
+
+  h4 {
+    margin: 0 0 @space-md 0;
+  }
+
+  p {
+    margin: 0;
+    color: #666;
+  }
+}
+
+// 代码卡片
+.console-card-code {
+  background: #fafafa;
+  border: @card-border;
+  border-radius: @card-radius;
+  padding: @space-md;
+  margin-top: @space-md;
+
+  h5 {
+    margin: 0 0 @space-sm 0;
+  }
+}
+
+// 代码块
+.console-code-block {
+  font-family: monospace;
+  font-size: 12px;
+  background: white;
+  padding: @space-md;
+  border-radius: @card-radius;
+  margin-top: @space-md;
+  overflow: auto;
+}
+
+// API 测试区
 .api-test-area {
   min-height: 200px;
-  background: #f8f9fa;
-  border: 1px solid #e9ecef;
-  border-radius: 6px;
-  padding: 20px;
+  background: #fafafa;
+  border: @card-border;
+  border-radius: @card-radius;
+  padding: @space-xl;
+  margin: @space-xl;
 }
 
+// 设置区域
+.settings-section {
+  .container-responsive();
+  padding: @space-lg @grid-gutter-md;
+  width: 100%;
+}
+
+// 状态徽章
+.status-badge {
+  padding: @space-md;
+  border-radius: @card-radius;
+  text-align: center;
+  font-size: 14px;
+
+  &-connected {
+    background: #f6ffed;
+    border: 1px solid #b7eb8f;
+    color: #389e0d;
+  }
+
+  &-disconnected {
+    background: #fff2f0;
+    border: 1px solid #ffccc7;
+    color: #cf1322;
+  }
+}
+
+// ============================================
+// 通用组件类 - 统一栅格对齐
+// ============================================
+
+// 按钮图标间距 - 横向布局
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: @space-xs;
+  vertical-align: middle;
+}
+
+// 搜索按钮 - 带图标文本布局
+.btn-search {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: @space-xs;
+}
+
+// 标题图标
+.section-title {
+  display: inline-flex;
+  align-items: center;
+  gap: @space-sm;
+  margin: 0;
+}
+
+// 数据控制行 - 搜索区域
+.data-controls-row {
+  .flex-between();
+  width: 100%;
+  padding: 0;
+  margin: 0 0 @space-lg 0;
+  max-width: none;
+  margin-left: 0;
+  margin-right: 0;
+  align-items: center;
+
+  .rs-input {
+    flex: 1;
+    margin-right: @space-sm;
+  }
+
+  .btn-search {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+}
+
+// 排序控制行
+.data-controls-row-sort {
+  .flex-start();
+  gap: @space-sm;
+  width: 100%;
+  padding: 0;
+  margin: 0 0 @space-lg 0;
+  max-width: none;
+  margin-left: 0;
+  margin-right: 0;
+  flex-wrap: wrap;
+  align-items: center;
+
+  > span {
+    flex-shrink: 0;
+    padding: @space-xs 0;
+  }
+
+  .rs-btn {
+    margin-right: @space-xs;
+    margin-bottom: @space-xs;
+  }
+}
+
+// 未配置状态面板
+.unconfigured-panel {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+// 配置表单容器
+.config-form-container {
+  .container-responsive();
+  padding: @space-xl @grid-gutter-md;
+  display: flex;
+  justify-content: center;
+  min-height: 400px;
+}
+
+.config-form-card {
+  background: white;
+  border: @card-border;
+  border-radius: @card-radius;
+  padding: @space-xxl * 2;
+  text-align: center;
+  max-width: 400px;
+  width: 100%;
+}
+
+.config-form-icon {
+  color: #1890ff;
+  margin-bottom: @space-lg;
+}
+
+.config-form-title {
+  margin: 0 0 @space-sm 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #262626;
+}
+
+.config-form-desc {
+  margin: 0 0 @space-xl 0;
+  font-size: 14px;
+  color: #666;
+}
+
+// 表格类型图标
+.table-type-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+// 类型标签徽章
+.type-badge {
+  display: inline-block;
+  padding: 2px @space-md;
+  border-radius: @card-radius;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+
+  &-json {
+    background: rgba(82, 196, 26, 0.1);
+    color: #389e0d;
+  }
+
+  &-text {
+    background: rgba(24, 144, 255, 0.1);
+    color: #096dd9;
+  }
+
+  &-binary {
+    background: rgba(250, 173, 20, 0.1);
+    color: #d48806;
+  }
+}
+
+// 表单提示文字
+.form-hint {
+  margin-top: @space-xs;
+  font-size: 12px;
+  color: #999;
+}
+
+// 排序按钮内容
+.sort-btn-content {
+  display: inline-flex;
+  align-items: center;
+  gap: @space-xs;
+}
+
+// 模态框标题
+.modal-title {
+  display: inline-flex;
+  align-items: center;
+  gap: @space-sm;
+}
+
+// ============================================
 // Dark theme support
-[data-theme='dark'] {
+// ============================================
+.rs-theme-dark {
   .console-header {
-    border-bottom-color: #434343;
+    border-bottom-color: var(--rs-border-primary);
+    background: var(--rs-bg-card);
+  }
+
+  .data-table-container {
+    background: var(--rs-bg-card);
+    border-color: var(--rs-table-border-color);
+  }
+
+  .action-card {
+    background: var(--rs-bg-card);
+    border-color: var(--rs-border-primary);
+
+    &:hover {
+      border-color: var(--rs-primary-500);
+      background: var(--rs-state-hover-bg);
+    }
+
+    .action-title {
+      color: var(--rs-text-primary);
+    }
+
+    .action-description {
+      color: var(--rs-text-secondary);
+    }
   }
 
   .api-test-area {
-    background: #1f1f1f;
-    border-color: #434343;
+    background: var(--rs-bg-card);
+    border-color: var(--rs-border-primary);
+  }
+
+  .stat-number {
+    color: var(--rs-primary-500);
+  }
+
+  .stat-label {
+    color: var(--rs-text-secondary);
+  }
+
+  .console-card {
+    background: var(--rs-bg-card);
+    border-color: var(--rs-border-primary);
+
+    h4 {
+      color: var(--rs-text-primary);
+    }
+
+    p {
+      color: var(--rs-text-secondary);
+    }
+  }
+
+  .console-card-code {
+    background: var(--rs-bg-overlay);
+    border-color: var(--rs-border-primary);
+  }
+
+  .console-code-block {
+    background: var(--rs-bg-card);
+    border-color: var(--rs-border-primary);
+    color: var(--rs-text-primary);
+  }
+
+  .data-controls-row-sort {
+    > span {
+      color: var(--rs-text-secondary);
+    }
+  }
+
+  .data-header-title {
+    h4 {
+      color: var(--rs-text-primary);
+    }
+  }
+
+  .data-pagination {
+    > span {
+      color: var(--rs-text-secondary);
+    }
+  }
+
+  // 继承 rsuite 组件暗黑样式
+  .rs-table {
+    background: var(--rs-bg-card);
+    border-color: var(--rs-table-border-color);
+  }
+
+  .rs-table-row {
+    background: var(--rs-bg-card);
+  }
+
+  .rs-table-row:hover {
+    background: var(--rs-state-hover-bg);
+  }
+
+  .rs-table-cell {
+    background: var(--rs-bg-card);
+    color: var(--rs-text-primary);
+    border-color: var(--rs-table-border-color);
+  }
+
+  .rs-table-header-cell {
+    background: var(--rs-bg-card);
+    color: var(--rs-text-secondary);
+    border-color: var(--rs-table-border-color);
+  }
+
+  .rs-panel {
+    background: var(--rs-bg-card);
+    border-color: var(--rs-border-primary);
+  }
+
+  .rs-panel-heading {
+    background: var(--rs-bg-overlay);
+    border-color: var(--rs-border-primary);
+    color: var(--rs-text-primary);
+  }
+
+  .rs-form-group-label {
+    color: var(--rs-text-primary);
+  }
+
+  .rs-input,
+  .rs-picker-input,
+  .rs-select-picker {
+    background: var(--rs-input-bg);
+    border-color: var(--rs-border-primary);
+    color: var(--rs-text-primary);
+  }
+
+  .rs-input:focus,
+  .rs-picker-input:focus,
+  .rs-select-picker:focus {
+    border-color: var(--rs-input-focus-border);
+  }
+
+  .rs-input::placeholder {
+    color: var(--rs-placeholder);
+  }
+
+  .rs-picker-toggle {
+    background: var(--rs-input-bg);
+    border-color: var(--rs-border-primary);
+    color: var(--rs-text-primary);
+  }
+
+  .rs-picker-menu {
+    background: var(--rs-bg-card);
+    border-color: var(--rs-border-primary);
+    box-shadow: var(--rs-dropdown-shadow);
+  }
+
+  .rs-picker-menu-item {
+    background: var(--rs-bg-card);
+    color: var(--rs-text-primary);
+  }
+
+  .rs-picker-menu-item:hover {
+    background: var(--rs-state-hover-bg);
+  }
+
+  .rs-picker-menu-item-selected {
+    background: var(--rs-listbox-option-selected-bg);
+    color: var(--rs-listbox-option-selected-text);
+  }
+
+  .rs-btn-default {
+    background: var(--rs-btn-default-bg);
+    border-color: var(--rs-border-primary);
+    color: var(--rs-btn-default-text);
+  }
+
+  .rs-btn-default:hover {
+    background: var(--rs-btn-default-hover-bg);
+    border-color: var(--rs-border-primary);
+  }
+
+  .rs-btn-primary {
+    background: var(--rs-btn-primary-bg);
+    border-color: var(--rs-btn-primary-bg);
+    color: var(--rs-btn-primary-text);
+  }
+
+  .rs-btn-primary:hover {
+    background: var(--rs-btn-primary-hover-bg);
+    border-color: var(--rs-btn-primary-hover-bg);
+  }
+
+  .rs-btn-subtle {
+    color: var(--rs-btn-subtle-text);
+  }
+
+  .rs-btn-subtle:hover {
+    background: var(--rs-btn-subtle-hover-bg);
+    color: var(--rs-btn-subtle-hover-text);
+  }
+
+  .rs-pagination {
+    background: var(--rs-bg-card);
+  }
+
+  .rs-pagination-btn {
+    background: var(--rs-bg-card);
+    border-color: var(--rs-border-primary);
+    color: var(--rs-text-primary);
+  }
+
+  .rs-pagination-btn:hover {
+    background: var(--rs-state-hover-bg);
+  }
+
+  .rs-pagination-btn-active {
+    background: var(--rs-btn-primary-bg);
+    border-color: var(--rs-btn-primary-bg);
+    color: var(--rs-btn-primary-text);
+  }
+
+  .rs-divider {
+    background: var(--rs-divider-border);
+  }
+
+  // Modal
+  .rs-modal {
+    background: var(--rs-bg-card);
+  }
+
+  .rs-modal-content {
+    background: var(--rs-bg-card);
+    border: 1px solid var(--rs-border-primary);
+  }
+
+  .rs-modal-header {
+    background: var(--rs-bg-card);
+    border-bottom-color: var(--rs-border-primary);
+  }
+
+  .rs-modal-title {
+    color: var(--rs-text-primary);
+  }
+
+  .rs-modal-body {
+    background: var(--rs-bg-card);
+    color: var(--rs-text-primary);
+  }
+
+  .rs-modal-footer {
+    background: var(--rs-bg-card);
+    border-top-color: var(--rs-border-primary);
+  }
+
+  .rs-modal-backdrop {
+    background: var(--rs-bg-backdrop);
+  }
+
+  // 新组件暗黑模式
+  .section-title {
+    color: var(--rs-text-primary);
+  }
+
+  .unconfigured-panel {
+    background: var(--rs-bg-card);
+    border-color: var(--rs-border-primary);
+  }
+
+  .config-form-card {
+    background: var(--rs-bg-card);
+    border-color: var(--rs-border-primary);
+  }
+
+  .config-form-title {
+    color: var(--rs-text-primary);
+  }
+
+  .config-form-desc {
+    color: var(--rs-text-secondary);
+  }
+
+  .form-hint {
+    color: var(--rs-text-secondary);
+  }
+
+  .type-badge {
+    &-json {
+      background: rgba(82, 196, 26, 0.15);
+      color: #52c41a;
+    }
+
+    &-text {
+      background: rgba(24, 144, 255, 0.15);
+      color: #177ddc;
+    }
+
+    &-binary {
+      background: rgba(250, 173, 20, 0.15);
+      color: #ffc53d;
+    }
+  }
+
+  .console-card h4 {
+    color: var(--rs-text-primary);
+  }
+
+  .console-card p {
+    color: var(--rs-text-secondary);
+  }
+
+  .console-card-code h5 {
+    color: var(--rs-text-primary);
+  }
+
+  .stat-number {
+    color: var(--rs-primary-500);
+  }
+
+  .stat-label {
+    color: var(--rs-text-secondary);
+  }
+
+  .quick-actions {
+    background: transparent;
+  }
+
+  .action-card {
+    background: var(--rs-bg-card);
+    border-color: var(--rs-border-primary);
+
+    &:hover {
+      border-color: var(--rs-primary-500);
+      background: var(--rs-state-hover-bg);
+    }
+
+    .action-title {
+      color: var(--rs-text-primary);
+    }
+
+    .action-description {
+      color: var(--rs-text-secondary);
+    }
   }
 }

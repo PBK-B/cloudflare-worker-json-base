@@ -1,110 +1,181 @@
-import { useState, useEffect, useCallback } from 'react'
-import { ApiResponse, StorageData, CreateDataRequest, UpdateDataRequest, PaginatedResponse } from '../types'
+import { useState, useEffect, useCallback } from 'react';
+import axios, { AxiosError } from 'axios';
+import useAxios, { configure } from 'axios-hooks';
+import { ApiResponse, StorageData, CreateDataRequest, UpdateDataRequest, PaginatedResponse } from '../types';
 
-const API_BASE_URL = '/api'
+const API_BASE_URL = '/api';
+
+const axiosInstance = axios.create({
+	baseURL: API_BASE_URL,
+	headers: {
+		'Content-Type': 'application/json',
+	},
+});
+
+axiosInstance.interceptors.response.use(
+	(response) => response,
+	(error: AxiosError) => {
+		if (error.response?.status === 401 || error.response?.status === 403) {
+			localStorage.removeItem('jsonbase-verified');
+			localStorage.removeItem('jsonbase-api-key');
+			window.location.href = '/login';
+		}
+		return Promise.reject(error);
+	}
+);
+
+configure({ axios: axiosInstance });
 
 export const useApi = () => {
-  const [apiKey, setApiKey] = useState<string>('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+	const [apiKey, setApiKeyState] = useState<string>('');
+	const [isConfigured, setIsConfigured] = useState(false);
+	const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    const savedApiKey = localStorage.getItem('jsonbase-api-key')
-    if (savedApiKey) {
-      setApiKey(savedApiKey)
-    }
-  }, [])
+	useEffect(() => {
+		const savedApiKey = localStorage.getItem('jsonbase-api-key');
+		if (savedApiKey) {
+			setApiKeyState(savedApiKey);
+			axiosInstance.defaults.headers.common['Authorization'] = `Bearer ${savedApiKey}`;
+			setIsConfigured(true);
+		}
+	}, []);
 
-  const saveApiKey = useCallback((key: string) => {
-    setApiKey(key)
-    localStorage.setItem('jsonbase-api-key', key)
-  }, [])
+	const setApiKey = useCallback((key: string) => {
+		setApiKeyState(key);
+		axiosInstance.defaults.headers.common['Authorization'] = `Bearer ${key}`;
+		localStorage.setItem('jsonbase-api-key', key);
+	}, []);
 
-  const makeRequest = useCallback(async <T>(
-    endpoint: string,
-    options: RequestInit = {}
-  ): Promise<ApiResponse<T>> => {
-    setLoading(true)
-    setError(null)
+	const testConnection = useCallback(async (): Promise<ApiResponse<any>> => {
+		setLoading(true);
+		try {
+			const response = await axiosInstance.get('/data/test');
+			return response.data;
+		} catch (error) {
+			if (axios.isAxiosError(error)) {
+				return {
+					success: false,
+					error: error.response?.data?.error || '连接失败',
+					timestamp: new Date().toISOString(),
+				};
+			}
+			return {
+				success: false,
+				error: '未知错误',
+				timestamp: new Date().toISOString(),
+			};
+		} finally {
+			setLoading(false);
+		}
+	}, []);
 
-    try {
-      const url = `${API_BASE_URL}${endpoint}`
-      const authOptions = {
-        ...options,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-          ...options.headers,
-        },
-      }
+	const createData = useCallback(
+		async (path: string, data: CreateDataRequest): Promise<ApiResponse<StorageData>> => {
+			try {
+				const response = await axiosInstance.post(`/data${path}`, data);
+				return response.data;
+			} catch (error) {
+				if (axios.isAxiosError(error)) {
+					return {
+						success: false,
+						error: error.response?.data?.error || '创建失败',
+						timestamp: new Date().toISOString(),
+					};
+				}
+				throw error;
+			}
+		},
+		[]
+	);
 
-      const response = await fetch(url, authOptions)
-      const data: ApiResponse<T> = await response.json()
+	const updateData = useCallback(
+		async (path: string, data: UpdateDataRequest): Promise<ApiResponse<StorageData>> => {
+			try {
+				const response = await axiosInstance.put(`/data${path}`, data);
+				return response.data;
+			} catch (error) {
+				if (axios.isAxiosError(error)) {
+					return {
+						success: false,
+						error: error.response?.data?.error || '更新失败',
+						timestamp: new Date().toISOString(),
+					};
+				}
+				throw error;
+			}
+		},
+		[]
+	);
 
-      if (!response.ok) {
-        throw new Error(data.error || `HTTP ${response.status}`)
-      }
+	const deleteData = useCallback(async (path: string): Promise<ApiResponse<void>> => {
+		try {
+			await axiosInstance.delete(`/data${path}`);
+			return {
+				success: true,
+				timestamp: new Date().toISOString()
+			};
+		} catch (error) {
+			if (axios.isAxiosError(error)) {
+				if (error.response?.status === 204 || error.response?.status === 200) {
+					return {
+						success: true,
+						timestamp: new Date().toISOString()
+					};
+				}
+				return {
+					success: false,
+					error: error.response?.data?.error || '删除失败',
+					timestamp: new Date().toISOString(),
+				};
+			}
+			throw error;
+		}
+	}, []);
 
-      return data
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error'
-      setError(errorMessage)
-      throw err
-    } finally {
-      setLoading(false)
-    }
-  }, [apiKey])
+	const listData = useCallback(
+		async (
+			page: number = 1,
+			limit: number = 20,
+			search?: string,
+			sort?: string,
+			order?: 'asc' | 'desc'
+		): Promise<ApiResponse<PaginatedResponse<StorageData>>> => {
+			try {
+				const params = new URLSearchParams({
+					page: page.toString(),
+					limit: limit.toString(),
+				});
+				if (search) params.append('search', search);
+				if (sort) params.append('sort', sort);
+				if (order) params.append('order', order);
 
-  const testConnection = useCallback(async (): Promise<ApiResponse<any>> => {
-    return makeRequest('/data/test')
-  }, [makeRequest])
+				const response = await axiosInstance.get(`/data?${params.toString()}`);
+				return response.data;
+			} catch (error) {
+				if (axios.isAxiosError(error)) {
+					return {
+						success: false,
+						error: error.response?.data?.error || '获取列表失败',
+						timestamp: new Date().toISOString(),
+					};
+				}
+				throw error;
+			}
+		},
+		[]
+	);
 
-  const fetchData = useCallback(async (path: string): Promise<ApiResponse<StorageData>> => {
-    return makeRequest(`/data${path}`)
-  }, [makeRequest])
+	return {
+		apiKey,
+		setApiKey,
+		isConfigured,
+		loading,
+		testConnection,
+		createData,
+		updateData,
+		deleteData,
+		listData,
+	};
+};
 
-  const createData = useCallback(async (path: string, data: CreateDataRequest): Promise<ApiResponse<StorageData>> => {
-    return makeRequest(`/data${path}`, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    })
-  }, [makeRequest])
-
-  const updateData = useCallback(async (path: string, data: UpdateDataRequest): Promise<ApiResponse<StorageData>> => {
-    return makeRequest(`/data${path}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    })
-  }, [makeRequest])
-
-  const deleteData = useCallback(async (path: string): Promise<ApiResponse<void>> => {
-    return makeRequest(`/data${path}`, {
-      method: 'DELETE',
-    })
-  }, [makeRequest])
-
-  const listData = useCallback(async (page: number = 1, limit: number = 20): Promise<ApiResponse<PaginatedResponse<StorageData>>> => {
-    return makeRequest(`/data?page=${page}&limit=${limit}`)
-  }, [makeRequest])
-
-  const checkHealth = useCallback(async (): Promise<ApiResponse<any>> => {
-    return makeRequest('/health')
-  }, [makeRequest])
-
-  const isConfigured = Boolean(apiKey.trim())
-
-  return {
-    apiKey,
-    setApiKey: saveApiKey,
-    loading,
-    error,
-    isConfigured,
-    testConnection,
-    fetchData,
-    createData,
-    updateData,
-    deleteData,
-    listData,
-    checkHealth,
-  }
-}
+export default useApi;

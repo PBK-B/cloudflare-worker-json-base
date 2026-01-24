@@ -1,0 +1,18 @@
+{
+  "preset": "ts-jest",
+  "testEnvironment": "jsdom",
+  "setupFilesAfterEnv": ["<rootDir>/jest.setup.ts"],
+  "moduleNameMapper": {
+    "\\.(css|less|scss|sass)$": "identity-obj-proxy"
+  },
+  "transform": {
+    "^.+\\.(ts|tsx|js|jsx)$": ["ts-jest", { "tsconfig": "tsconfig.json" }]
+  },
+  "testMatch": ["**/*.test.(ts|tsx)"],
+  "collectCoverageFrom": [
+    "src/**/*.{ts,tsx}",
+    "!src/**/*.d.ts",
+    "!src/main.tsx"
+  ],
+  "moduleFileExtensions": ["ts", "tsx", "js", "jsx", "json", "node"]
+}

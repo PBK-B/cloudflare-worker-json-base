@@ -1,12 +1,13 @@
 import { DataController, HealthController } from './controllers'
 import { CorsHandler } from '../utils/response'
 import { Logger } from '../utils/middleware'
+import { WorkerEnv } from '../types'
 
 export class Router {
   private dataController: DataController
   private healthController: HealthController
 
-  constructor(env: any) {
+  constructor(env: WorkerEnv) {
     this.dataController = new DataController(env)
     this.healthController = new HealthController(env)
   }

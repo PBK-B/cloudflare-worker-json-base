@@ -12,3 +12,12 @@ VERSION = "2.0.0"
 binding = "JSONBIN"
 id = "jsonbin"
 preview_id = "jsonbin_preview"
+
+# Rate limit configuration (requests per window)
+[vars.RATE_LIMITS]
+GET_LIMIT = 1000
+POST_LIMIT = 100
+PUT_LIMIT = 100
+DELETE_LIMIT = 50
+LIST_LIMIT = 10
+LIST_WINDOW = 60

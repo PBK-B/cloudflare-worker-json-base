@@ -1,0 +1,140 @@
+// ============================================
+// Grid System - 统一栅格响应式布局系统
+// ============================================
+
+// 断点定义
+@grid-breakpoint-xs: 0;
+@grid-breakpoint-sm: 576px;
+@grid-breakpoint-md: 768px;
+@grid-breakpoint-lg: 992px;
+@grid-breakpoint-xl: 1200px;
+@grid-breakpoint-xxl: 1400px;
+
+// 容器最大宽度
+@container-max-width-sm: 540px;
+@container-max-width-md: 720px;
+@container-max-width-lg: 960px;
+@container-max-width-xl: 1200px;
+@container-max-width-xxl: 1320px;
+
+// 标准内边距
+@grid-gutter-xs: 12px;
+@grid-gutter-sm: 16px;
+@grid-gutter-md: 20px;
+@grid-gutter-lg: 24px;
+
+// 容器mixin
+.container-base() {
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: @grid-gutter-md;
+  padding-right: @grid-gutter-md;
+}
+
+.container-responsive() {
+  .container-base();
+
+  @media (max-width: @grid-breakpoint-sm) {
+    padding-left: @grid-gutter-xs;
+    padding-right: @grid-gutter-xs;
+  }
+
+  @media (min-width: @grid-breakpoint-sm) {
+    max-width: @container-max-width-sm;
+  }
+
+  @media (min-width: @grid-breakpoint-md) {
+    max-width: @container-max-width-md;
+  }
+
+  @media (min-width: @grid-breakpoint-lg) {
+    max-width: @container-max-width-lg;
+  }
+
+  @media (min-width: @grid-breakpoint-xl) {
+    max-width: @container-max-width-xl;
+  }
+
+  @media (min-width: @grid-breakpoint-xxl) {
+    max-width: @container-max-width-xxl;
+  }
+}
+
+// 弹性盒子布局 mixin
+.flex-center() {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.flex-between() {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.flex-start() {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+}
+
+// 间距系统
+@space-xs: 4px;
+@space-sm: 8px;
+@space-md: 12px;
+@space-lg: 16px;
+@space-xl: 20px;
+@space-xxl: 24px;
+
+// 卡片样式
+@card-radius: 4px;
+@card-shadow: none;
+@card-border: 1px solid #e8e8e8;
+@card-bg: white;
+
+// 响应式显示/隐藏
+.show-xs(@display: block) when (@grid-breakpoint-xs >= 0) {
+  display: @display;
+}
+
+.hide-xs() when (@grid-breakpoint-xs >= 0) {
+  display: none;
+}
+
+.show-sm(@display: block) when (@grid-breakpoint-sm >= 576px) {
+  @media (min-width: @grid-breakpoint-sm) {
+    display: @display;
+  }
+}
+
+.hide-sm() when (@grid-breakpoint-sm >= 576px) {
+  @media (min-width: @grid-breakpoint-sm) {
+    display: none;
+  }
+}
+
+.show-md(@display: block) when (@grid-breakpoint-md >= 768px) {
+  @media (min-width: @grid-breakpoint-md) {
+    display: @display;
+  }
+}
+
+.hide-md() when (@grid-breakpoint-md >= 768px) {
+  @media (min-width: @grid-breakpoint-md) {
+    display: none;
+  }
+}
+
+.show-lg(@display: block) when (@grid-breakpoint-lg >= 992px) {
+  @media (min-width: @grid-breakpoint-lg) {
+    display: @display;
+  }
+}
+
+.hide-lg() when (@grid-breakpoint-lg >= 992px) {
+  @media (min-width: @grid-breakpoint-lg) {
+    display: none;
+  }
+}

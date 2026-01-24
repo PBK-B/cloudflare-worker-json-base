@@ -33,19 +33,29 @@ body {
 
 .page-header {
   background: white;
-  padding: 20px;
+  padding: 16px 20px;
   border-bottom: 1px solid #e5e5e5;
-  margin-bottom: 20px;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin-bottom: 16px;
 }
 
 .content-card {
   background: white;
-  border-radius: 8px;
-  padding: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  margin-bottom: 20px;
+  border: 1px solid #e8e8e8;
+  border-radius: 4px;
+  padding: 16px 20px;
+  margin-bottom: 16px;
+}
+
+[data-theme='dark'] {
+  .page-header {
+    background: #1f1f1f;
+    border-bottom-color: #434343;
+  }
+
+  .content-card {
+    background: #1f1f1f;
+    border-color: #434343;
+  }
 }
 
 .form-container {

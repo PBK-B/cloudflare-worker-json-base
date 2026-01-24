@@ -72,6 +72,8 @@ export interface PaginationParams {
   limit?: number
   sort?: string
   order?: 'asc' | 'desc'
+  prefix?: string
+  search?: string
 }
 
 export interface PaginatedResponse<T> {

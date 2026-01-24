@@ -2,13 +2,15 @@ import { ResponseBuilder, ApiError } from '../utils/response'
 import { CorsHandler } from '../utils/response'
 import { AuthMiddleware, ValidationMiddleware, RateLimiter, Logger } from '../utils/middleware'
 import { StorageService } from '../services/storage'
+import { WorkerEnv } from '../types'
 
 export class DataController {
   private storageService: StorageService
 
-  constructor(env: any) {
+  constructor(env: WorkerEnv) {
     this.storageService = new StorageService(env)
     AuthMiddleware.initialize(env)
+    RateLimiter.initialize(env)
   }
 
   async get(request: Request): Promise<Response> {
@@ -117,15 +119,35 @@ export class DataController {
     try {
       const url = new URL(request.url)
       const prefix = url.searchParams.get('prefix') || undefined
-      const limit = parseInt(url.searchParams.get('limit') || '100')
+      const search = url.searchParams.get('search') || undefined
+      const page = parseInt(url.searchParams.get('page') || '1')
+      const limit = parseInt(url.searchParams.get('limit') || '20')
+      const sort = url.searchParams.get('sort') || 'updatedAt'
+      const order = url.searchParams.get('order') || 'desc'
 
       const auth = await AuthMiddleware.requireAuth(request)
       await RateLimiter.checkLimit(auth.apiKey, 10, 60)
 
-      const data = await this.storageService.listData(prefix, Math.min(limit, 1000))
-      Logger.info('Data listed', { prefix, count: data.length, auth: auth.apiKey.substring(0, 8) })
+      const result = await this.storageService.listData({
+        prefix,
+        search,
+        page,
+        limit: Math.min(limit, 1000),
+        sort,
+        order: order as 'asc' | 'desc'
+      })
+      
+      Logger.info('Data listed', { 
+        prefix, 
+        search, 
+        page, 
+        limit, 
+        count: result.items.length, 
+        total: result.total,
+        auth: auth.apiKey.substring(0, 8) 
+      })
 
-      return ResponseBuilder.success(data, 'Data listed successfully')
+      return ResponseBuilder.success(result, 'Data listed successfully')
     } catch (error) {
       Logger.error('LIST request failed', error)
       return this.handleError(error)
@@ -197,7 +219,7 @@ export class DataController {
 export class HealthController {
   private storageService: StorageService
 
-  constructor(env: any) {
+  constructor(env: WorkerEnv) {
     this.storageService = new StorageService(env)
   }
 
