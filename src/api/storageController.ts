@@ -32,6 +32,7 @@ export class StorageController {
     });
 
     this.pathMapper = new PathMapper(env);
+    this.pathMapper.initialize();
 
     AuthMiddleware.initialize(env);
     RateLimiter.initialize(env);
@@ -125,22 +126,29 @@ export class StorageController {
       const body = await request.arrayBuffer();
       const data = this.arrayBufferToUint8Array(body);
 
+      const pathParam = url.searchParams.get('path');
+      const targetPath = pathParam || pathname || '/';
+
       const result = await this.storageService.write(data, {
         contentType
       });
 
-      if (!result.success) {
+      if (!result.success || !result.fileId) {
         throw ApiError.internal(result.error || 'Failed to store file');
       }
+
+      await this.pathMapper.setMapping(targetPath, result.fileId);
 
       Logger.info('Data uploaded', {
         id: result.fileId,
         size: data.length,
+        path: targetPath,
         auth: auth.apiKey.substring(0, 8)
       });
 
       return ResponseBuilder.created({
-        id: result.fileId,
+        id: targetPath,
+        fileId: result.fileId,
         size: data.length,
         checksum: result.metadata?.checksum,
         createdAt: result.metadata?.createdAt

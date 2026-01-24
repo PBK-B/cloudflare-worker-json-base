@@ -58,7 +58,7 @@ const AdminLayout: React.FC = () => {
 		setSubmitLoading(true);
 		try {
 			if (file) {
-				const response = await uploadFile(data.path, file, data.type);
+				const response = await uploadFile(data.path, file, file.type);
 				if (response.success) {
 					handleCloseModals();
 					notifyRefresh();

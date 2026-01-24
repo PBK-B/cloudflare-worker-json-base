@@ -34,6 +34,10 @@ export class FileStorageService {
     this.metadataStore = config.metadataStore;
     this.chunkSize = config.defaultChunkSize || DEFAULT_CHUNK_SIZE;
 
+    if (this.d1Provider && typeof (this.d1Provider as any).initialize === 'function') {
+      (this.d1Provider as any).initialize();
+    }
+
     try {
       const cfg = Config.getInstance();
       this.storageBackend = cfg.storageBackend;

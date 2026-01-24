@@ -119,14 +119,17 @@ export const useApi = () => {
 	);
 
 	const uploadFile = useCallback(
-		async (path: string, file: File, type: string): Promise<ApiResponse<StorageData>> => {
+		async (path: string, file: File, contentType: string): Promise<ApiResponse<StorageData>> => {
 			try {
 				const formData = new FormData();
 				formData.append('file', file);
-				formData.append('type', type);
 				formData.append('path', path);
 				
-				const response = await axiosInstance.post(`/storage${path}`, formData);
+				const response = await axiosInstance.post(`/storage?path=${encodeURIComponent(path)}`, file, {
+					headers: {
+						'Content-Type': contentType || file.type,
+					},
+				});
 				return response.data;
 			} catch (error) {
 				if (axios.isAxiosError(error)) {
