@@ -237,22 +237,29 @@ export class HybridStorageService {
     const type = request.type || 'json';
     let value: string = typeof request.value === 'string' ? request.value : JSON.stringify(request.value);
     let content_type: string = request.content_type || 'application/json';
+    let size: number;
 
     if (type === 'json') {
       value = JSON.stringify(request.value);
       content_type = request.content_type || 'application/json';
+      size = new Blob([value]).size;
     } else if (type === 'binary') {
       if (typeof request.value === 'string' && request.value.startsWith('data:')) {
         content_type = request.content_type || request.value.split(';')[0].split(':')[1];
+        const base64 = request.value.split(',')[1];
+        const binaryString = atob(base64);
+        value = request.value;
+        size = binaryString.length;
       } else {
         content_type = request.content_type || 'application/octet-stream';
+        size = new Blob([value]).size;
       }
     } else {
       value = String(request.value);
       content_type = request.content_type || 'text/plain';
+      size = new Blob([value]).size;
     }
 
-    const size = new Blob([value]).size;
     const storageLocation: StorageLocation = isLargeFile(size) ? 'kv' : 'd1';
 
     const metadata: Omit<StorageMetadata, 'storage_location'> = {
@@ -452,7 +459,7 @@ export class HybridStorageService {
       countParams.push(searchPattern, searchPattern);
     }
 
-    const sortColumn = sort === 'id' ? 'id' : 'updated_at';
+     const sortColumn = sort === 'id' ? 'id' : sort === 'size' ? 'size' : 'updated_at';
     const sortOrder = order.toUpperCase();
     dataQuery += ` ORDER BY ${sortColumn} ${sortOrder} LIMIT ? OFFSET ?`;
     queryParams.push(limit.toString(), offset.toString());

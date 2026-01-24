@@ -145,7 +145,6 @@ export class StorageAdapter {
     type?: 'json' | 'binary' | 'text';
     content_type?: string;
   }): Promise<StoredData> {
-    console.log('StorageAdapter.create called:', { pathname, value: request.value, type: request.type });
     await this.ensureInitialized();
 
     const existingFileId = await this.pathMapper.getFileId(pathname);
@@ -255,6 +254,8 @@ export class StorageAdapter {
     search?: string;
     page?: number;
     limit?: number;
+    sort?: string;
+    order?: 'asc' | 'desc';
   } = {}): Promise<{
     items: StoredData[];
     total: number;
@@ -264,7 +265,7 @@ export class StorageAdapter {
   }> {
     await this.ensureInitialized();
 
-    const { search, page = 1, limit = 20 } = params;
+    const { search, page = 1, limit = 20, sort, order = 'desc' } = params;
     const offset = (page - 1) * limit;
 
     let allPaths = await this.pathMapper.listPaths(100000, 0);
@@ -343,6 +344,37 @@ export class StorageAdapter {
       } catch (error) {
         Logger.warn('Failed to load data for path', { path: mapping.path, error });
       }
+    }
+
+    if (sort && items.length > 0) {
+      items.sort((a, b) => {
+        let aVal: any;
+        let bVal: any;
+        
+        switch (sort) {
+          case 'id':
+            aVal = a.id.toLowerCase();
+            bVal = b.id.toLowerCase();
+            break;
+          case 'size':
+            aVal = a.size;
+            bVal = b.size;
+            break;
+          case 'updated_at':
+          default:
+            aVal = new Date(a.updated_at).getTime();
+            bVal = new Date(b.updated_at).getTime();
+            break;
+        }
+        
+        if (typeof aVal === 'string') {
+          return order === 'asc' 
+            ? aVal.localeCompare(bVal) 
+            : bVal.localeCompare(aVal);
+        } else {
+          return order === 'asc' ? aVal - bVal : bVal - aVal;
+        }
+      });
     }
 
     total = items.length;

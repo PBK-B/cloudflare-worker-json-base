@@ -171,15 +171,19 @@ export class DataController {
       const search = url.searchParams.get('search') || undefined
       const page = parseInt(url.searchParams.get('page') || '1')
       const limit = parseInt(url.searchParams.get('limit') || '20')
-      const sort = url.searchParams.get('sort') || 'updatedAt'
+      const sort = url.searchParams.get('sort') || 'updated_at'
       const order = url.searchParams.get('order') || 'desc'
+      
+      const sortField = sort === 'id' ? 'id' : sort === 'size' ? 'size' : 'updated_at'
 
       const auth = await AuthMiddleware.requireAuth(request)
 
       const result = await this.storageAdapter.list({
         search,
         page,
-        limit: Math.min(limit, 1000)
+        limit: Math.min(limit, 1000),
+        sort: sortField,
+        order: order as 'asc' | 'desc'
       })
       
       Logger.info('Data listed', { 
