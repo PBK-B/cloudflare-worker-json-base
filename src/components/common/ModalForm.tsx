@@ -14,6 +14,7 @@ interface ModalFormProps {
 	onSubmit: (data: FormData) => Promise<void>;
 	title: string;
 	initialData?: FormData;
+	initialType?: 'json' | 'text' | 'binary';
 	loading?: boolean;
 	mode: 'create' | 'edit';
 }
@@ -24,6 +25,7 @@ export const ModalForm: React.FC<ModalFormProps> = ({
 	onSubmit,
 	title,
 	initialData,
+	initialType = 'json',
 	loading = false,
 	mode,
 }) => {
@@ -31,15 +33,21 @@ export const ModalForm: React.FC<ModalFormProps> = ({
 		initialData || {
 			path: '',
 			value: '',
-			type: 'json',
+			type: initialType,
 		}
 	);
 
 	React.useEffect(() => {
 		if (initialData) {
 			setFormData(initialData);
+		} else if (show) {
+			setFormData({
+				path: '',
+				value: '',
+				type: initialType,
+			});
 		}
-	}, [initialData, show]);
+	}, [initialData, show, initialType]);
 
 	const handleSubmit = async () => {
 		if (!formData.path.trim()) {

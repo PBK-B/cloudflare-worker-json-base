@@ -25,13 +25,15 @@ const AdminLayout: React.FC = () => {
 	const [showEditModal, setShowEditModal] = useState(false);
 	const [selectedData, setSelectedData] = useState<StorageData | null>(null);
 	const [refreshKey, setRefreshKey] = useState(0);
+	const [createDefaultType, setCreateDefaultType] = useState<'json' | 'text' | 'binary'>('json');
 
 	const handleLogout = () => {
 		logout();
 		navigate('/login');
 	};
 
-	const handleOpenCreateModal = () => {
+	const handleOpenCreateModal = (defaultType?: 'json' | 'text' | 'binary') => {
+		setCreateDefaultType(defaultType || 'json');
 		setShowCreateModal(true);
 	};
 
@@ -138,6 +140,7 @@ const AdminLayout: React.FC = () => {
 				title="创建数据"
 				loading={false}
 				mode="create"
+				initialType={createDefaultType}
 			/>
 
 			{selectedData && (

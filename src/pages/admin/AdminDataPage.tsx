@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { Container, Content, Button, Input, Table, Pagination } from 'rsuite';
-import { Search, Edit, Trash2, FileText, Paperclip } from 'lucide-react';
+import { Search, Edit, Trash2, FileText, Paperclip, Plus } from 'lucide-react';
 import { useApi } from '../../hooks/useApi';
 import { StorageData } from '../../types';
 import '../../styles/WebUIConsole.less';
@@ -9,19 +9,19 @@ import '../../styles/WebUIConsole.less';
 const { Column, HeaderCell, Cell } = Table;
 
 interface AdminContext {
-	onOpenCreateModal: () => void;
+	onOpenCreateModal: (defaultType?: 'json' | 'text' | 'binary') => void;
 	onOpenEditModal: (data: StorageData) => void;
 	refreshKey?: number;
 }
 
 const AdminDataPage: React.FC = () => {
-	const { onOpenEditModal, refreshKey } = useOutletContext<AdminContext>();
+	const { onOpenCreateModal, onOpenEditModal, refreshKey } = useOutletContext<AdminContext>();
 	const { listData, deleteData } = useApi();
 
 	const [dataList, setDataList] = useState<StorageData[]>([]);
 	const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0 });
 	const [searchQuery, setSearchQuery] = useState('');
-	const [sortBy, setSortBy] = useState('updatedAt');
+	const [sortBy, setSortBy] = useState('updated_at');
 	const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 	const [loading, setLoading] = useState(false);
 	const abortRef = useRef<AbortController | null>(null);
@@ -155,14 +155,17 @@ const AdminDataPage: React.FC = () => {
 				</div>
 
 				<div className="data-controls-row-sort">
-					<span>排序：</span>
+					<Button size="sm" appearance="primary" onClick={() => onOpenCreateModal()}>
+						<Plus size={14} /> 创建数据
+					</Button>
+					<span style={{ marginLeft: 'auto' }}>排序：</span>
 					<Button
 						size="sm"
-						appearance={sortBy === 'updatedAt' ? 'primary' : 'subtle'}
-						onClick={() => handleSort('updatedAt')}
+						appearance={sortBy === 'updated_at' ? 'primary' : 'subtle'}
+						onClick={() => handleSort('updated_at')}
 					>
 						<span className="sort-btn-content">
-							更新时间 {sortBy === 'updatedAt' && (sortOrder === 'asc' ? '↑' : '↓')}
+							更新时间 {sortBy === 'updated_at' && (sortOrder === 'asc' ? '↑' : '↓')}
 						</span>
 					</Button>
 					<Button size="sm" appearance={sortBy === 'id' ? 'primary' : 'subtle'} onClick={() => handleSort('id')}>
@@ -208,7 +211,7 @@ const AdminDataPage: React.FC = () => {
 
 					<Column width={150}>
 						<HeaderCell>更新时间</HeaderCell>
-						<Cell>{(rowData) => formatDate(rowData.updatedAt)}</Cell>
+						<Cell>{(rowData) => formatDate(rowData.updated_at)}</Cell>
 					</Column>
 
 					<Column width={120} fixed="right">

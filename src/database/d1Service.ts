@@ -53,31 +53,33 @@ export class D1StorageService {
 
 		const now = new Date().toISOString();
 		const type = request.type || 'json';
-		let value = request.value;
-		let contentType = request.contentType;
+		let value: string = typeof request.value === 'string' ? request.value : JSON.stringify(request.value);
+		let content_type: string = request.content_type || 'application/json';
 
 		if (type === 'json') {
 			value = JSON.stringify(request.value);
-			contentType = contentType || 'application/json';
+			content_type = request.content_type || 'application/json';
 		} else if (type === 'binary') {
 			if (typeof request.value === 'string' && request.value.startsWith('data:')) {
-				contentType = contentType || request.value.split(';')[0].split(':')[1];
+				content_type = request.content_type || request.value.split(';')[0].split(':')[1];
 			} else {
-				contentType = contentType || 'application/octet-stream';
+				content_type = request.content_type || 'application/octet-stream';
 			}
 		} else {
 			value = String(request.value);
-			contentType = contentType || 'text/plain';
+			content_type = request.content_type || 'text/plain';
 		}
 
-		const size = new Blob([value as string]).size;
+		const size = new Blob([value]).size;
+
+		Logger.debug('Creating data', { pathname, type, content_type, size, valueLength: value.length });
 
 		await db
 			.prepare(
 				`INSERT INTO data_items (id, value, type, content_type, size, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?)`
 			)
-			.bind(pathname, value as string, type, contentType, size, now, now)
+			.bind(pathname, value, type, content_type, size, now, now)
 			.run();
 
 		Logger.info('Data created', { pathname, type, size });
@@ -86,10 +88,10 @@ export class D1StorageService {
 			id: pathname,
 			value,
 			type,
-			createdAt: now,
-			updatedAt: now,
+			created_at: now,
+			updated_at: now,
 			size,
-			contentType,
+			content_type,
 		};
 	}
 
@@ -111,20 +113,20 @@ export class D1StorageService {
 		const now = new Date().toISOString();
 		const type = request.type || existing.type;
 		let value = request.value;
-		let contentType = request.contentType || existing.contentType;
+		let content_type = request.content_type || existing.content_type;
 
 		if (type === 'json') {
 			value = JSON.stringify(request.value);
-			contentType = contentType || 'application/json';
+			content_type = content_type || 'application/json';
 		} else if (type === 'binary') {
 			if (typeof request.value === 'string' && request.value.startsWith('data:')) {
-				contentType = contentType || request.value.split(';')[0].split(':')[1];
+				content_type = content_type || request.value.split(';')[0].split(':')[1];
 			} else {
-				contentType = contentType || 'application/octet-stream';
+				content_type = content_type || 'application/octet-stream';
 			}
 		} else {
 			value = String(request.value);
-			contentType = contentType || 'text/plain';
+			content_type = content_type || 'text/plain';
 		}
 
 		const size = new Blob([value as string]).size;
@@ -135,7 +137,7 @@ export class D1StorageService {
          SET value = ?, type = ?, content_type = ?, size = ?, updated_at = ?
          WHERE id = ?`
 			)
-			.bind(value as string, type, contentType, size, now, pathname)
+			.bind(value as string, type, content_type, size, now, pathname)
 			.run();
 
 		Logger.info('Data updated', { pathname, type, size });
@@ -144,10 +146,10 @@ export class D1StorageService {
 			id: pathname,
 			value,
 			type,
-			createdAt: existing.createdAt,
-			updatedAt: now,
+			created_at: existing.created_at,
+			updated_at: now,
 			size,
-			contentType,
+			content_type,
 		};
 	}
 
@@ -198,16 +200,20 @@ export class D1StorageService {
 		const offset = (page - 1) * limit;
 
 		let countQuery = 'SELECT COUNT(*) as total FROM data_items';
+		let sizeQuery = 'SELECT COALESCE(SUM(size), 0) as total_size FROM data_items';
 		let dataQuery = 'SELECT * FROM data_items';
 
 		const queryParams: string[] = [];
+		const countParams: string[] = [];
 
 		if (search) {
 			const searchCondition = ' WHERE id LIKE ? OR value LIKE ?';
 			countQuery += searchCondition;
+			sizeQuery += searchCondition;
 			dataQuery += searchCondition;
 			const searchPattern = `%${search}%`;
 			queryParams.push(searchPattern, searchPattern);
+			countParams.push(searchPattern, searchPattern);
 		}
 
 		const sortColumn = sort === 'id' ? 'id' : 'updated_at';
@@ -215,14 +221,18 @@ export class D1StorageService {
 		dataQuery += ` ORDER BY ${sortColumn} ${sortOrder} LIMIT ? OFFSET ?`;
 		queryParams.push(limit.toString(), offset.toString());
 
-		const [countResult, dataResult] = await Promise.all([
-			db.prepare(countQuery).bind(...(search ? [`%${search}%`, `%${search}%`] : [])).first<{ total: number }>(),
+		const [countResult, sizeResult, dataResult] = await Promise.all([
+			db.prepare(countQuery).bind(...countParams).first<{ total: number }>(),
+			db.prepare(sizeQuery).bind(...countParams).first<{ total_size: number }>(),
 			db.prepare(dataQuery).bind(...queryParams).all<StorageData>(),
 		]);
 
 		const total = countResult?.total || 0;
+		const totalSize = sizeResult?.total_size || 0;
 		const items = (dataResult.results as StorageData[]) || [];
 		const hasMore = offset + items.length < total;
+
+		return { items, total, totalSize, page, limit, hasMore };
 
 		Logger.debug('Data listed', { total, page, limit, count: items.length });
 

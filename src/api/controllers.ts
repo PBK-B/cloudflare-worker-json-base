@@ -36,7 +36,7 @@ export class DataController {
       if (data.type === 'binary') {
         return ResponseBuilder.binary(
           await this.dataUrlToArrayBuffer(data.value),
-          data.contentType || 'application/octet-stream',
+          data.content_type || 'application/octet-stream',
           data.id.split('/').pop()
         )
       }

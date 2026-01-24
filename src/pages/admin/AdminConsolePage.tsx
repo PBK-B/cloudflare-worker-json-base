@@ -5,7 +5,7 @@ import { useApi } from '../../hooks/useApi';
 import '../../styles/WebUIConsole.less';
 
 interface AdminContext {
-	onOpenCreateModal: () => void;
+	onOpenCreateModal: (defaultType?: 'json' | 'text' | 'binary') => void;
 	onOpenEditModal: (data: any) => void;
 	refreshKey?: number;
 }
@@ -22,11 +22,11 @@ const AdminConsolePage: React.FC = () => {
 
 	const loadStats = useCallback(async () => {
 		try {
-			const response = await listData(1, 20);
+			const response = await listData(1, 1000);
 			if (response.success && response.data) {
 				setStats({
 					totalCount: response.data.total,
-					totalSize: 0,
+					totalSize: response.data.totalSize || 0,
 					pageCount: Math.ceil(response.data.total / 20),
 				});
 			}
@@ -65,21 +65,21 @@ const AdminConsolePage: React.FC = () => {
 				</div>
 
 				<div className="quick-actions">
-					<div className="action-card" onClick={onOpenCreateModal}>
+					<div className="action-card" onClick={() => onOpenCreateModal('json')}>
 						<span className="action-icon">
 							<Plus size={24} />
 						</span>
 						<div className="action-title">创建数据</div>
 						<div className="action-description">快速创建新的JSON数据</div>
 					</div>
-					<div className="action-card" onClick={onOpenCreateModal}>
+					<div className="action-card" onClick={() => onOpenCreateModal('text')}>
 						<span className="action-icon">
 							<FileText size={24} />
 						</span>
 						<div className="action-title">存储文本</div>
 						<div className="action-description">存储纯文本内容</div>
 					</div>
-					<div className="action-card" onClick={onOpenCreateModal}>
+					<div className="action-card" onClick={() => onOpenCreateModal('binary')}>
 						<span className="action-icon">
 							<Paperclip size={24} />
 						</span>

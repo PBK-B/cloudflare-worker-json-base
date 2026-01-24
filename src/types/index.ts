@@ -11,22 +11,22 @@ export interface StorageData {
   id: string
   value: any
   type: 'json' | 'binary' | 'text'
-  createdAt: string
-  updatedAt: string
+  created_at: string
+  updated_at: string
   size: number
-  contentType?: string
+  content_type?: string
 }
 
 export interface CreateDataRequest {
   value: any
   type?: 'json' | 'binary' | 'text'
-  contentType?: string
+  content_type?: string
 }
 
 export interface UpdateDataRequest {
   value: any
   type?: 'json' | 'binary' | 'text'
-  contentType?: string
+  content_type?: string
 }
 
 export interface Config {
@@ -84,6 +84,7 @@ export interface PaginationParams {
 export interface PaginatedResponse<T> {
   items: T[]
   total: number
+  totalSize?: number
   page: number
   limit: number
   hasMore: boolean
