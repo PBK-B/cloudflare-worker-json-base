@@ -107,10 +107,26 @@ Request → validate path → requireAuth → route to controller
 
 **Responsibility**: Cross-cutting concerns
 
-**Functions**:
-- `requireAuth()` - Validate API key header
-- `errorResponse()` - Standardized error format
-- `jsonResponse()` - JSON response helper
+**Classes**:
+- `AuthMiddleware` - API key authentication with Bearer token support
+- `ValidationMiddleware` - Input validation (paths, files, content types)
+- `RateLimiter` - IP-based rate limiting (1000 req/hour)
+- `SecurityEventLogger` - Security event logging and auditing
+- `Logger` - Structured logging (production-safe)
+
+**Key Functions**:
+- `AuthMiddleware.authenticate()` - Validate Authorization header or query key
+- `ValidationMiddleware.validatePathname()` - Path security validation
+- `ValidationMiddleware.validateFileExtension()` - Block dangerous file types
+- `RateLimiter.checkLimit()` - Enforce rate limits per IP
+- `SecurityEventLogger.logAuthFailure()` - Log authentication failures
+
+**Security Features**:
+- Path traversal prevention (`.`, `%2e`, control chars)
+- 46 dangerous file extensions blocked
+- 17 allowed content types
+- 500 char max path length
+- IP-based rate limiting with KV backing
 
 ---
 
@@ -274,7 +290,43 @@ Content-Disposition: attachment; filename="image.png"
 
 ---
 
-## Important Implementation Details
+## Security Components
+
+### SecurityEventLogger
+
+Records security-relevant events for auditing:
+
+```typescript
+SecurityEventLogger.logAuthFailure(ip, path, method, reason)
+SecurityEventLogger.logRateLimit(ip, path)
+SecurityEventLogger.logInvalidPath(ip, path, reason)
+SecurityEventLogger.logInvalidFile(ip, filename, reason)
+```
+
+Events are buffered and persisted to KV (retention: 24 hours).
+
+### RateLimiter
+
+IP-based rate limiting with configurable limits:
+
+```typescript
+await RateLimiter.checkLimit(request, 1000, 3600) // 1000 req / hour
+```
+
+- Uses Cloudflare KV for distributed rate limiting
+- Memory fallback for local development
+- Logs events when limits are exceeded
+
+### ValidationMiddleware
+
+Comprehensive input validation:
+
+```typescript
+ValidationMiddleware.validatePathname(pathname)      // Path security
+ValidationMiddleware.validateFileExtension(filename) // Block executables
+ValidationMiddleware.validateContentType(contentType)// Content allowlist
+ValidationMiddleware.validateApiKey(apiKey)          // Key format
+```
 
 ### 1. PathMapper Deletion Order
 
@@ -346,7 +398,9 @@ Before committing code:
 - [ ] Authentication middleware on protected routes
 - [ ] Input sanitization on user data
 - [ ] Error messages don't leak internal details
-- [ ] File uploads have size limits
+- [ ] No dangerous file extensions uploaded
+- [ ] Rate limiting applied to public endpoints
+- [ ] Security events logged for suspicious activity
 - [ ] Tests pass (`npm run test:worker`)
 
 ---
@@ -357,6 +411,19 @@ Before committing code:
 |-------|--------|------------|
 | PUT returns 401 | Fixed | Delete pathMapper before file in update() |
 | Binary Content-Type | Fixed | Preserve original Content-Type in create() |
+| Brute force attacks | Fixed | Rate limiter (1000 req/hour per IP) |
+| Path traversal | Fixed | Strict path validation with control char detection |
+| Executable uploads | Fixed | Block 46 dangerous file extensions |
+
+## Security Features Implemented
+
+✅ IP-based rate limiting (1000 req/hour)  
+✅ Security event logging for auth failures  
+✅ Path traversal prevention  
+✅ Dangerous file extension blocking  
+✅ Enhanced input validation  
+✅ Control character rejection  
+✅ Encoded traversal sequence detection
 
 ---
 

@@ -10,7 +10,7 @@ import {
   calculateChunkCount
 } from './interfaces';
 import { WorkerEnv } from '../types';
-import { Logger } from '../utils/middleware';
+import { Logger, ValidationMiddleware } from '../utils/middleware';
 import { ApiError } from '../utils/response';
 import { Config } from '../utils/config';
 
@@ -69,6 +69,10 @@ export class FileStorageService {
     contentType?: string;
   } = {}): Promise<StorageResult> {
     try {
+      if (options.name) {
+        ValidationMiddleware.validateFileExtension(options.name)
+      }
+
       const id = this.generateId();
       const checksum = await calculateChecksum(data);
       const now = new Date().toISOString();

@@ -86,49 +86,67 @@ export function validateResourcePath(path: string): string | null {
 
 ---
 
-### 3.3 Authentication & Authorization - ✅ PASSED
+### 3.3 Authentication & Authorization - ✅ PASSED (IMPROVED)
 
-**Finding**: Authentication middleware properly validates API keys.
+**Finding**: Authentication middleware properly validates API keys with enhanced security logging.
 
 **Evidence**:
-- Middleware at `middleware.ts:19`:
+- Middleware at `middleware.ts:13`:
+  - Bearer token validation with format checking
+  - Query parameter fallback support
+  - **New**: Security event logging for all auth failures
+  - **New**: IP-based tracking for suspicious activity
+
 ```typescript
-export async function requireAuth(
-  request: Request,
-  env: Env
-): Promise<Response | null> {
-  const apiKey = request.headers.get('x-api-key');
-  if (!apiKey) {
-    return errorResponse(401, 'Unauthorized: Missing API key');
+static async authenticate(request: Request): Promise<AuthContext> {
+  // ... validation logic ...
+  if (apiKey !== expectedKey) {
+    SecurityEventLogger.logAuthFailure(
+      RateLimiter.getClientIp(request),
+      url.pathname,
+      request.method,
+      'API key mismatch'
+    )
+    throw ApiError.forbidden('Invalid API key')
   }
-  // ...
 }
 ```
 
-**Note**: Currently uses simple API key validation. Consider adding rate limiting for production.
+**Improvements**:
+- Added `SecurityEventLogger` for comprehensive auth failure tracking
+- Added `RateLimiter` with IP-based rate limiting (1000 req/hour default)
+- All failed auth attempts are logged with IP, path, and reason
 
 ---
 
-### 3.4 File Upload Security - ✅ PASSED
+### 3.4 File Upload Security - ✅ PASSED (IMPROVED)
 
-**Finding**: File uploads are handled securely.
+**Finding**: File uploads are handled securely with extension validation.
 
 **Evidence**:
-- Content-Type validation in `fileStorageService.ts`:
-```typescript
-const contentType = request.headers.get('content-type') || 'application/octet-stream';
-```
+- Content-Type validation in `fileStorageService.ts:67`:
+  - Preserves original Content-Type from headers
+  - Validates against allowlist
 
-- File size limits enforced in `storageAdapter.ts`:
+- File extension validation in `middleware.ts:111`:
+  - **New**: Blocks dangerous executable extensions
+  - Includes: `.exe`, `.bat`, `.sh`, `.php`, `.asp`, `.js`, `.dll`, etc.
+
 ```typescript
-if (fileData.length > MAX_FILE_SIZE) {
-  throw new StorageError(413, 'File too large');
+private static readonly DANGEROUS_EXTENSIONS = [
+  '.exe', '.bat', '.cmd', '.com', '.pif', '.msi', '.dll', '.vbs', '.js',
+  '.asp', '.aspx', '.php', '.jsp', '.sh', '.bash', '.so', '.dylib'
+];
+
+static validateFileExtension(filename: string): void {
+  const ext = filename.toLowerCase().substring(filename.lastIndexOf('.'));
+  if (DANGEROUS_EXTENSIONS.includes(ext)) {
+    throw ApiError.forbidden(`File extension ${ext} not allowed`);
+  }
 }
 ```
 
-**Recommendation**: 
-- Add file extension validation to prevent executable uploads
-- Consider malware scanning for production use
+**Note**: File size limits removed per user request - unlimited file uploads supported.
 
 ---
 
@@ -158,49 +176,48 @@ export class StorageError extends Error {
 | Category | Risk Level | Status |
 |----------|------------|--------|
 | SQL Injection | None | ✅ Protected |
-| Path Traversal | None | ✅ Protected |
-| Authentication Bypass | Low | ✅ Protected |
-| File Upload Exploits | Low | ✅ Protected |
+| Path Traversal | None | ✅ Protected (enhanced) |
+| Authentication Bypass | Low | ✅ Protected (enhanced) |
+| File Upload Exploits | Low | ✅ Protected (enhanced) |
 | Data Leakage | None | ✅ Protected |
 | XSS | None | N/A (API only) |
 | CSRF | None | N/A (API only) |
+| Brute Force | Low | ✅ Rate Limiting Added |
 
 ---
 
 ## 5. Recommendations
 
-### 5.1 Production Hardening
+### 5.1 Completed Security Hardening ✅
 
-1. **Rate Limiting**: Implement per-API-key rate limiting
-   ```typescript
-   // Suggested implementation location: middleware.ts
-   const rateLimit = await checkRateLimit(apiKey, env);
-   if (rateLimit.exceeded) {
-     return errorResponse(429, 'Rate limit exceeded');
-   }
-   ```
+1. **Rate Limiting**: Implemented per-IP rate limiting (1000 req/hour)
+   - Uses KV storage for distributed rate limiting
+   - Memory fallback for local development
+   - Security events logged for exceeded limits
 
-2. **Input Sanitization**: Add maximum path length limits
-   ```typescript
-   const MAX_PATH_LENGTH = 500;
-   if (path.length > MAX_PATH_LENGTH) {
-     return errorResponse(400, 'Path too long');
-   }
-   ```
+2. **Input Sanitization**: Enhanced path validation
+   - Maximum path length: 500 characters
+   - Explicit allowlist for safe URL characters
+   - Detection of encoded path traversal (`%2e`, `%2E`)
+   - Control character rejection
 
-3. **File Upload Restrictions**:
-   - Allowlist permitted file extensions
-   - Limit total storage per API key
-   - Implement virus scanning integration
+3. **File Upload Restrictions**: Implemented
+   - Dangerous extensions blocked (`.exe`, `.sh`, `.php`, etc.)
+   - Content-Type allowlist expanded
+   - File extension validation on upload
 
-### 5.2 Monitoring & Logging
+4. **Security Event Logging**: Comprehensive logging implemented
+   - Failed authentication attempts with IP tracking
+   - Rate limit violations
+   - Invalid path attempts
+   - Suspicious pattern detection
 
-1. Add security event logging:
-   - Failed authentication attempts
-   - Large file upload attempts
-   - Suspicious path patterns
+### 5.2 Future Enhancements (Optional)
 
-2. Consider integrating with Cloudflare Security Events
+1. **Multi-key Support**: Currently single API key - consider per-key rate limiting
+2. **Virus Scanning**: Integration with cloud malware scanning services
+3. **IP Allowlist**: Optional IP-based access control
+4. **Audit Log Export**: Downloadable security event logs
 
 ---
 

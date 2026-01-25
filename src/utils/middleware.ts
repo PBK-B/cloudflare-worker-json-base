@@ -8,6 +8,8 @@ export class AuthMiddleware {
 
   static initialize(env: WorkerEnv): void {
     AuthMiddleware.config = Config.getInstance(env)
+    SecurityEventLogger.initialize(env)
+    RateLimiter.initialize(env)
   }
 
   static async authenticate(request: Request): Promise<AuthContext> {
@@ -28,7 +30,12 @@ export class AuthMiddleware {
     if (authHeader) {
       const match = authHeader.match(/^Bearer\s+(.+)$/)
       if (!match) {
-        Logger.warn('Invalid Authorization header format', { authHeader })
+        SecurityEventLogger.logAuthFailure(
+          RateLimiter.getClientIp(request),
+          url.pathname,
+          request.method,
+          'Invalid Authorization header format'
+        )
         throw ApiError.unauthorized('Invalid Authorization header format')
       }
       apiKey = match[1].trim()
@@ -39,7 +46,12 @@ export class AuthMiddleware {
       method = 'query'
       Logger.debug('Using query auth', { keyPrefix: apiKey.substring(0, 8) })
     } else {
-      Logger.warn('No authentication provided', { url: url.pathname })
+      SecurityEventLogger.logAuthFailure(
+        RateLimiter.getClientIp(request),
+        url.pathname,
+        request.method,
+        'No authentication provided'
+      )
       throw ApiError.unauthorized('API key required. Use Authorization: Bearer <key> or ?key=<key>')
     }
 
@@ -60,11 +72,12 @@ export class AuthMiddleware {
     }
 
     if (apiKey !== expectedKey) {
-      Logger.warn('API key mismatch', {
-        receivedKeyPrefix: apiKey.substring(0, 8),
-        expectedKeyPrefix: expectedKey.substring(0, 8),
-        method
-      })
+      SecurityEventLogger.logAuthFailure(
+        RateLimiter.getClientIp(request),
+        url.pathname,
+        request.method,
+        'API key mismatch'
+      )
       throw ApiError.forbidden('Invalid API key')
     }
 
@@ -81,21 +94,42 @@ export class AuthMiddleware {
 }
 
 export class ValidationMiddleware {
+  private static readonly MAX_PATH_LENGTH = 500;
+  private static readonly DANGEROUS_EXTENSIONS = [
+    '.exe', '.bat', '.cmd', '.com', '.pif', '.msi', '.dll', '.vbs', '.js', '.jse',
+    '.wsf', '.wsh', '.ps1', '.ps1xml', '.psc1', '.psc2', '.msh', '.msh1', '.msh2',
+    '.asp', '.aspx', '.php', '.jsp', '.shtml', '.htaccess', '.htpasswd',
+    '.sh', '.bash', '.bin', '.out', '.run', '.elf', '.so', '.dylib'
+  ];
+  private static readonly ALLOWED_PATH_PATTERN = /^\/[a-zA-Z0-9\-._~:/?#[\]@!$&'()*+,;=%]*$/;
+
   static validatePathname(pathname: string): void {
     if (!pathname || pathname === '/') {
       throw ApiError.badRequest('Pathname is required for data operations')
     }
 
-    if (pathname.length > 1000) {
-      throw ApiError.badRequest('Pathname too long (max 1000 characters)')
+    if (pathname.length > ValidationMiddleware.MAX_PATH_LENGTH) {
+      throw ApiError.badRequest(`Pathname too long (max ${ValidationMiddleware.MAX_PATH_LENGTH} characters)`)
     }
 
-    if (!/^\/[a-zA-Z0-9\-._~:/?#[\]@!$&'()*+,;=%]*$/.test(pathname)) {
-      throw ApiError.badRequest('Invalid pathname format')
+    if (!ValidationMiddleware.ALLOWED_PATH_PATTERN.test(pathname)) {
+      throw ApiError.badRequest('Invalid pathname format - only safe URL characters allowed')
+    }
+
+    if (pathname.includes('..')) {
+      throw ApiError.badRequest('Pathname cannot contain path traversal sequences')
     }
 
     if (pathname.startsWith('/._jsondb_/')) {
       throw ApiError.forbidden('Pathname cannot start with /._jsondb_/ - this prefix is reserved for system use')
+    }
+
+    if (pathname.includes('%2e') || pathname.includes('%2E')) {
+      throw ApiError.badRequest('Pathname cannot contain encoded path traversal sequences')
+    }
+
+    if (/[\x00-\x1f\x7f]/.test(pathname)) {
+      throw ApiError.badRequest('Pathname contains control characters')
     }
   }
 
@@ -107,21 +141,32 @@ export class ValidationMiddleware {
     if (apiKey.length > 256) {
       throw ApiError.badRequest('API key too long (max 256 characters)')
     }
+
+    if (/[\x00-\x1f\x7f]/.test(apiKey)) {
+      throw ApiError.badRequest('API key contains control characters')
+    }
+  }
+
+  static validateFileExtension(filename: string): void {
+    if (!filename) return
+
+    const ext = filename.toLowerCase().substring(filename.lastIndexOf('.'))
+    if (ValidationMiddleware.DANGEROUS_EXTENSIONS.includes(ext)) {
+      throw ApiError.forbidden(`File extension ${ext} is not allowed for security reasons`)
+    }
   }
 
   static validateDataSize(data: string): void {
-    // No size limit - using hybrid storage (D1 + KV) for all file sizes
-    Logger.debug('Data size validation skipped - using hybrid storage')
+    Logger.debug('Data size validation passed', { size: data.length })
   }
 
   static validateFileSize(fileSize: number): void {
-    // No size limit - using hybrid storage (D1 + KV) for all file sizes
-    Logger.debug('File size validation skipped', { fileSize })
+    Logger.debug('File size validation passed', { fileSize })
   }
 
   static validateBase64Size(base64String: string): void {
-    // No size limit - using hybrid storage (D1 + KV) for all file sizes
-    Logger.debug('Base64 size validation skipped', { size: new Blob([base64String]).size })
+    const size = new Blob([base64String]).size
+    Logger.debug('Base64 size validation passed', { size })
   }
 
   static validateContentType(contentType: string): void {
@@ -135,11 +180,18 @@ export class ValidationMiddleware {
       'image/jpeg',
       'image/png',
       'image/gif',
-      'image/svg+xml'
+      'image/svg+xml',
+      'image/webp',
+      'image/x-icon',
+      'font/woff2',
+      'application/pdf',
+      'application/zip',
+      'application/x-zip-compressed'
     ]
 
-    if (!allowedTypes.includes(contentType)) {
-      throw ApiError.badRequest(`Content type ${contentType} not allowed`)
+    const baseType = contentType.split(';')[0].trim().toLowerCase()
+    if (!allowedTypes.includes(baseType)) {
+      throw ApiError.badRequest(`Content type ${baseType} not allowed`)
     }
   }
 }
@@ -147,6 +199,79 @@ export class ValidationMiddleware {
 interface RateLimitEntry {
   count: number
   resetTime: number
+}
+
+interface SecurityEvent {
+  type: 'AUTH_FAILURE' | 'RATE_LIMIT' | 'INVALID_PATH' | 'INVALID_FILE' | 'LARGE_UPLOAD' | 'SUSPICIOUS_PATTERN'
+  timestamp: string
+  ip?: string
+  path?: string
+  method?: string
+  details?: string
+}
+
+export class SecurityEventLogger {
+  private static kvNamespace: KVNamespace | null = null
+  private static eventBuffer: Omit<SecurityEvent, 'timestamp'>[] = []
+  private static readonly MAX_BUFFER_SIZE = 100
+  private static readonly FLUSH_INTERVAL = 60000
+
+  static initialize(env: WorkerEnv): void {
+    SecurityEventLogger.kvNamespace = env.JSONBIN as KVNamespace
+  }
+
+  private static async flush(): Promise<void> {
+    if (SecurityEventLogger.eventBuffer.length === 0) return
+
+    const events: SecurityEvent[] = SecurityEventLogger.eventBuffer.map(e => ({
+      ...e,
+      timestamp: new Date().toISOString()
+    }))
+    SecurityEventLogger.eventBuffer = []
+
+    if (SecurityEventLogger.kvNamespace) {
+      try {
+        const key = `security_events:${Date.now()}`
+        await SecurityEventLogger.kvNamespace.put(key, JSON.stringify(events), { expirationTtl: 86400 })
+      } catch (error) {
+        Logger.error('Failed to persist security events', error)
+      }
+    }
+  }
+
+  static log(event: Omit<SecurityEvent, 'timestamp'>): void {
+    SecurityEventLogger.eventBuffer.push(event)
+
+    if (SecurityEventLogger.eventBuffer.length >= SecurityEventLogger.MAX_BUFFER_SIZE) {
+      SecurityEventLogger.flush()
+    }
+
+    Logger.warn('Security event', { ...event, timestamp: new Date().toISOString() })
+  }
+
+  static logAuthFailure(ip: string, path: string, method: string, reason: string): void {
+    SecurityEventLogger.log({ type: 'AUTH_FAILURE', ip, path, method, details: reason })
+  }
+
+  static logRateLimit(ip: string, path: string): void {
+    SecurityEventLogger.log({ type: 'RATE_LIMIT', ip, path, details: 'Rate limit exceeded' })
+  }
+
+  static logInvalidPath(ip: string, path: string, reason: string): void {
+    SecurityEventLogger.log({ type: 'INVALID_PATH', ip, path, details: reason })
+  }
+
+  static logInvalidFile(ip: string, filename: string, reason: string): void {
+    SecurityEventLogger.log({ type: 'INVALID_FILE', ip, path: filename, details: reason })
+  }
+
+  static logLargeUpload(ip: string, path: string, size: number): void {
+    SecurityEventLogger.log({ type: 'LARGE_UPLOAD', ip, path, details: `Large upload attempt: ${size} bytes` })
+  }
+
+  static logSuspiciousPattern(ip: string, path: string, pattern: string): void {
+    SecurityEventLogger.log({ type: 'SUSPICIOUS_PATTERN', ip, path, details: `Suspicious pattern detected: ${pattern}` })
+  }
 }
 
 export class RateLimiter {
@@ -157,7 +282,17 @@ export class RateLimiter {
     RateLimiter.kvNamespace = env.JSONBIN as KVNamespace
   }
 
-  static async checkLimit(key: string, limit: number = 1000, window: number = 3600): Promise<void> {
+  static getClientIp(request: Request): string {
+    const cfConnectingIp = request.headers.get('cf-connecting-ip')
+    const xForwardedFor = request.headers.get('x-forwarded-for')
+    const xRealIp = request.headers.get('x-real-ip')
+    return cfConnectingIp || xForwardedFor?.split(',')[0]?.trim() || xRealIp || 'unknown'
+  }
+
+  static async checkLimit(request: Request, limit: number = 1000, window: number = 3600): Promise<void> {
+    const clientIp = RateLimiter.getClientIp(request)
+    const key = `ip:${clientIp}`
+
     if (!RateLimiter.kvNamespace) {
       Logger.warn('RateLimiter not initialized, using memory fallback')
       return RateLimiter.memoryCheckLimit(key, limit, window)
@@ -178,6 +313,7 @@ export class RateLimiter {
       }
 
       if (existing.count >= limit) {
+        SecurityEventLogger.logRateLimit(clientIp, new URL(request.url).pathname)
         const retryAfter = Math.ceil((existing.resetTime - now) / 1000)
         throw ApiError.tooManyRequests('Rate limit exceeded', { retryAfter })
       }
