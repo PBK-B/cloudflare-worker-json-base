@@ -19,7 +19,7 @@ const AdminDataPage: React.FC = () => {
 	const { listData, deleteData } = useApi();
 
 	const [dataList, setDataList] = useState<StorageData[]>([]);
-	const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0 });
+	const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0 });
 	const [searchQuery, setSearchQuery] = useState('');
 	const [sortBy, setSortBy] = useState('updated_at');
 	const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
@@ -192,7 +192,7 @@ const AdminDataPage: React.FC = () => {
 						<Cell>{(rowData) => formatSize(rowData.size)}</Cell>
 					</Column>
 
-					<Column width={150}>
+					<Column width={152}>
 						<HeaderCell>更新时间</HeaderCell>
 						<Cell>{(rowData) => formatDate(rowData.updated_at)}</Cell>
 					</Column>
