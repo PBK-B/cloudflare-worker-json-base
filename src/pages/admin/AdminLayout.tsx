@@ -6,6 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useApi } from '../../hooks/useApi';
 import { ModalForm } from '../../components/common/ModalForm';
 import { StorageData } from '../../types';
+import { notify } from '../../utils/notification';
 import '../../styles/WebUIConsole.less';
 
 interface FormData {
@@ -61,9 +62,10 @@ const AdminLayout: React.FC = () => {
 				const response = await uploadFile(data.path, file, file.type);
 				if (response.success) {
 					handleCloseModals();
+					notify.success('创建成功');
 					notifyRefresh();
 				} else {
-					alert(`创建失败: ${response.error}`);
+					notify.error(`创建失败: ${response.error}`);
 				}
 			} else {
 				let processedValue = data.value;
@@ -78,13 +80,14 @@ const AdminLayout: React.FC = () => {
 
 				if (response.success) {
 					handleCloseModals();
+					notify.success('创建成功');
 					notifyRefresh();
 				} else {
-					alert(`创建失败: ${response.error}`);
+					notify.error(`创建失败: ${response.error}`);
 				}
 			}
 		} catch (error) {
-			alert('创建失败');
+			notify.error('创建失败');
 			console.error('Create error:', error);
 		} finally {
 			setSubmitLoading(false);
@@ -108,12 +111,13 @@ const AdminLayout: React.FC = () => {
 
 			if (response.success) {
 				handleCloseModals();
+				notify.success('更新成功');
 				notifyRefresh();
 			} else {
-				alert(`更新失败: ${response.error}`);
+				notify.error(`更新失败: ${response.error}`);
 			}
 		} catch (error) {
-			alert('更新失败');
+			notify.error('更新失败');
 			console.error('Update error:', error);
 		} finally {
 			setSubmitLoading(false);

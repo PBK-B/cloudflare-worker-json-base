@@ -1,6 +1,7 @@
 import React from 'react'
 import { observer } from 'mobx-react-lite'
 import appStore from '../stores/AppStore'
+import { notify } from '../utils/notification'
 
 const DeploymentGuide: React.FC = observer(() => {
   const [formValue, setFormValue] = React.useState({
@@ -12,7 +13,7 @@ const DeploymentGuide: React.FC = observer(() => {
 
   const handleConfigSubmit = async () => {
     if (!formValue.apiKey.trim()) {
-      alert('请输入 API Key')
+      notify.warning('请输入 API Key')
       return
     }
 
@@ -23,7 +24,7 @@ const DeploymentGuide: React.FC = observer(() => {
     setTimeout(() => {
       appStore.setLoading(false)
       appStore.nextStep()
-      alert('配置已保存，请继续下一步')
+      notify.success('配置已保存，请继续下一步')
     }, 1000)
   }
 
@@ -35,7 +36,7 @@ const DeploymentGuide: React.FC = observer(() => {
   const handleDeployComplete = () => {
     appStore.updateStepStatus('deploy', 'completed')
     appStore.setDeployed(true)
-    alert('部署完成！WebUI 控制台已准备就绪')
+    notify.success('部署完成！WebUI 控制台已准备就绪')
   }
 
   const renderStepContent = () => {

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Modal, Form, Input, InputPicker, Button, Uploader } from 'rsuite';
 import { Plus, Edit, Upload, File, X } from 'lucide-react';
+import { notify } from '../../utils/notification';
 
 interface FormData {
 	path: string;
@@ -55,18 +56,18 @@ export const ModalForm: React.FC<ModalFormProps> = ({
 
 	const handleSubmit = async () => {
 		if (!formData.path.trim()) {
-			alert('请输入路径');
+			notify.warning('请输入路径');
 			return;
 		}
 
 		if (formData.type === 'binary') {
 			if (!uploadedFile && !formData.value) {
-				alert('请上传文件');
+				notify.warning('请上传文件');
 				return;
 			}
 		} else {
 			if (!formData.value.trim()) {
-				alert('请输入数据内容');
+				notify.warning('请输入数据内容');
 				return;
 			}
 		}
@@ -75,7 +76,7 @@ export const ModalForm: React.FC<ModalFormProps> = ({
 			try {
 				JSON.parse(formData.value);
 			} catch {
-				alert('JSON 格式错误，请检查数据格式');
+				notify.warning('JSON 格式错误，请检查数据格式');
 				return;
 			}
 		}
@@ -220,7 +221,7 @@ export const ModalForm: React.FC<ModalFormProps> = ({
 	return (
 		<Modal open={show} onClose={onClose}>
 			<Modal.Header>
-				<Modal.Title className="modal-title">
+				<Modal.Title className="modal-title" style={{ display: 'flex', flexDirection: 'row' }}>
 					<li style={{ display: 'flex', flexDirection: 'row' }}>{mode === 'create' ? <Plus size={18} /> : <Edit size={18} />}</li>
 					{title}
 				</Modal.Title>

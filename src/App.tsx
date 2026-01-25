@@ -5,6 +5,7 @@ import LoginPage from './pages/LoginPage';
 import AdminLayout from './pages/admin/AdminLayout';
 import AdminConsolePage from './pages/admin/AdminConsolePage';
 import AdminDataPage from './pages/admin/AdminDataPage';
+import { ToastContainer } from './utils/notification';
 import './styles/App.less';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -50,6 +51,7 @@ const App: React.FC = () => {
 	return (
 		<BrowserRouter>
 			<AuthProvider>
+				<ToastContainer />
 				<AppRoutes />
 			</AuthProvider>
 		</BrowserRouter>

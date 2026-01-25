@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { Container, Content, Button, Input, Table, Pagination } from 'rsuite';
-import { Search, Edit, Trash2, FileText, Paperclip, Plus } from 'lucide-react';
+import { Container, Content, Button, Input, Table, Pagination, Modal } from 'rsuite';
+import { Search, Edit, Trash2, FileText, Paperclip, Plus, AlertTriangle } from 'lucide-react';
 import { useApi } from '../../hooks/useApi';
 import { StorageData } from '../../types';
 import '../../styles/WebUIConsole.less';
@@ -25,6 +25,10 @@ const AdminDataPage: React.FC = () => {
 	const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 	const [loading, setLoading] = useState(false);
 	const abortRef = useRef<AbortController | null>(null);
+	const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+	const [deletingId, setDeletingId] = useState<string | null>(null);
+	const [errorModalOpen, setErrorModalOpen] = useState(false);
+	const [errorMessage, setErrorMessage] = useState('');
 
 	const loadData = useCallback(async () => {
 		if (abortRef.current) {
@@ -85,21 +89,28 @@ const AdminDataPage: React.FC = () => {
 		setPagination((prev) => ({ ...prev, page: 1 }));
 	};
 
-	const handleDeleteData = async (id: string) => {
-		const confirmed = window.confirm(`确定要删除 "${id}" 吗？此操作不可撤销。`);
-		if (!confirmed) return;
+	const handleDeleteData = (id: string) => {
+		setDeletingId(id);
+		setDeleteModalOpen(true);
+	};
+
+	const confirmDelete = async () => {
+		if (!deletingId) return;
 
 		setLoading(true);
 		try {
-			const response = await deleteData(id);
+			const response = await deleteData(deletingId);
 			if (response.success) {
-				alert('数据删除成功！');
+				setDeleteModalOpen(false);
+				setDeletingId(null);
 				await loadData();
 			} else {
-				alert(`删除失败: ${response.error}`);
+				setErrorMessage(response.error || '删除数据时发生错误');
+				setErrorModalOpen(true);
 			}
 		} catch {
-			alert('删除失败');
+			setErrorMessage('删除数据时发生错误');
+			setErrorModalOpen(true);
 		} finally {
 			setLoading(false);
 		}
@@ -228,6 +239,44 @@ const AdminDataPage: React.FC = () => {
 					}}
 				/>
 			</div>
+
+			<Modal open={deleteModalOpen} onClose={() => setDeleteModalOpen(false)}>
+				<Modal.Header>
+					<Modal.Title style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+						<AlertTriangle size={18} style={{ color: '#ff4d4f' }} />
+						确认删除
+					</Modal.Title>
+				</Modal.Header>
+				<Modal.Body>
+					<p>确定要删除 <strong>"{deletingId}"</strong> 吗？</p>
+					<p style={{ color: '#999', marginTop: '8px', fontSize: '12px' }}>此操作不可撤销，数据将被永久删除。</p>
+				</Modal.Body>
+				<Modal.Footer>
+					<Button onClick={() => setDeleteModalOpen(false)} appearance="subtle">
+						取消
+					</Button>
+					<Button onClick={confirmDelete} appearance="primary" color="red" loading={loading}>
+						删除
+					</Button>
+				</Modal.Footer>
+			</Modal>
+
+			<Modal open={errorModalOpen} onClose={() => setErrorModalOpen(false)}>
+				<Modal.Header>
+					<Modal.Title style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+						<AlertTriangle size={18} style={{ color: '#ff4d4f' }} />
+						删除失败
+					</Modal.Title>
+				</Modal.Header>
+				<Modal.Body>
+					<p>{errorMessage}</p>
+				</Modal.Body>
+				<Modal.Footer>
+					<Button onClick={() => setErrorModalOpen(false)} appearance="primary">
+						确定
+					</Button>
+				</Modal.Footer>
+			</Modal>
 		</div>
 	);
 };
