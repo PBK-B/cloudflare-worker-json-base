@@ -103,9 +103,15 @@ const AdminConsolePage: React.FC = () => {
 						<h5>快速API示例</h5>
 						<pre className="console-code-block">
 							{`创建数据:
-POST /api/data/example
+POST /data/example
 Authorization: Bearer YOUR_API_KEY
-{"name": "example", "value": "data"}`}
+{"name": "example", "value": "data"}
+
+获取数据:
+GET /data/example
+Authorization: Bearer YOUR_API_KEY
+-> {"name": "example", "value": "data"}
+`}
 						</pre>
 					</div>
 				</div>
