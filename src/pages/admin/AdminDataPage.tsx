@@ -143,40 +143,25 @@ const AdminDataPage: React.FC = () => {
 				</div>
 
 				<div className="data-controls-row">
-					<Input
-						className="data-controls-row-search"
-						placeholder="搜索数据..."
-						value={searchQuery}
-						onChange={setSearchQuery}
-					/>
+					<Input className="data-controls-row-search" placeholder="搜索数据..." value={searchQuery} onChange={setSearchQuery} />
 					<Button onClick={handleSearch} className="btn-search">
 						<Search size={16} /> 搜索
 					</Button>
 				</div>
 
 				<div className="data-controls-row-sort">
-					<Button size="sm" appearance="primary" onClick={() => onOpenCreateModal()}>
+					<Button className="create-btn" size="sm" appearance="primary" onClick={() => onOpenCreateModal()}>
 						<Plus size={14} /> 创建数据
 					</Button>
 					<span style={{ marginLeft: 'auto' }}>排序：</span>
-					<Button
-						size="sm"
-						appearance={sortBy === 'updated_at' ? 'primary' : 'subtle'}
-						onClick={() => handleSort('updated_at')}
-					>
-						<span className="sort-btn-content">
-							更新时间 {sortBy === 'updated_at' && (sortOrder === 'asc' ? '↑' : '↓')}
-						</span>
+					<Button size="sm" appearance={sortBy === 'updated_at' ? 'primary' : 'subtle'} onClick={() => handleSort('updated_at')}>
+						<span className="sort-btn-content">更新时间 {sortBy === 'updated_at' && (sortOrder === 'asc' ? '↑' : '↓')}</span>
 					</Button>
 					<Button size="sm" appearance={sortBy === 'id' ? 'primary' : 'subtle'} onClick={() => handleSort('id')}>
-						<span className="sort-btn-content">
-							路径 {sortBy === 'id' && (sortOrder === 'asc' ? '↑' : '↓')}
-						</span>
+						<span className="sort-btn-content">路径 {sortBy === 'id' && (sortOrder === 'asc' ? '↑' : '↓')}</span>
 					</Button>
 					<Button size="sm" appearance={sortBy === 'size' ? 'primary' : 'subtle'} onClick={() => handleSort('size')}>
-						<span className="sort-btn-content">
-							大小 {sortBy === 'size' && (sortOrder === 'asc' ? '↑' : '↓')}
-						</span>
+						<span className="sort-btn-content">大小 {sortBy === 'size' && (sortOrder === 'asc' ? '↑' : '↓')}</span>
 					</Button>
 				</div>
 			</div>
@@ -197,9 +182,7 @@ const AdminDataPage: React.FC = () => {
 						<HeaderCell>类型</HeaderCell>
 						<Cell>
 							{(rowData) => (
-								<span className={`type-badge type-badge-${rowData.type || 'unknown'}`}>
-									{(rowData.type || 'UNKNOWN').toUpperCase()}
-								</span>
+								<span className={`type-badge type-badge-${rowData.type || 'unknown'}`}>{(rowData.type || 'UNKNOWN').toUpperCase()}</span>
 							)}
 						</Cell>
 					</Column>

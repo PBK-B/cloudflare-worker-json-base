@@ -221,7 +221,7 @@ export const ModalForm: React.FC<ModalFormProps> = ({
 		<Modal open={show} onClose={onClose}>
 			<Modal.Header>
 				<Modal.Title className="modal-title">
-					{mode === 'create' ? <Plus size={18} /> : <Edit size={18} />}
+					<li style={{ display: 'flex', flexDirection: 'row' }}>{mode === 'create' ? <Plus size={18} /> : <Edit size={18} />}</li>
 					{title}
 				</Modal.Title>
 			</Modal.Header>
