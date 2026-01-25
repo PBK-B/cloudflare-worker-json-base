@@ -1,7 +1,7 @@
 import { DataController, HealthController } from './controllers'
 import { StorageController } from './storageController'
 import { ConsoleController } from './consoleController'
-import { DataAccessController } from './dataAccessController'
+import { ResourceController } from './resourceController'
 import { CorsHandler } from '../utils/response'
 import { Logger } from '../utils/middleware'
 import { WorkerEnv } from '../types'
@@ -11,7 +11,7 @@ export class Router {
   private healthController!: HealthController
   private storageController!: StorageController
   private consoleController!: ConsoleController
-  private dataAccessController!: DataAccessController
+  private resourceController!: ResourceController
   private initError: Error | null = null;
 
   constructor(env: WorkerEnv) {
@@ -20,7 +20,7 @@ export class Router {
       this.healthController = new HealthController(env)
       this.storageController = new StorageController(env)
       this.consoleController = new ConsoleController(env)
-      this.dataAccessController = new DataAccessController(env)
+      this.resourceController = new ResourceController(env)
     } catch (error) {
       this.initError = error instanceof Error ? error : new Error('Unknown initialization error');
     }
@@ -71,9 +71,9 @@ export class Router {
       } else if (pathname.startsWith('/assets/') || pathname === '/vite.svg') {
         response = new Response('Static asset - handled by Vite', { status: 404 })
       } else {
-        const dataResponse = await this.dataAccessController.handle(request);
-        if (dataResponse) {
-          response = dataResponse;
+        const resourceResponse = await this.resourceController.handle(request);
+        if (resourceResponse) {
+          response = resourceResponse;
         } else {
           response = new Response('Unauthorized', { status: 401 });
         }

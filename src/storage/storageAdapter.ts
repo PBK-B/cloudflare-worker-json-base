@@ -111,7 +111,7 @@ export class StorageAdapter {
 
     if (metadata.contentType === 'application/json') {
       try {
-        value = JSON.parse(this.uint8ArrayToText(data));
+        value = this.uint8ArrayToText(data);
         type = 'json';
       } catch {
         value = this.uint8ArrayToBase64(data);
@@ -120,9 +120,12 @@ export class StorageAdapter {
     } else if (metadata.contentType.startsWith('text/')) {
       value = this.uint8ArrayToText(data);
       type = 'text';
-    } else {
-      value = this.uint8ArrayToBase64(data);
+    } else if (this.isBinaryContentType(metadata.contentType)) {
+      value = data;
       type = 'binary';
+    } else {
+      value = this.uint8ArrayToText(data);
+      type = 'text';
     }
 
     return {
@@ -174,7 +177,7 @@ export class StorageAdapter {
       }
     } else {
       data = this.textToUint8Array(String(request.value));
-      contentType = 'text/plain';
+      contentType = request.content_type || contentType || 'text/plain';
     }
 
     const result = await this.storageService.write(data, {
@@ -224,6 +227,9 @@ export class StorageAdapter {
     if (!fileId) {
       throw ApiError.notFound(`Data not found at path: ${pathname}`);
     }
+
+    // Delete path mapping first to avoid conflict in create
+    await this.pathMapper.deleteMapping(pathname);
 
     // Delete old data
     await this.storageService.delete(fileId);
@@ -412,6 +418,19 @@ export class StorageAdapter {
       total,
       totalSize
     };
+  }
+
+  private isBinaryContentType(contentType: string): boolean {
+    const binaryTypes = [
+      'image/',
+      'audio/',
+      'video/',
+      'application/pdf',
+      'application/zip',
+      'application/gzip',
+      'application/octet-stream'
+    ];
+    return binaryTypes.some(type => contentType.startsWith(type));
   }
 }
 

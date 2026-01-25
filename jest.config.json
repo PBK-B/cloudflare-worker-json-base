@@ -3,6 +3,7 @@
   "testEnvironment": "jsdom",
   "setupFilesAfterEnv": ["<rootDir>/jest.setup.ts"],
   "moduleNameMapper": {
+    "^@/(.*)$": "<rootDir>/src/$1",
     "\\.(css|less|scss|sass)$": "identity-obj-proxy"
   },
   "transform": {
@@ -12,7 +13,10 @@
   "collectCoverageFrom": [
     "src/**/*.{ts,tsx}",
     "!src/**/*.d.ts",
-    "!src/main.tsx"
+    "!src/main.tsx",
+    "!src/App.tsx",
+    "!src/**/*.test.ts",
+    "!src/__tests__/**"
   ],
   "moduleFileExtensions": ["ts", "tsx", "js", "jsx", "json", "node"]
 }

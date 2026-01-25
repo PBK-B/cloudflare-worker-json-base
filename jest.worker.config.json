@@ -1,0 +1,40 @@
+{
+  "preset": "ts-jest",
+  "testEnvironment": "jsdom",
+  "setupFilesAfterEnv": ["<rootDir>/jest.setup.ts"],
+  "moduleNameMapper": {
+    "^@/(.*)$": "<rootDir>/src/$1"
+  },
+  "transform": {
+    "^.+\\.(ts|tsx|js|jsx)$": ["ts-jest", { "tsconfig": "tsconfig.json" }]
+  },
+  "testMatch": ["**/__tests__/worker/**/*.test.(ts|tsx)", "**/__tests__/*.test.(ts|tsx)"],
+  "testPathIgnorePatterns": [
+    "/node_modules/",
+    "/dist/",
+    "/dist-webui/",
+    "/src/components/",
+    "/src/pages/",
+    "/src/hooks/",
+    "/src/stores/",
+    "/src/context/",
+    "/src/styles/"
+  ],
+  "collectCoverageFrom": [
+    "src/api/**/*.ts",
+    "src/storage/**/*.ts",
+    "src/utils/**/*.ts",
+    "!src/**/*.d.ts",
+    "!src/**/*.test.ts",
+    "!src/__tests__/**"
+  ],
+  "moduleFileExtensions": ["ts", "tsx", "js", "jsx", "json", "node"],
+  "coverageThreshold": {
+    "global": {
+      "branches": 50,
+      "functions": 50,
+      "lines": 50,
+      "statements": 50
+    }
+  }
+}

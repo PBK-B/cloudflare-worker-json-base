@@ -15,20 +15,31 @@ export class AuthMiddleware {
     const authHeader = request.headers.get('Authorization')
     const queryKey = url.searchParams.get('key')
 
+    Logger.debug('AuthMiddleware authenticate', {
+      url: url.pathname,
+      method: request.method,
+      hasAuthHeader: !!authHeader,
+      hasQueryKey: !!queryKey
+    })
+
     let apiKey: string | null = null
     let method: 'bearer' | 'query' = 'bearer'
 
     if (authHeader) {
       const match = authHeader.match(/^Bearer\s+(.+)$/)
       if (!match) {
+        Logger.warn('Invalid Authorization header format', { authHeader })
         throw ApiError.unauthorized('Invalid Authorization header format')
       }
       apiKey = match[1].trim()
       method = 'bearer'
+      Logger.debug('Using bearer auth', { keyPrefix: apiKey.substring(0, 8) })
     } else if (queryKey) {
       apiKey = queryKey.trim()
       method = 'query'
+      Logger.debug('Using query auth', { keyPrefix: apiKey.substring(0, 8) })
     } else {
+      Logger.warn('No authentication provided', { url: url.pathname })
       throw ApiError.unauthorized('API key required. Use Authorization: Bearer <key> or ?key=<key>')
     }
 
@@ -204,7 +215,7 @@ export class RateLimiter {
 export class Logger {
   private static isProduction(): boolean {
     try {
-      const config = Config.getInstance({} as any)
+      const config = Config.getInstance()
       return config.isProduction
     } catch {
       return false

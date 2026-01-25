@@ -1,0 +1,44 @@
+{
+  "preset": "ts-jest",
+  "testEnvironment": "jsdom",
+  "setupFilesAfterEnv": ["<rootDir>/jest.setup.ts"],
+  "moduleNameMapper": {
+    "^@/(.*)$": "<rootDir>/src/$1",
+    "\\.(css|less|scss|sass)$": "identity-obj-proxy"
+  },
+  "transform": {
+    "^.+\\.(ts|tsx|js|jsx)$": ["ts-jest", { "tsconfig": "tsconfig.json" }]
+  },
+  "testMatch": ["**/__tests__/webui/**/*.test.(ts|tsx)"],
+  "testPathIgnorePatterns": [
+    "/node_modules/",
+    "/dist/",
+    "/dist-webui/",
+    "/src/api/",
+    "/src/storage/",
+    "/src/utils/",
+    "/src/types/"
+  ],
+  "collectCoverageFrom": [
+    "src/components/**/*.{ts,tsx}",
+    "src/hooks/**/*.{ts,tsx}",
+    "src/pages/**/*.{ts,tsx}",
+    "src/stores/**/*.{ts,tsx}",
+    "src/context/**/*.{ts,tsx}",
+    "!src/**/*.d.ts",
+    "!src/**/*.test.ts",
+    "!src/__tests__/**",
+    "!src/main.tsx",
+    "!src/App.tsx"
+  ],
+  "moduleFileExtensions": ["ts", "tsx", "js", "jsx", "json", "node"],
+  "passWithNoTests": true,
+  "coverageThreshold": {
+    "global": {
+      "branches": 30,
+      "functions": 30,
+      "lines": 30,
+      "statements": 30
+    }
+  }
+}
