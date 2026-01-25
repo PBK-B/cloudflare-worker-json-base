@@ -56,14 +56,10 @@ const LoginPage: React.FC = () => {
 
 	return (
 		<Container className="login-container">
-			<div className="login-background">
-				<div className="login-particles"></div>
-			</div>
-
 			<div className="login-card">
 				<div className="login-header">
 					<div className="login-icon">
-						<Key size={32} />
+						<Key size={24} />
 					</div>
 					<h1 className="login-title">JSON Base</h1>
 					<p className="login-subtitle">Cloudflare Workers JSON 存储服务</p>
@@ -103,7 +99,7 @@ const LoginPage: React.FC = () => {
 						>
 							<span className="login-btn-content">
 								验证并登录
-								<ArrowRight size={18} />
+								<ArrowRight size={16} />
 							</span>
 						</Button>
 					</Form.Group>
