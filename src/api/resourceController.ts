@@ -131,7 +131,7 @@ export class ResourceController {
         const mimeType = file.type || 'application/octet-stream'
         const dataUrl = `data:${mimeType};base64,${base64}`
 
-        await this.storageAdapter.create(pathname, {
+        await this.storageAdapter.upsert(pathname, {
           value: dataUrl,
           type: 'binary',
           content_type: mimeType
@@ -154,7 +154,7 @@ export class ResourceController {
 
     const body = await this.parseRequestBody(request, contentType)
 
-    await this.storageAdapter.create(pathname, {
+    await this.storageAdapter.upsert(pathname, {
       value: body.value,
       type: body.type,
       content_type: body.contentType
@@ -177,7 +177,7 @@ export class ResourceController {
     const contentType = request.headers.get('Content-Type') || ''
     const body = await this.parseRequestBody(request, contentType)
 
-    await this.storageAdapter.update(pathname, {
+    await this.storageAdapter.upsert(pathname, {
       value: body.value,
       type: body.type,
       content_type: body.contentType

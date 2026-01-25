@@ -8,6 +8,7 @@ compatibility_flags = ["nodejs_compat"]
 ENVIRONMENT = "development"
 VERSION = "2.0.0"
 STORAGE_BACKEND = "d1"
+RATE_LIMIT_ENABLED = false
 
 [[d1_databases]]
 binding = "JSONBASE_DB"

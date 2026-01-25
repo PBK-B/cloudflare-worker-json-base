@@ -65,7 +65,7 @@ export class StorageController {
       const pathname = url.pathname.replace('/._jsondb_/api/storage', '') || '/';
 
       const auth = await AuthMiddleware.requireAuth(request);
-      await RateLimiter.checkLimit(auth.apiKey, 100, 3600);
+      await RateLimiter.checkLimit(request, 100, 3600);
 
       const contentType = request.headers.get('Content-Type') || '';
 
@@ -252,7 +252,7 @@ export class StorageController {
       }
 
       const auth = await AuthMiddleware.requireAuth(request);
-      await RateLimiter.checkLimit(auth.apiKey, 50, 3600);
+      await RateLimiter.checkLimit(request, 50, 3600);
 
       const result = await this.storageService.delete(id);
 

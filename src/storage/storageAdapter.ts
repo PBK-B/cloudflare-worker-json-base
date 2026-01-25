@@ -238,6 +238,22 @@ export class StorageAdapter {
     return await this.create(pathname, request);
   }
 
+  async upsert(pathname: string, request: {
+    value: any;
+    type?: 'json' | 'binary' | 'text';
+    content_type?: string;
+  }): Promise<StoredData> {
+    await this.ensureInitialized();
+
+    const existingFileId = await this.pathMapper.getFileId(pathname);
+
+    if (existingFileId) {
+      return await this.update(pathname, request);
+    }
+
+    return await this.create(pathname, request);
+  }
+
   async delete(pathname: string): Promise<void> {
     await this.ensureInitialized();
 
@@ -247,11 +263,22 @@ export class StorageAdapter {
       throw ApiError.notFound(`Data not found at path: ${pathname}`);
     }
 
-    // Delete from storage
-    await this.storageService.delete(fileId);
+    try {
+      const deleteResult = await this.storageService.delete(fileId);
+      if (!deleteResult.success) {
+        throw new Error(deleteResult.error || 'Failed to delete from storage');
+      }
+    } catch (storageError) {
+      Logger.error('Storage delete failed', { pathname, fileId, storageError });
+      throw ApiError.internal('Failed to delete data from storage');
+    }
 
-    // Delete path mapping
-    await this.pathMapper.deleteMapping(pathname);
+    try {
+      await this.pathMapper.deleteMapping(pathname);
+    } catch (mappingError) {
+      Logger.error('Path mapping delete failed', { pathname, fileId, mappingError });
+      throw ApiError.internal('Failed to delete path mapping');
+    }
 
     Logger.info('Data deleted via adapter', { pathname, fileId });
   }

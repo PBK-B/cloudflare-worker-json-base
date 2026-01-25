@@ -68,7 +68,7 @@ export class DataController {
       ValidationMiddleware.validatePathname(pathname)
       
       const auth = await AuthMiddleware.requireAuth(request)
-      await RateLimiter.checkLimit(auth.apiKey, 100, 3600)
+      await RateLimiter.checkLimit(request, 100, 3600)
 
       const contentType = request.headers.get('Content-Type') || ''
 
@@ -130,7 +130,7 @@ export class DataController {
       ValidationMiddleware.validatePathname(pathname)
       
       const auth = await AuthMiddleware.requireAuth(request)
-      await RateLimiter.checkLimit(auth.apiKey, 100, 3600)
+      await RateLimiter.checkLimit(request, 100, 3600)
 
       const requestData = await this.parseRequestBody(request)
 
@@ -152,7 +152,7 @@ export class DataController {
       ValidationMiddleware.validatePathname(pathname)
       
       const auth = await AuthMiddleware.requireAuth(request)
-      await RateLimiter.checkLimit(auth.apiKey, 50, 3600)
+      await RateLimiter.checkLimit(request, 50, 3600)
 
       await this.storageAdapter.delete(pathname)
       Logger.info('Data deleted', { pathname, auth: auth.apiKey.substring(0, 8) })

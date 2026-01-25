@@ -290,6 +290,14 @@ export class RateLimiter {
   }
 
   static async checkLimit(request: Request, limit: number = 1000, window: number = 3600): Promise<void> {
+    try {
+      const config = Config.getInstance();
+      if (!config.rateLimitEnabled) {
+        return;
+      }
+    } catch {
+    }
+
     const clientIp = RateLimiter.getClientIp(request)
     const key = `ip:${clientIp}`
 

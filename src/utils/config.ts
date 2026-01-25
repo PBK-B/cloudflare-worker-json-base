@@ -5,6 +5,7 @@ export interface EnvConfig {
 	version: string;
 	kvNamespace: string;
 	storageBackend: 'kv' | 'd1';
+	rateLimitEnabled: boolean;
 }
 
 export class Config {
@@ -13,12 +14,14 @@ export class Config {
 
   constructor(env: any) {
     const storageBackend = (env?.STORAGE_BACKEND || env?.STORAGE_LOCATION || 'kv').toLowerCase();
+    const rateLimitEnabled = env?.RATE_LIMIT_ENABLED === 'true' || env?.RATE_LIMIT_ENABLED === true;
     this.config = {
       apiKey: env?.API_KEY || 'MYDATABASEKEY',
       environment: (env?.ENVIRONMENT as 'development' | 'production') || 'development',
       version: env?.VERSION || '2.0.0',
       kvNamespace: env?.KV_NAMESPACE || 'JSONBIN',
       storageBackend: storageBackend === 'd1' ? 'd1' : 'kv',
+      rateLimitEnabled,
     };
   }
 
@@ -49,6 +52,10 @@ export class Config {
 
 	get storageBackend(): 'kv' | 'd1' {
 		return this.config.storageBackend;
+	}
+
+	get rateLimitEnabled(): boolean {
+		return this.config.rateLimitEnabled;
 	}
 
 	get isProduction(): boolean {
