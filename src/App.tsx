@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import LoginPage from './pages/LoginPage';
 import AdminLayout from './pages/admin/AdminLayout';
@@ -49,12 +49,12 @@ const AppRoutes: React.FC = () => {
 
 const App: React.FC = () => {
 	return (
-		<BrowserRouter>
+		<HashRouter>
 			<AuthProvider>
 				<ToastContainer />
 				<AppRoutes />
 			</AuthProvider>
-		</BrowserRouter>
+		</HashRouter>
 	);
 };
 

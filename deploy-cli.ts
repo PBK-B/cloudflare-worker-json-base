@@ -83,9 +83,12 @@ interface DeployOptions {
 
 interface EnvironmentConfig {
 	name: string;
-	route?: string;
 	workers_dev?: boolean;
 	vars?: Record<string, any>;
+	assets?: {
+		directory: string;
+		binding: string;
+	};
 }
 
 interface ResourceInfo {
@@ -240,13 +243,28 @@ function parseWranglerToml(): WranglerConfig {
 		const envName = match[1];
 		const envBlock = match[2];
 		const nameMatch = envBlock.match(/name\s*=\s*"([^"]+)"/);
-		const routeMatch = envBlock.match(/route\s*=\s*"([^"]+)"/);
 		const workersDevMatch = envBlock.match(/workers_dev\s*=\s*(true|false)/);
+
 		config.environments[envName] = {
 			name: nameMatch?.[1] || `${config.name}-${envName}`,
-			route: routeMatch?.[1],
 			workers_dev: workersDevMatch?.[1] !== 'false',
 		};
+	}
+
+	const topLevelAssetsMatch = content.match(/\[assets\]([\s\S]*?)(?=\n\[|$)/);
+	if (topLevelAssetsMatch) {
+		const assetsBlock = topLevelAssetsMatch[1];
+		const assetsDirMatch = assetsBlock.match(/directory\s*=\s*"([^"]+)"/);
+		const assetsBindingMatch = assetsBlock.match(/binding\s*=\s*"([^"]+)"/);
+
+		if (assetsDirMatch && assetsBindingMatch) {
+			for (const envName of Object.keys(config.environments)) {
+				config.environments[envName].assets = {
+					directory: assetsDirMatch[1],
+					binding: assetsBindingMatch[1],
+				};
+			}
+		}
 	}
 
 	return config;
@@ -399,7 +417,7 @@ async function ensureD1Database(binding: D1Binding, env: string): Promise<Resour
 			retries--;
 			if (retries > 0) {
 				log.warning(`创建失败，${retries} 次重试...`);
-				await new Promise(resolve => setTimeout(resolve, 3000));
+				await new Promise((resolve) => setTimeout(resolve, 3000));
 			} else {
 				log.warning(`创建失败: ${error.message}`);
 			}
@@ -481,7 +499,7 @@ async function ensureKVNamespace(binding: KVBinding, env: string): Promise<Resou
 			retries--;
 			if (retries > 0) {
 				log.warning(`创建失败，${retries} 次重试...`);
-				await new Promise(resolve => setTimeout(resolve, 3000));
+				await new Promise((resolve) => setTimeout(resolve, 3000));
 			} else {
 				log.warning(`创建失败: ${error}`);
 			}
@@ -558,14 +576,19 @@ async function setSecrets(apiKey: string, environment: string): Promise<void> {
 	}
 }
 
-function generateWranglerJsonc(config: WranglerConfig, environment: string, storageBackend: StorageBackend, resources: ResourceInfo[]): string {
+function generateWranglerJsonc(
+	config: WranglerConfig,
+	environment: string,
+	storageBackend: StorageBackend,
+	resources: ResourceInfo[],
+): string {
 	const envConfig = config.environments[environment];
 	const workerName = envConfig?.name || `${config.name}-${environment}`;
 
 	const wranglerConfig: any = {
 		$schema: '../node_modules/wrangler/config-schema.json',
 		name: workerName,
-		main: path.basename(config.main),
+		main: 'index.js',
 		compatibility_date: config.compatibility_date,
 		compatibility_flags: config.compatibility_flags,
 		build: config.build,
@@ -607,8 +630,11 @@ function generateWranglerJsonc(config: WranglerConfig, environment: string, stor
 		});
 	}
 
-	if (envConfig?.route) {
-		wranglerConfig.env[environment].route = envConfig.route;
+	if (envConfig?.assets) {
+		wranglerConfig.env[environment].assets = {
+			directory: '../' + envConfig.assets.directory,
+			binding: envConfig.assets.binding,
+		};
 	}
 
 	return JSON.stringify(wranglerConfig, null, 2);
@@ -715,7 +741,7 @@ async function selectStorageBackend(): Promise<StorageBackend> {
 }
 
 async function deploy() {
-	console.log(chalk.blue.bold('🚀 Cloudflare Worker 智能部署'));
+	console.log(chalk.blue.bold('🚀 Cloudflare Worker 自动部署'));
 	console.log(chalk.gray('='.repeat(50)));
 
 	const config = parseWranglerToml();
@@ -794,15 +820,16 @@ async function deploy() {
 
 	log.info(`[${step++}/${totalSteps}] 部署到 Cloudflare...`);
 	const deployOutput = execSync(`wrangler deploy --config dist/wrangler.jsonc --env ${environment}`, { encoding: 'utf8', timeout: 180000 });
-	const versionMatch = deployOutput.match(/Version ID:\s*([^\s]+)/);
-	const versionId = versionMatch?.[1] || 'unknown';
 	const urlMatch = deployOutput.match(/https:\/\/[^\s]*\.workers\.dev/);
 	const workerUrl = urlMatch?.[0] || `https://${workerName}.workers.dev`;
+
+	const versionMatch = deployOutput.match(/Version ID:\s*([^\s]+)/);
+	const versionId = versionMatch?.[1] || 'unknown';
 
 	log.success('部署成功!');
 
 	try {
-		const response = await fetch(`${workerUrl}/api/health`, { signal: AbortSignal.timeout(15000) });
+		const response = await fetch(`${workerUrl}/._jsondb_/api/health`, { signal: AbortSignal.timeout(15000) });
 		if (response.ok) log.info(`健康检查: ${(await response.json()).status}`);
 	} catch {
 		log.warning('健康检查超时');
@@ -827,7 +854,8 @@ async function deploy() {
 
 	console.log(chalk.green.bold('\n🎉 部署成功!'));
 	console.log(chalk.gray(`后端: ${storageBackend}`));
-	console.log(chalk.gray(`URL: ${workerUrl}/`));
+	console.log(chalk.gray(`前端: ${workerUrl}/dash/`));
+	console.log(chalk.gray(`API: ${workerUrl}/._jsondb_/api/`));
 }
 
 async function check() {

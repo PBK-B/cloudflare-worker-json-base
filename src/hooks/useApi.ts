@@ -29,7 +29,7 @@ axiosInstance.interceptors.response.use(
 			window.location.href = '/login';
 		}
 		return Promise.reject(error);
-	}
+	},
 );
 
 configure({ axios: axiosInstance });
@@ -63,7 +63,7 @@ export const useApi = () => {
 					success: true,
 					message: 'API Key 有效',
 					timestamp: new Date().toISOString(),
-					data: response.data.data
+					data: response.data.data,
 				};
 			}
 			return {
@@ -74,7 +74,7 @@ export const useApi = () => {
 		} catch (error) {
 			if (axios.isAxiosError(error)) {
 				const statusCode = error.response?.status;
-				
+
 				if (statusCode === 401 || statusCode === 403) {
 					return {
 						success: false,
@@ -82,7 +82,7 @@ export const useApi = () => {
 						timestamp: new Date().toISOString(),
 					};
 				}
-				
+
 				return {
 					success: false,
 					error: error.response?.data?.error || '连接失败',
@@ -99,97 +99,88 @@ export const useApi = () => {
 		}
 	}, []);
 
-	const createData = useCallback(
-		async (path: string, data: CreateDataRequest): Promise<ApiResponse<StorageData>> => {
-			try {
-				const response = await axiosInstance.post(`/data${path}`, data);
-				return response.data;
-			} catch (error) {
-				if (axios.isAxiosError(error)) {
-					return {
-						success: false,
-						error: error.response?.data?.error || '创建失败',
-						timestamp: new Date().toISOString(),
-					};
-				}
-				throw error;
+	const createData = useCallback(async (path: string, data: CreateDataRequest): Promise<ApiResponse<StorageData>> => {
+		try {
+			const response = await axiosInstance.post(`/data${path}`, data);
+			return response.data;
+		} catch (error) {
+			if (axios.isAxiosError(error)) {
+				return {
+					success: false,
+					error: error.response?.data?.error || '创建失败',
+					timestamp: new Date().toISOString(),
+				};
 			}
-		},
-		[]
-	);
+			throw error;
+		}
+	}, []);
 
-	const uploadFile = useCallback(
-		async (path: string, file: File, contentType: string): Promise<ApiResponse<StorageData>> => {
-			try {
-				const formData = new FormData();
-				formData.append('file', file);
-				formData.append('path', path);
-				
-				const response = await axiosInstance.post(`/storage?path=${encodeURIComponent(path)}`, file, {
-					headers: {
-						'Content-Type': contentType || file.type,
-					},
-				});
-				return response.data;
-			} catch (error) {
-				if (axios.isAxiosError(error)) {
-					const statusCode = error.response?.status;
-					let errorMessage = '上传失败';
-					
-					if (statusCode === 400) {
-						errorMessage = error.response?.data?.error || '请求参数错误，请检查文件格式';
-					} else if (statusCode === 401 || statusCode === 403) {
-						errorMessage = 'API Key 无效，请重新登录';
-					} else if (statusCode === 413) {
-						errorMessage = '文件过大，无法上传';
-					} else if (statusCode === 500) {
-						errorMessage = error.response?.data?.error || '服务器内部错误';
-					}
-					
-					return {
-						success: false,
-						error: errorMessage,
-						timestamp: new Date().toISOString(),
-					};
-				}
-				throw error;
-			}
-		},
-		[]
-	);
+	const uploadFile = useCallback(async (path: string, file: File, contentType: string): Promise<ApiResponse<StorageData>> => {
+		try {
+			const formData = new FormData();
+			formData.append('file', file);
+			formData.append('path', path);
 
-	const updateData = useCallback(
-		async (path: string, data: UpdateDataRequest): Promise<ApiResponse<StorageData>> => {
-			try {
-				const response = await axiosInstance.put(`/data${path}`, data);
-				return response.data;
-			} catch (error) {
-				if (axios.isAxiosError(error)) {
-					return {
-						success: false,
-						error: error.response?.data?.error || '更新失败',
-						timestamp: new Date().toISOString(),
-					};
+			const response = await axiosInstance.post(`/storage?path=${encodeURIComponent(path)}`, file, {
+				headers: {
+					'Content-Type': contentType || file.type,
+				},
+			});
+			return response.data;
+		} catch (error) {
+			if (axios.isAxiosError(error)) {
+				const statusCode = error.response?.status;
+				let errorMessage = '上传失败';
+
+				if (statusCode === 400) {
+					errorMessage = error.response?.data?.error || '请求参数错误，请检查文件格式';
+				} else if (statusCode === 401 || statusCode === 403) {
+					errorMessage = 'API Key 无效，请重新登录';
+				} else if (statusCode === 413) {
+					errorMessage = '文件过大，无法上传';
+				} else if (statusCode === 500) {
+					errorMessage = error.response?.data?.error || '服务器内部错误';
 				}
-				throw error;
+
+				return {
+					success: false,
+					error: errorMessage,
+					timestamp: new Date().toISOString(),
+				};
 			}
-		},
-		[]
-	);
+			throw error;
+		}
+	}, []);
+
+	const updateData = useCallback(async (path: string, data: UpdateDataRequest): Promise<ApiResponse<StorageData>> => {
+		try {
+			const response = await axiosInstance.put(`/data${path}`, data);
+			return response.data;
+		} catch (error) {
+			if (axios.isAxiosError(error)) {
+				return {
+					success: false,
+					error: error.response?.data?.error || '更新失败',
+					timestamp: new Date().toISOString(),
+				};
+			}
+			throw error;
+		}
+	}, []);
 
 	const deleteData = useCallback(async (path: string): Promise<ApiResponse<void>> => {
 		try {
 			await axiosInstance.delete(`/data${path}`);
 			return {
 				success: true,
-				timestamp: new Date().toISOString()
+				timestamp: new Date().toISOString(),
 			};
 		} catch (error) {
 			if (axios.isAxiosError(error)) {
 				if (error.response?.status === 204 || error.response?.status === 200) {
 					return {
 						success: true,
-						timestamp: new Date().toISOString()
+						timestamp: new Date().toISOString(),
 					};
 				}
 				return {
@@ -208,7 +199,7 @@ export const useApi = () => {
 			limit: number = 20,
 			search?: string,
 			sort?: string,
-			order?: 'asc' | 'desc'
+			order?: 'asc' | 'desc',
 		): Promise<ApiResponse<PaginatedResponse<StorageData>>> => {
 			try {
 				const params = new URLSearchParams({
@@ -232,7 +223,7 @@ export const useApi = () => {
 				throw error;
 			}
 		},
-		[]
+		[],
 	);
 
 	const getConsoleStats = useCallback(async (): Promise<ApiResponse<any>> => {

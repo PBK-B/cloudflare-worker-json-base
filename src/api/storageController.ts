@@ -10,6 +10,29 @@ import { D1MetadataManager } from '../storage/metadata/metadataManager';
 import { PathMapper } from '../storage/pathMapper';
 import { FileMetadata } from '../storage/interfaces';
 import { Config } from '../utils/config';
+import { Router } from './router';
+
+const RESERVED_PREFIXES = [
+  '/._jsondb_',
+  '/dash'
+];
+
+function isReservedPath(path: string): boolean {
+  const normalizedPath = path.toLowerCase();
+  for (const prefix of RESERVED_PREFIXES) {
+    if (normalizedPath.startsWith(prefix)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function getReservedPathsInfo(): string[] {
+  return [
+    'API 路径: /._jsondb_/*',
+    '管理页面: /dash/*'
+  ];
+}
 
 export class StorageController {
   private storageService: FileStorageService;
@@ -67,14 +90,21 @@ export class StorageController {
       const auth = await AuthMiddleware.requireAuth(request);
       await RateLimiter.checkLimit(request, 100, 3600);
 
+      const pathParam = url.searchParams.get('path') || pathname;
+      if (isReservedPath(pathParam)) {
+        throw ApiError.badRequest(
+          'Path is reserved and cannot be used for storage. Reserved paths: /._jsondb_/*, /dash/*'
+        );
+      }
+
       const contentType = request.headers.get('Content-Type') || '';
 
       if (contentType.includes('multipart/form-data')) {
         const formData = await request.formData();
         const file = formData.get('file') as File;
-        const pathParam = formData.get('path') as string | null;
+        const pathFromForm = formData.get('path') as string | null;
 
-        const targetPath = pathParam || pathname;
+        const targetPath = pathFromForm || pathname;
 
         if (!file) {
           throw ApiError.badRequest('File is required');
@@ -126,8 +156,8 @@ export class StorageController {
       const body = await request.arrayBuffer();
       const data = this.arrayBufferToUint8Array(body);
 
-      const pathParam = url.searchParams.get('path');
-      const targetPath = pathParam || pathname || '/';
+      const pathFromBody = url.searchParams.get('path');
+      const targetPath = pathFromBody || pathname || '/';
 
       const result = await this.storageService.write(data, {
         contentType
@@ -166,10 +196,17 @@ export class StorageController {
   async download(request: Request): Promise<Response> {
     try {
       const url = new URL(request.url);
-      const id = url.pathname.replace('/._jsondb_/api/storage', '').replace(/^\//, '');
+      let id = url.pathname.replace('/._jsondb_/api/storage', '').replace(/^\//, '');
 
       if (!id) {
         throw ApiError.badRequest('File ID is required');
+      }
+
+      if (isReservedPath('/' + id)) {
+        throw ApiError.badRequest(
+          'Path is reserved and cannot be accessed as storage. Reserved paths: ' +
+          RESERVED_PREFIXES.join(', ')
+        );
       }
 
       const auth = await AuthMiddleware.requireAuth(request);
@@ -217,10 +254,16 @@ export class StorageController {
   async getMetadata(request: Request): Promise<Response> {
     try {
       const url = new URL(request.url);
-      const id = url.pathname.replace('/._jsondb_/api/storage', '').replace(/^\//, '');
+      let id = url.pathname.replace('/._jsondb_/api/storage', '').replace(/^\//, '');
 
       if (!id) {
         throw ApiError.badRequest('File ID is required');
+      }
+
+      if (isReservedPath('/' + id)) {
+        throw ApiError.badRequest(
+          'Path is reserved and cannot be accessed as storage. Reserved paths: /._jsondb_/*, /dash/*'
+        );
       }
 
       const auth = await AuthMiddleware.requireAuth(request);
@@ -245,10 +288,16 @@ export class StorageController {
   async delete(request: Request): Promise<Response> {
     try {
       const url = new URL(request.url);
-      const id = url.pathname.replace('/._jsondb_/api/storage', '').replace(/^\//, '');
+      let id = url.pathname.replace('/._jsondb_/api/storage', '').replace(/^\//, '');
 
       if (!id) {
         throw ApiError.badRequest('File ID is required');
+      }
+
+      if (isReservedPath('/' + id)) {
+        throw ApiError.badRequest(
+          'Path is reserved and cannot be deleted. Reserved paths: /._jsondb_/*, /dash/*'
+        );
       }
 
       const auth = await AuthMiddleware.requireAuth(request);

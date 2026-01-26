@@ -13,17 +13,21 @@ ENVIRONMENT = "development"
 VERSION = "2.0.0"
 STORAGE_BACKEND = "d1"
 RATE_LIMIT_ENABLED = false
-# API_KEY = "MYDATABASEKEY"
 
+# D1 数据库
 [[d1_databases]]
 binding = "JSONBASE_DB"
 database_name = "jsonbase"
-database_id = "your-database-id"
 
 # 本地开发配置
-[env.dev]
+[env.development]
 name = "worker-json-base-dev"
 
 # 生产环境配置
 [env.production]
 name = "worker-json-base"
+
+[assets]
+directory = "dist-webui/dash"
+binding = "WEBUI"
+run_worker_first = true

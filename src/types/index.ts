@@ -69,6 +69,7 @@ export interface WorkerEnv {
 	JSONBASE_DB: D1Database
 	JSONBIN: KVNamespace
 	JSONBIN_PREVIEW: KVNamespace
+	WEBUI: Fetcher
 	API_KEY?: string
 	ENVIRONMENT?: string
 	VERSION?: string

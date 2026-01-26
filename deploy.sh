@@ -23,8 +23,19 @@ fi
 export DEPLOY_ENV="${DEPLOY_ENV:-development}"
 export STORAGE_BACKEND="d1"
 
+if [ -z "$DASH_ROUTE" ]; then
+    echo ""
+    echo "错误: 请设置 DASH_ROUTE 环境变量 (例如: dash.yourdomain.dev)"
+    echo ""
+    echo "示例用法:"
+    echo "  DASH_ROUTE=dash.example.com ./deploy.sh"
+    echo "  API_KEY=xxx DASH_ROUTE=dash.example.com DEPLOY_ENV=production ./deploy.sh"
+    exit 1
+fi
+
 echo ""
 echo "部署环境: $DEPLOY_ENV"
+echo "Dash 路由: $DASH_ROUTE"
 echo ""
 
 npm run build:all
@@ -42,7 +53,7 @@ echo "更新 .dev.vars 用于本地开发..."
 sed -i "s/^API_KEY=.*/API_KEY=$API_KEY/" .dev.vars
 
 echo ""
-echo "生成 wrangler 配置 (包含存储绑定)..."
+echo "生成 wrangler 配置 (包含 dash 路由和 assets)..."
 STORAGE_BACKEND="d1"
 
 WORKER_NAME=$(grep -A1 "^\[env.$DEPLOY_ENV\]" wrangler.toml 2>/dev/null | grep "name" | cut -d'"' -f2 || echo "worker-json-base-$DEPLOY_ENV")
@@ -60,6 +71,10 @@ STORAGE_BACKEND = "$STORAGE_BACKEND"
 [[d1_databases]]
 binding = "JSONBASE_DB"
 database_name = "jsonbase001"
+
+[assets]
+directory = "dist-webui"
+binding = "WEBUI"
 EOF
 
 echo ""

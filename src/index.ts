@@ -2,15 +2,32 @@ import { WorkerEnv } from './types'
 import { Router } from './api/router'
 import { Logger } from './utils/middleware'
 
+const DASH_PATH = '/dash'
+
 export default {
   async fetch(request: Request, env: WorkerEnv, ctx: ExecutionContext): Promise<Response> {
     const startTime = Date.now()
-    
+    const url = new URL(request.url)
+    const pathname = url.pathname
+
     try {
       Logger.info('Worker initialized', {
         environment: env.ENVIRONMENT || 'development',
         version: env.VERSION || '2.0.0'
       })
+
+      if (pathname === DASH_PATH) {
+        return new Response(null, {
+          status: 302,
+          headers: { 'Location': DASH_PATH + '/' }
+        })
+      }
+
+      if (pathname.startsWith(DASH_PATH) || pathname === DASH_PATH) {
+        const assetPath = pathname.replace(DASH_PATH, '')
+        const assetUrl = new URL(assetPath, request.url)
+        return await env.WEBUI.fetch(assetUrl.toString(), request)
+      }
 
       const router = new Router(env)
       const response = await router.handle(request)

@@ -6,6 +6,8 @@ import { CorsHandler } from '../utils/response'
 import { Logger } from '../utils/middleware'
 import { WorkerEnv } from '../types'
 
+const API_PATH = '/._jsondb_/api'
+
 export class Router {
   private dataController!: DataController
   private healthController!: HealthController
@@ -26,7 +28,7 @@ export class Router {
     }
   }
 
-  async handle(request: Request): Promise<Response> {
+  async handle(request: Request): Promise<Response | null> {
     const url = new URL(request.url)
     const { pathname, method } = { pathname: url.pathname, method: request.method }
 
@@ -51,8 +53,9 @@ export class Router {
 
       let response: Response
 
-      if (pathname.startsWith('/._jsondb_/api/')) {
-        const path = pathname.replace('/._jsondb_/api', '')
+      if (pathname.startsWith(API_PATH + '/') || pathname === API_PATH) {
+        const path = pathname.replace(API_PATH, '') || '/'
+        
         if (path === '/health' || path === '/test') {
           response = await this.healthController.health(request)
         } else if (path.startsWith('/storage')) {
@@ -68,14 +71,12 @@ export class Router {
         }
       } else if (pathname === '/') {
         response = await this.handleRoot()
-      } else if (pathname.startsWith('/assets/') || pathname === '/vite.svg') {
-        response = new Response('Static asset - handled by Vite', { status: 404 })
       } else {
         const resourceResponse = await this.resourceController.handle(request);
         if (resourceResponse) {
           response = resourceResponse;
         } else {
-          response = new Response('Unauthorized', { status: 401 });
+          response = new Response('Not Found', { status: 404 });
         }
       }
 
@@ -91,6 +92,10 @@ export class Router {
         headers: { 'Content-Type': 'application/json' }
       })
     }
+  }
+
+  static getApiPath(): string {
+    return API_PATH;
   }
 
   private async handleStorageRoutes(request: Request, pathname: string, method: string): Promise<Response> {
@@ -198,6 +203,7 @@ export class Router {
   <h1>JSON Base API</h1>
   <p>Version 2.0.0</p>
   <p>Cloudflare Workers JSON Storage Service</p>
+  <p><a href="/dash/">Go to Dashboard</a></p>
 </body>
 </html>`
     
