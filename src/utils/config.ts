@@ -13,10 +13,15 @@ export class Config {
 	private config: EnvConfig;
 
   constructor(env: any) {
+    const apiKey = env?.API_KEY;
+    if (!apiKey || apiKey.trim().length === 0) {
+      throw new Error('API_KEY is required. Please set it via wrangler secret or .dev.vars');
+    }
+
     const storageBackend = (env?.STORAGE_BACKEND || env?.STORAGE_LOCATION || 'kv').toLowerCase();
     const rateLimitEnabled = env?.RATE_LIMIT_ENABLED === 'true' || env?.RATE_LIMIT_ENABLED === true;
     this.config = {
-      apiKey: env?.API_KEY || 'MYDATABASEKEY',
+      apiKey: apiKey,
       environment: (env?.ENVIRONMENT as 'development' | 'production') || 'development',
       version: env?.VERSION || '2.0.0',
       kvNamespace: env?.KV_NAMESPACE || 'JSONBIN',
