@@ -3,8 +3,8 @@
     "version": "0.0.0",
     "private": true,
     "scripts": {
-        "deploy": "npm run build && wrangler deploy",
-        "auto-deploy": "tsc --esModuleInterop deploy-cli.ts && node deploy-cli deploy",
+        "deploy": "npm run build:all && wrangler deploy",
+        "auto-deploy": "tsc --esModuleInterop --outDir .deploy-temp deploy-cli.ts && node .deploy-temp/deploy-cli.js deploy && rm -rf .deploy-temp",
         "dev": "wrangler dev --port 8788",
         "dev:worker": "wrangler dev --port 8788",
         "dev:webui": "vite",
