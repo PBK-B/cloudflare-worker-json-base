@@ -1,48 +1,71 @@
 {
-  "compilerOptions": {
-    "target": "ES2022",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "module": "ES2022",
-    "moduleResolution": "bundler",
-    "allowSyntheticDefaultImports": true,
-    "esModuleInterop": true,
-    "allowJs": true,
-    "checkJs": false,
-    "strict": true,
-    "alwaysStrict": true,
-    "preserveConstEnums": true,
-    "moduleDetection": "force",
-    "isolatedModules": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
-    "declaration": false,
-    "declarationMap": false,
-    "sourceMap": true,
-    "outDir": "./dist",
-    "rootDir": "./src",
-    "jsx": "react-jsx",
-    "jsxImportSource": "react",
-    "noEmit": false,
-    "types": ["@cloudflare/workers-types"],
-    "baseUrl": "./src",
-    "paths": {
-      "@/*": ["*"],
-      "@/types/*": ["types/*"],
-      "@/utils/*": ["utils/*"],
-      "@/api/*": ["api/*"],
-      "@/services/*": ["services/*"],
-      "@/components/*": ["components/*"],
-      "@/stores/*": ["stores/*"],
-      "@/hooks/*": ["hooks/*"]
-    }
-  },
-  "include": [
-    "src/**/*"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "dist-webui"
-  ]
+    "compilerOptions": {
+        "target": "ES2022",
+        "lib": [
+            "ES2022",
+            "DOM",
+            "DOM.Iterable"
+        ],
+        "module": "ES2022",
+        "moduleResolution": "bundler",
+        "allowSyntheticDefaultImports": true,
+        "esModuleInterop": true,
+        "allowJs": true,
+        "checkJs": false,
+        "strict": true,
+        "alwaysStrict": true,
+        "preserveConstEnums": true,
+        "moduleDetection": "force",
+        "isolatedModules": true,
+        "skipLibCheck": true,
+        "forceConsistentCasingInFileNames": true,
+        "resolveJsonModule": true,
+        "declaration": false,
+        "declarationMap": false,
+        "sourceMap": true,
+        "outDir": "./dist",
+        "rootDir": "./src",
+        "jsx": "react-jsx",
+        "jsxImportSource": "react",
+        "noEmit": false,
+        "types": [
+            "@cloudflare/workers-types"
+        ],
+        "baseUrl": "./src",
+        "paths": {
+            "@/*": [
+                "*"
+            ],
+            "@/types/*": [
+                "types/*"
+            ],
+            "@/utils/*": [
+                "utils/*"
+            ],
+            "@/api/*": [
+                "api/*"
+            ],
+            "@/services/*": [
+                "services/*"
+            ],
+            "@/components/*": [
+                "components/*"
+            ],
+            "@/stores/*": [
+                "stores/*"
+            ],
+            "@/hooks/*": [
+                "hooks/*"
+            ]
+        }
+    },
+    "include": [
+        "src/**/*"
+    ],
+    "exclude": [
+        "node_modules",
+        "dist",
+        "dist-webui",
+        "src/**/__tests__/*"
+    ]
 }

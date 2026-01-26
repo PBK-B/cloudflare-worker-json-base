@@ -4,6 +4,7 @@
     "private": true,
     "scripts": {
         "deploy": "npm run build && wrangler deploy",
+        "auto-deploy": "tsc --esModuleInterop deploy-cli.ts && node deploy-cli deploy",
         "dev": "wrangler dev --port 8788",
         "dev:worker": "wrangler dev --port 8788",
         "dev:webui": "vite",

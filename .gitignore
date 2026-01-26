@@ -173,3 +173,5 @@ dist
 .wrangler/
 
 .vscode
+
+deploy-cli.js
