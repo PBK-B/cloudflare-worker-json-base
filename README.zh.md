@@ -43,6 +43,8 @@ npm run auto-deploy
 npm install -g wrangler
 wrangler login
 npx wrangler d1 create jsonbase
+# 修改 d1_databases.database_id 和 vars.API_KEY
+vim wrangler.toml
 npm run deploy
 ```
 

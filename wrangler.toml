@@ -4,11 +4,16 @@ main = "dist/index.js"
 compatibility_date = "2024-05-02"
 compatibility_flags = ["nodejs_compat"]
 
+[build]
+command = "npm run build"
+watch_dir = "./src"
+
 [vars]
 ENVIRONMENT = "development"
 VERSION = "2.0.0"
 STORAGE_BACKEND = "d1"
 RATE_LIMIT_ENABLED = false
+# API_KEY = "MYDATABASEKEY"
 
 [[d1_databases]]
 binding = "JSONBASE_DB"
