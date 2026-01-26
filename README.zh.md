@@ -10,7 +10,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
 [![D1 Database](https://img.shields.io/badge/Cloudflare-D1-blueviolet?style=flat-square&logo=cloudflare)](https://developers.cloudflare.com/d1/)
 
-[English](./README.md) | [中文](./README.zh.md) | [Quick Start](#quick-start)
+[English](./README.md) | [中文](./README.zh.md) | [快速开始](#快速开始)
 
 无需服务器管理，快速部署即可使用。
 
