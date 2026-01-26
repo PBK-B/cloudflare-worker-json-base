@@ -88,6 +88,7 @@ interface EnvironmentConfig {
 	assets?: {
 		directory: string;
 		binding: string;
+		run_worker_first?: boolean;
 	};
 }
 
@@ -262,6 +263,7 @@ function parseWranglerToml(): WranglerConfig {
 				config.environments[envName].assets = {
 					directory: assetsDirMatch[1],
 					binding: assetsBindingMatch[1],
+					run_worker_first: true,
 				};
 			}
 		}
@@ -634,6 +636,7 @@ function generateWranglerJsonc(
 		wranglerConfig.env[environment].assets = {
 			directory: '../' + envConfig.assets.directory,
 			binding: envConfig.assets.binding,
+			run_worker_first: envConfig.assets.run_worker_first,
 		};
 	}
 
