@@ -567,6 +567,18 @@ async function runMigrations(migrationsDir: string): Promise<void> {
 async function setSecrets(apiKey: string, environment: string): Promise<void> {
 	log.info(`配置 Secrets (${environment})`);
 	const tempFile = path.join(getProjectRoot(), '.temp_secret');
+	
+	function cleanup() {
+		try {
+			if (fs.existsSync(tempFile)) {
+				fs.unlinkSync(tempFile);
+			}
+		} catch {}
+	}
+	
+	process.on('SIGINT', cleanup);
+	process.on('SIGTERM', cleanup);
+	
 	try {
 		fs.writeFileSync(tempFile, apiKey, { mode: 0o600 });
 		execSync(`wrangler secret put API_KEY --path="${tempFile}" --env ${environment}`, {
@@ -578,9 +590,9 @@ async function setSecrets(apiKey: string, environment: string): Promise<void> {
 		log.error(`Secrets 失败: ${error}`);
 		throw error;
 	} finally {
-		if (fs.existsSync(tempFile)) {
-			fs.unlinkSync(tempFile);
-		}
+		process.off('SIGINT', cleanup);
+		process.off('SIGTERM', cleanup);
+		cleanup();
 	}
 }
 
