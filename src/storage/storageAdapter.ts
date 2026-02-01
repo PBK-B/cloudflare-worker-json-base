@@ -156,7 +156,7 @@ export class StorageAdapter {
     }
 
     const type = request.type || 'json';
-    let contentType = request.content_type || this.defaultContentType;
+    let contentType = request.content_type;
     let data: Uint8Array;
 
     if (type === 'json') {
@@ -174,10 +174,11 @@ export class StorageAdapter {
         contentType = request.content_type || request.value.split(';')[0].split(':')[1];
       } else {
         data = this.textToUint8Array(String(request.value));
+        contentType = request.content_type || 'application/octet-stream';
       }
     } else {
       data = this.textToUint8Array(String(request.value));
-      contentType = request.content_type || contentType || 'text/plain';
+      contentType = request.content_type || 'text/plain';
     }
 
     const result = await this.storageService.write(data, {

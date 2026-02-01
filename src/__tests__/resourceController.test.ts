@@ -123,6 +123,30 @@ describe('ResourceController', () => {
       expect(response).not.toBeNull()
       expect(response!.status).toBe(201)
     })
+
+    it('should create text data starting with data: prefix', async () => {
+      const mockAdapter = createMockAdapter({ 
+        create: async () => MOCK_TEXT_DATA 
+      })
+      const controller = createController(mockAdapter)
+      const request = createMockRequest('POST', '/demo_bucket/test.txt', 'data:something', 'text/plain')
+      const response = await controller.handle(request)
+
+      expect(response).not.toBeNull()
+      expect(response!.status).toBe(201)
+    })
+
+    it('should create plain text data without content-type header', async () => {
+      const mockAdapter = createMockAdapter({ 
+        create: async () => MOCK_TEXT_DATA 
+      })
+      const controller = createController(mockAdapter)
+      const request = createMockRequest('POST', '/demo_bucket/test.txt', 'Hello World')
+      const response = await controller.handle(request)
+
+      expect(response).not.toBeNull()
+      expect(response!.status).toBe(201)
+    })
   })
 
   describe('PUT', () => {

@@ -247,7 +247,7 @@ export class ResourceController {
       }
     }
 
-    if (body.startsWith('data:')) {
+    if (this.isValidDataUrl(body)) {
       return {
         value: body,
         type: 'binary',
@@ -262,6 +262,14 @@ export class ResourceController {
       contentType: contentType || 'text/plain',
       size: body.length
     }
+  }
+
+  private isValidDataUrl(url: string): boolean {
+    if (!url.startsWith('data:')) {
+      return false;
+    }
+    const dataUrlPattern = /^data:([a-zA-Z0-9!#$&+^_.-]+\/[a-zA-Z0-9!#$&+^_.-]+);base64,/;
+    return dataUrlPattern.test(url);
   }
 
   private arrayBufferToBase64(buffer: ArrayBuffer): string {

@@ -109,8 +109,10 @@ export class DataController {
 
       const type = (requestData as any)?.type || (requestData as any)?.dataType || 'json'
       
+      const value = (requestData as any)?.value ?? requestData
+      
       const data = await this.storageAdapter.create(pathname, {
-        value: (requestData as any)?.value ?? requestData,
+        value,
         type: type as 'json' | 'text' | 'binary'
       })
       Logger.info('Data created', { pathname, auth: auth.apiKey.substring(0, 8) })
@@ -221,7 +223,7 @@ export class DataController {
       }
     }
 
-    if (body.startsWith('data:')) {
+    if (this.isValidDataUrl(body)) {
       return {
         value: body,
         type: 'binary',
@@ -234,6 +236,14 @@ export class DataController {
       type: 'text',
       contentType: contentType || 'text/plain'
     }
+  }
+
+  private isValidDataUrl(url: string): boolean {
+    if (!url.startsWith('data:')) {
+      return false;
+    }
+    const dataUrlPattern = /^data:([a-zA-Z0-9!#$&+^_.-]+\/[a-zA-Z0-9!#$&+^_.-]+);base64,/;
+    return dataUrlPattern.test(url);
   }
 
   private async dataUrlToArrayBuffer(dataUrl: string): Promise<ArrayBuffer> {
