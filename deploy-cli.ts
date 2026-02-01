@@ -564,35 +564,26 @@ async function runMigrations(migrationsDir: string): Promise<void> {
 	}
 }
 
-async function setSecrets(apiKey: string, environment: string): Promise<void> {
-	log.info(`配置 Secrets (${environment})`);
-	const tempFile = path.join(getProjectRoot(), '.temp_secret');
-	
-	function cleanup() {
-		try {
-			if (fs.existsSync(tempFile)) {
-				fs.unlinkSync(tempFile);
-			}
-		} catch {}
-	}
-	
-	process.on('SIGINT', cleanup);
-	process.on('SIGTERM', cleanup);
-	
+async function setSecrets(apiKey: string, workerName?: string): Promise<void> {
+	log.info(`配置 Secrets (${workerName})`);
+
 	try {
-		fs.writeFileSync(tempFile, apiKey, { mode: 0o600 });
-		execSync(`wrangler secret put API_KEY --path="${tempFile}" --env ${environment}`, {
-			stdio: 'inherit',
+		const nameArg = workerName ? `--name ${workerName}` : '';
+		const output = execSync(`npx wrangler secret put API_KEY ${nameArg}`, {
+			stdio: 'pipe',
 			timeout: 60000,
+			input: apiKey,
+			encoding: 'utf8',
 		});
-		log.success('Secrets 配置完成');
+
+		if (output && (output.includes('success') || output.includes('Success') || output.includes('Done') || output.includes('done'))) {
+			log.success('Secrets 配置完成');
+		} else {
+			log.warning('Secrets 设置输出未确认成功');
+		}
 	} catch (error) {
 		log.error(`Secrets 失败: ${error}`);
 		throw error;
-	} finally {
-		process.off('SIGINT', cleanup);
-		process.off('SIGTERM', cleanup);
-		cleanup();
 	}
 }
 
@@ -603,7 +594,7 @@ function generateWranglerJsonc(
 	resources: ResourceInfo[],
 ): string {
 	const envConfig = config.environments[environment];
-	const workerName = envConfig?.name || `${config.name}-${environment}`;
+	const workerName = envConfig?.name || `${config.name}`;
 
 	const wranglerConfig: any = {
 		$schema: '../node_modules/wrangler/config-schema.json',
@@ -817,9 +808,6 @@ async function deploy() {
 		await runMigrations(config.deploy_options.migrations_dir);
 	}
 
-	log.info(`[${step++}/${totalSteps}] 配置 Secrets...`);
-	await setSecrets(apiKey, environment);
-
 	log.info(`[${step++}/${totalSteps}] 构建项目...`);
 	await executeCommand('npm run build:all', '构建');
 
@@ -829,6 +817,12 @@ async function deploy() {
 	log.info(`[${step++}/${totalSteps}] 生成配置...`);
 	const wranglerJsonc = generateWranglerJsonc(config, environment, storageBackend, resources);
 	fs.writeFileSync(path.join(distFolder, 'wrangler.jsonc'), wranglerJsonc);
+
+	const wranglerConfig = JSON.parse(wranglerJsonc);
+	const deployedWorkerName = wranglerConfig.name;
+
+	log.info(`[${step++}/${totalSteps}] 配置 Secrets...`);
+	await setSecrets(apiKey, deployedWorkerName);
 
 	const missingResources = resources.filter((r) => !r.id && (r.type === 'd1' || r.type === 'kv'));
 	if (missingResources.length > 0) {
