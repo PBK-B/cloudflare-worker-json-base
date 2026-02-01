@@ -27,6 +27,8 @@ export class ResourceController {
     let pathname = url.pathname
 
     try {
+      const method = request.method.toUpperCase()
+
       const isApiPath = pathname.startsWith('/._jsondb_/') ||
                         pathname === '/' ||
                         pathname.startsWith('/assets/') ||
@@ -36,13 +38,25 @@ export class ResourceController {
         return null
       }
 
-      await AuthMiddleware.authenticate(request)
+      if (method === 'OPTIONS') {
+        return new Response(null, {
+          status: 204,
+          headers: {
+            'Access-Control-Allow-Origin': request.headers.get('Origin') || '*',
+            'Access-Control-Allow-Methods': 'GET, HEAD, POST, PUT, DELETE, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+            'Access-Control-Max-Age': '86400'
+          }
+        })
+      }
 
-      const method = request.method.toUpperCase()
+      await AuthMiddleware.authenticate(request)
 
       switch (method) {
         case 'GET':
           return await this.get(pathname)
+        case 'HEAD':
+          return await this.head(pathname)
         case 'POST':
           return await this.post(pathname, request)
         case 'PUT':
@@ -52,11 +66,22 @@ export class ResourceController {
         default:
           return new Response('Method Not Allowed', {
             status: 405,
-            headers: { 'Allow': 'GET, POST, PUT, DELETE' }
+            headers: { 'Allow': 'GET, HEAD, POST, PUT, DELETE' }
           })
       }
     } catch (error) {
-      return null
+      if (error instanceof ApiError) {
+        return error.toResponse()
+      }
+      Logger.error('Resource controller error', { pathname, error })
+      return new Response(JSON.stringify({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        timestamp: new Date().toISOString()
+      }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      })
     }
   }
 
@@ -109,6 +134,37 @@ export class ResourceController {
       }
 
       return response
+    } catch (error) {
+      if (error instanceof ApiError && error.statusCode === 404) {
+        return new Response('Not Found', { status: 404 })
+      }
+      throw error
+    }
+  }
+
+  private async head(pathname: string): Promise<Response> {
+    try {
+      const data = await this.storageAdapter.get(pathname)
+
+      const contentType = data.content_type || 'application/octet-stream'
+      const shouldDownload = !this.isTextContent(contentType) && this.isDownloadable(contentType)
+
+      const responseHeaders: Record<string, string> = {
+        'Content-Type': contentType,
+        'Content-Length': String(data.size || 0),
+        'Cache-Control': 'public, max-age=3600',
+        'X-Content-Type-Options': 'nosniff'
+      }
+
+      if (shouldDownload) {
+        const filename = pathname.split('/').pop() || 'download'
+        responseHeaders['Content-Disposition'] = `attachment; filename="${filename}"`
+      }
+
+      return new Response(null, {
+        status: 200,
+        headers: responseHeaders
+      })
     } catch (error) {
       if (error instanceof ApiError && error.statusCode === 404) {
         return new Response('Not Found', { status: 404 })
