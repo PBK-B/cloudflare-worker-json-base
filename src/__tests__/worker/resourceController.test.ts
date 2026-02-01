@@ -4,15 +4,15 @@ import { MOCK_JSON_DATA, MOCK_BINARY_DATA, MOCK_TEXT_DATA } from './mocks/storag
 import { ApiError } from '@/utils/response'
 import { StorageAdapter } from '@/storage/storageAdapter'
 
-describe('ResourceController', () => {
+describe('资源控制器', () => {
   let mockEnv: ReturnType<typeof createMockEnv>
 
   beforeEach(() => {
     mockEnv = createMockEnv()
   })
 
-  describe('path filtering', () => {
-    it('should return null for API paths', async () => {
+  describe('路径过滤', () => {
+    it('应该对 API 路径返回 null', async () => {
       const mockAdapter = createMockAdapter({ get: async () => MOCK_JSON_DATA })
       const controller = createController(mockAdapter)
       const request = createMockRequest('GET', '/._jsondb_/api/data/test')
@@ -20,7 +20,7 @@ describe('ResourceController', () => {
       expect(response).toBeNull()
     })
 
-    it('should return null for root path', async () => {
+    it('应该对根路径返回 null', async () => {
       const mockAdapter = createMockAdapter({ get: async () => MOCK_JSON_DATA })
       const controller = createController(mockAdapter)
       const request = createMockRequest('GET', '/')
@@ -28,7 +28,7 @@ describe('ResourceController', () => {
       expect(response).toBeNull()
     })
 
-    it('should return null for assets path', async () => {
+    it('应该对静态资源路径返回 null', async () => {
       const mockAdapter = createMockAdapter({ get: async () => MOCK_JSON_DATA })
       const controller = createController(mockAdapter)
       const request = createMockRequest('GET', '/assets/app.js')
@@ -36,7 +36,7 @@ describe('ResourceController', () => {
       expect(response).toBeNull()
     })
 
-    it('should return 405 for unsupported methods', async () => {
+    it('应该对不支持的方法返回 405', async () => {
       const mockAdapter = createMockAdapter({ get: async () => MOCK_JSON_DATA })
       const controller = createController(mockAdapter)
       const request = createMockRequest('PATCH', '/demo_bucket/test')
@@ -46,8 +46,8 @@ describe('ResourceController', () => {
     })
   })
 
-  describe('GET', () => {
-    it('should return JSON data', async () => {
+  describe('GET 请求', () => {
+    it('应该返回 JSON 数据', async () => {
       const mockAdapter = createMockAdapter({ 
         get: async () => MOCK_JSON_DATA 
       })
@@ -59,7 +59,7 @@ describe('ResourceController', () => {
       expect(response!.status).toBe(200)
     })
 
-    it('should return text data', async () => {
+    it('应该返回文本数据', async () => {
       const mockAdapter = createMockAdapter({ 
         get: async () => MOCK_TEXT_DATA 
       })
@@ -71,7 +71,7 @@ describe('ResourceController', () => {
       expect(response!.status).toBe(200)
     })
 
-    it('should return binary data', async () => {
+    it('应该返回二进制数据', async () => {
       const mockAdapter = createMockAdapter({ 
         get: async () => MOCK_BINARY_DATA 
       })
@@ -83,7 +83,7 @@ describe('ResourceController', () => {
       expect(response!.status).toBe(200)
     })
 
-    it('should return 404 for non-existent paths', async () => {
+    it('应该对不存在的路径返回 404', async () => {
       const mockAdapter = createMockAdapter({ 
         get: async () => { throw ApiError.notFound('Not found') } 
       })
@@ -96,8 +96,8 @@ describe('ResourceController', () => {
     })
   })
 
-  describe('POST', () => {
-    it('should create JSON data', async () => {
+  describe('POST 请求', () => {
+    it('应该创建 JSON 数据', async () => {
       const mockAdapter = createMockAdapter({ 
         create: async () => MOCK_JSON_DATA 
       })
@@ -112,7 +112,7 @@ describe('ResourceController', () => {
       expect(body.message).toBe('storage ok')
     })
 
-    it('should create text data', async () => {
+    it('应该创建文本数据', async () => {
       const mockAdapter = createMockAdapter({ 
         create: async () => MOCK_TEXT_DATA 
       })
@@ -124,7 +124,7 @@ describe('ResourceController', () => {
       expect(response!.status).toBe(201)
     })
 
-    it('should create text data starting with data: prefix', async () => {
+    it('应该创建以 data: 前缀开头的文本数据', async () => {
       const mockAdapter = createMockAdapter({ 
         create: async () => MOCK_TEXT_DATA 
       })
@@ -136,7 +136,7 @@ describe('ResourceController', () => {
       expect(response!.status).toBe(201)
     })
 
-    it('should create plain text data without content-type header', async () => {
+    it('应该在没有 content-type 头时创建纯文本数据', async () => {
       const mockAdapter = createMockAdapter({ 
         create: async () => MOCK_TEXT_DATA 
       })
@@ -149,8 +149,8 @@ describe('ResourceController', () => {
     })
   })
 
-  describe('PUT', () => {
-    it('should update data', async () => {
+  describe('PUT 请求', () => {
+    it('应该更新数据', async () => {
       const mockAdapter = createMockAdapter({ 
         update: async () => MOCK_JSON_DATA 
       })
@@ -165,8 +165,8 @@ describe('ResourceController', () => {
     })
   })
 
-  describe('DELETE', () => {
-    it('should delete data', async () => {
+  describe('DELETE 请求', () => {
+    it('应该删除数据', async () => {
       const mockAdapter = createMockAdapter({ 
         delete: async () => undefined 
       })
