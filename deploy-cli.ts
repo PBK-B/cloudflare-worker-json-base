@@ -569,7 +569,7 @@ async function setSecrets(apiKey: string, environment: string): Promise<void> {
 	const tempFile = path.join(getProjectRoot(), '.temp_secret');
 	try {
 		fs.writeFileSync(tempFile, apiKey, { mode: 0o600 });
-		execSync(`wrangler secret put API_KEY --env ${environment} < "${tempFile}"`, {
+		execSync(`wrangler secret put API_KEY --path="${tempFile}" --env ${environment}`, {
 			stdio: 'inherit',
 			timeout: 60000,
 		});
