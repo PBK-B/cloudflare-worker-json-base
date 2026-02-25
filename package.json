@@ -31,7 +31,10 @@
         "d1:migrate": "npx wrangler d1 execute jsonbase --local --file=./src/database/schema.sql",
         "d1:reset": "npx wrangler d1 execute jsonbase --local --command=\"DROP TABLE IF EXISTS data_items; DROP TABLE IF EXISTS schema_migrations;\" && npm run d1:migrate",
         "d1:view": "npx wrangler d1 execute jsonbase --local --command=\"SELECT * FROM data_items ORDER BY updated_at DESC\"",
-        "d1:stats": "npx wrangler d1 execute jsonbase --local --command=\"SELECT COUNT(*) as total, SUM(size) as total_size FROM data_items\""
+        "d1:stats": "npx wrangler d1 execute jsonbase --local --command=\"SELECT COUNT(*) as total, SUM(size) as total_size FROM data_items\"",
+        "i18n:extract": "i18next-cli extract",
+        "i18n:sync": "i18next-cli sync",
+        "i18n:status": "i18next-cli status"
     },
     "devDependencies": {
         "@cloudflare/workers-types": "^4.20260124.0",
@@ -45,6 +48,7 @@
         "commander": "^12.0.0",
         "html-to-image": "^1.11.13",
         "identity-obj-proxy": "^3.0.0",
+        "i18next-cli": "^1.44.0",
         "inquirer": "^9.0.0",
         "jest": "^30.2.0",
         "jest-environment-jsdom": "^30.2.0",
@@ -62,11 +66,13 @@
         "@types/react-dom": "^19.2.3",
         "axios": "^1.13.2",
         "axios-hooks": "^5.1.1",
+        "i18next": "^25.6.0",
         "lucide-react": "^0.563.0",
         "mobx": "^6.15.0",
         "mobx-react-lite": "^4.1.1",
-        "react": "^19.2.3",
+        "react": "19.2.3",
         "react-dom": "^19.2.3",
+        "react-i18next": "^16.3.5",
         "react-router-dom": "^7.13.0",
         "rsuite": "^5.83.4",
         "sass": "^1.97.3"

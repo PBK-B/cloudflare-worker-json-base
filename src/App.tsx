@@ -1,5 +1,6 @@
 import React from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import LoginPage from './pages/LoginPage';
 import AdminLayout from './pages/admin/AdminLayout';
@@ -10,11 +11,12 @@ import './styles/App.less';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 	const { isAuthenticated, isLoading } = useAuth();
+	const { t } = useTranslation();
 
 	if (isLoading) {
 		return (
 			<div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-				加载中...
+				{t('app.loading', { defaultValue: "加载中..." })}
 			</div>
 		);
 	}

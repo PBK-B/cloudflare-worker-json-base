@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { Container, Header, Content, Button } from 'rsuite';
 import { Settings, Database, RefreshCw, LogOut, LayoutDashboard } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../context/AuthContext';
 import { useApi } from '../../hooks/useApi';
 import { ModalForm } from '../../components/common/ModalForm';
@@ -19,6 +20,7 @@ const DATA_REFRESH_EVENT = 'jsonbase-data-refresh';
 
 const AdminLayout: React.FC = () => {
 	const { logout } = useAuth();
+	const { t } = useTranslation();
 	const navigate = useNavigate();
 	const { createData, uploadFile, updateData } = useApi();
 
@@ -62,10 +64,10 @@ const AdminLayout: React.FC = () => {
 				const response = await uploadFile(data.path, file, file.type);
 				if (response.success) {
 					handleCloseModals();
-					notify.success('创建成功');
+					notify.success(t('layout.createSuccess', { defaultValue: "创建成功" }));
 					notifyRefresh();
 				} else {
-					notify.error(`创建失败: ${response.error}`);
+					notify.error(`${t('layout.createFailed', { defaultValue: "创建失败" })}: ${response.error}`);
 				}
 			} else {
 				let processedValue = data.value;
@@ -80,14 +82,14 @@ const AdminLayout: React.FC = () => {
 
 				if (response.success) {
 					handleCloseModals();
-					notify.success('创建成功');
+					notify.success(t('layout.createSuccess', { defaultValue: "创建成功" }));
 					notifyRefresh();
 				} else {
-					notify.error(`创建失败: ${response.error}`);
+					notify.error(`${t('layout.createFailed', { defaultValue: "创建失败" })}: ${response.error}`);
 				}
 			}
 		} catch (error) {
-			notify.error('创建失败');
+			notify.error(t('layout.createFailed', { defaultValue: "创建失败" }));
 			console.error('Create error:', error);
 		} finally {
 			setSubmitLoading(false);
@@ -111,13 +113,13 @@ const AdminLayout: React.FC = () => {
 
 			if (response.success) {
 				handleCloseModals();
-				notify.success('更新成功');
+				notify.success(t('layout.updateSuccess', { defaultValue: "更新成功" }));
 				notifyRefresh();
 			} else {
-				notify.error(`更新失败: ${response.error}`);
+				notify.error(`${t('layout.updateFailed', { defaultValue: "更新失败" })}: ${response.error}`);
 			}
 		} catch (error) {
-			notify.error('更新失败');
+			notify.error(t('layout.updateFailed', { defaultValue: "更新失败" }));
 			console.error('Update error:', error);
 		} finally {
 			setSubmitLoading(false);
@@ -130,7 +132,7 @@ const AdminLayout: React.FC = () => {
 				<div className="admin-header-content">
 					<div className="admin-logo">
 						<LayoutDashboard size={24} />
-						<span>JSON Base 管理控制台</span>
+						<span>{t('layout.consoleTitle', { defaultValue: "JSON Base 管理控制台" })}</span>
 					</div>
 					<div className="admin-nav">
 						<NavLink
@@ -139,14 +141,14 @@ const AdminLayout: React.FC = () => {
 							className={({ isActive }) => `admin-nav-link ${isActive ? 'active' : ''}`}
 						>
 							<Settings size={16} />
-							控制台
+							{t('layout.navConsole', { defaultValue: "控制台" })}
 						</NavLink>
 						<NavLink
 							to="/admin/data"
 							className={({ isActive }) => `admin-nav-link ${isActive ? 'active' : ''}`}
 						>
 							<Database size={16} />
-							数据管理
+							{t('layout.navData', { defaultValue: "数据管理" })}
 						</NavLink>
 					</div>
 					<div className="admin-actions">
@@ -155,7 +157,7 @@ const AdminLayout: React.FC = () => {
 						</Button>
 						<Button appearance="subtle" onClick={handleLogout} className="admin-logout-btn">
 							<LogOut size={16} />
-							退出
+							{t('layout.logout', { defaultValue: "退出" })}
 						</Button>
 					</div>
 				</div>
@@ -168,7 +170,7 @@ const AdminLayout: React.FC = () => {
 				show={showCreateModal}
 				onClose={handleCloseModals}
 				onSubmit={handleCreateSubmit}
-				title="创建数据"
+				title={t('layout.createData', { defaultValue: "创建数据" })}
 				loading={submitLoading}
 				mode="create"
 				initialType={createDefaultType}
@@ -179,7 +181,7 @@ const AdminLayout: React.FC = () => {
 					show={showEditModal}
 					onClose={handleCloseModals}
 					onSubmit={handleEditSubmit}
-					title="编辑数据"
+					title={t('layout.editData', { defaultValue: "编辑数据" })}
 					loading={submitLoading}
 					initialData={{
 						path: selectedData.id,

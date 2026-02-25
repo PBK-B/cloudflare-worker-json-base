@@ -15,6 +15,16 @@ Object.defineProperty(window, 'localStorage', {
 	writable: true,
 });
 
+Object.defineProperty(window.navigator, 'language', {
+	value: 'zh-CN',
+	configurable: true,
+});
+
+Object.defineProperty(window.navigator, 'languages', {
+	value: ['zh-CN', 'zh'],
+	configurable: true,
+});
+
 describe('登录页面', () => {
 	beforeEach(() => {
 		(localStorageMock.getItem as jest.Mock).mockReturnValue(null);
@@ -26,21 +36,21 @@ describe('登录页面', () => {
 	test('应该显示登录页面', () => {
 		render(<App />);
 		expect(screen.getByText('JSON Base')).toBeInTheDocument();
-		expect(screen.getByText('Cloudflare Workers JSON 存储服务')).toBeInTheDocument();
-		expect(screen.getByPlaceholderText('请输入您的 API Key')).toBeInTheDocument();
-		expect(screen.getByText('验证并登录')).toBeInTheDocument();
+		expect(screen.getByText('Cloudflare Workers JSON Storage Service')).toBeInTheDocument();
+		expect(screen.getByPlaceholderText('Please enter your API key')).toBeInTheDocument();
+		expect(screen.getByText('Verify and Sign In')).toBeInTheDocument();
 	});
 
 	test('应该显示 API Key 输入框', () => {
 		render(<App />);
-		const input = screen.getByPlaceholderText('请输入您的 API Key');
+		const input = screen.getByPlaceholderText('Please enter your API key');
 		expect(input).toBeInTheDocument();
 		expect(input).toHaveAttribute('type', 'password');
 	});
 
 	test('应该能够输入 API Key', () => {
 		render(<App />);
-		const input = screen.getByPlaceholderText('请输入您的 API Key') as HTMLInputElement;
+		const input = screen.getByPlaceholderText('Please enter your API key') as HTMLInputElement;
 		fireEvent.change(input, { target: { value: 'test-api-key' } });
 		expect(input.value).toBe('test-api-key');
 	});
@@ -104,7 +114,7 @@ describe('登录表单', () => {
 
 	test('登录按钮应该可点击', () => {
 		render(<App />);
-		const loginButton = screen.getByRole('button', { name: /验证并登录/i });
+		const loginButton = screen.getByRole('button', { name: /verify and sign in/i });
 		expect(loginButton).toBeInTheDocument();
 		expect(loginButton).toBeEnabled();
 	});

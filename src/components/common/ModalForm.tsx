@@ -1,6 +1,7 @@
 import React from 'react';
 import { Modal, Form, Input, InputPicker, Button, Uploader } from 'rsuite';
 import { Plus, Edit, Upload, File, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { notify } from '../../utils/notification';
 
 interface FormData {
@@ -30,6 +31,7 @@ export const ModalForm: React.FC<ModalFormProps> = ({
 	loading = false,
 	mode,
 }) => {
+	const { t } = useTranslation();
 	const [formData, setFormData] = React.useState<FormData>(
 		initialData || {
 			path: '',
@@ -56,18 +58,18 @@ export const ModalForm: React.FC<ModalFormProps> = ({
 
 	const handleSubmit = async () => {
 		if (!formData.path.trim()) {
-			notify.warning('请输入路径');
+			notify.warning(t('modal.pathRequired', { defaultValue: "请输入路径" }));
 			return;
 		}
 
 		if (formData.type === 'binary') {
 			if (!uploadedFile && !formData.value) {
-				notify.warning('请上传文件');
+				notify.warning(t('modal.uploadRequired', { defaultValue: "请上传文件" }));
 				return;
 			}
 		} else {
 			if (!formData.value.trim()) {
-				notify.warning('请输入数据内容');
+				notify.warning(t('modal.contentRequired', { defaultValue: "请输入数据内容" }));
 				return;
 			}
 		}
@@ -76,7 +78,7 @@ export const ModalForm: React.FC<ModalFormProps> = ({
 			try {
 				JSON.parse(formData.value);
 			} catch {
-				notify.warning('JSON 格式错误，请检查数据格式');
+				notify.warning(t('modal.jsonInvalid', { defaultValue: "JSON 格式错误，请检查数据格式" }));
 				return;
 			}
 		}
@@ -170,7 +172,7 @@ export const ModalForm: React.FC<ModalFormProps> = ({
 										{uploadedFile.webkitRelativePath || uploadedFile.name}
 									</span>
 									<span style={{ color: '#999', fontSize: '12px', marginLeft: '8px' }}>
-										{uploadedFile ? (uploadedFile.size / 1024).toFixed(1) : 0} KB
+										{uploadedFile ? (uploadedFile.size / 1024).toFixed(1) : 0} {t('modal.kbUnit', { defaultValue: "KB" })}
 									</span>
 									<button
 										type="button"
@@ -195,13 +197,13 @@ export const ModalForm: React.FC<ModalFormProps> = ({
 							) : (
 								<>
 									<Upload size={32} style={{ color: '#999', marginBottom: '8px' }} />
-									<p style={{ color: '#666', margin: 0 }}>{isUploading ? '文件处理中...' : '点击或拖拽文件到此处上传'}</p>
-									<p style={{ color: '#999', fontSize: '12px', margin: '4px 0 0 0' }}>支持任意文件格式</p>
+									<p style={{ color: '#666', margin: 0 }}>{isUploading ? t('modal.fileProcessing', { defaultValue: "文件处理中..." }) : t('modal.fileDropHint', { defaultValue: "点击或拖拽文件到此处上传" })}</p>
+									<p style={{ color: '#999', fontSize: '12px', margin: '4px 0 0 0' }}>{t('modal.fileSupportHint', { defaultValue: "支持任意文件格式" })}</p>
 								</>
 							)}
 						</div>
 					</Uploader>
-					<div className="form-hint">文件将在后端自动转换为 Base64 编码存储</div>
+					<div className="form-hint">{t('modal.fileStorageHint', { defaultValue: "文件将在后端自动转换为 Base64 编码存储" })}</div>
 				</div>
 			);
 		}
@@ -212,7 +214,7 @@ export const ModalForm: React.FC<ModalFormProps> = ({
 				rows={10}
 				value={formData.value}
 				onChange={(value) => setFormData((prev) => ({ ...prev, value }))}
-				placeholder={formData.type === 'json' ? '输入 JSON 数据，例如: {"key": "value"}' : '输入文本内容'}
+				placeholder={formData.type === 'json' ? t('modal.jsonPlaceholder', { defaultValue: "输入 JSON 数据，例如: {\"key\": \"value\"}" }) : t('modal.textPlaceholder', { defaultValue: "输入文本内容" })}
 				size="lg"
 			/>
 		);
@@ -229,24 +231,24 @@ export const ModalForm: React.FC<ModalFormProps> = ({
 			<Modal.Body>
 				<Form fluid>
 					<Form.Group>
-						<Form.ControlLabel>路径</Form.ControlLabel>
+						<Form.ControlLabel>{t('modal.path', { defaultValue: "路径" })}</Form.ControlLabel>
 						<Input
 							value={formData.path}
 							onChange={(value) => setFormData((prev) => ({ ...prev, path: value }))}
-							placeholder="/example/data"
+							placeholder={t('modal.pathPlaceholder', { defaultValue: "/example/data" })}
 							size="lg"
 							disabled={mode === 'edit'}
 						/>
-						<div className="form-hint">建议使用路径格式，如 /demo/user/profile</div>
+						<div className="form-hint">{t('modal.pathHint', { defaultValue: "建议使用路径格式，如 /demo/user/profile" })}</div>
 					</Form.Group>
 
 					<Form.Group>
-						<Form.ControlLabel>数据类型</Form.ControlLabel>
+						<Form.ControlLabel>{t('modal.type', { defaultValue: "数据类型" })}</Form.ControlLabel>
 						<InputPicker
 							data={[
-								{ label: 'JSON 数据', value: 'json' },
-								{ label: '文本内容', value: 'text' },
-								{ label: '二进制文件', value: 'binary' },
+								{ label: t('modal.typeJson', { defaultValue: "JSON 数据" }), value: 'json' },
+								{ label: t('modal.typeText', { defaultValue: "文本内容" }), value: 'text' },
+								{ label: t('modal.typeBinary', { defaultValue: "二进制文件" }), value: 'binary' },
 							]}
 							value={formData.type}
 							onChange={handleTypeChange}
@@ -256,17 +258,17 @@ export const ModalForm: React.FC<ModalFormProps> = ({
 					</Form.Group>
 
 					<Form.Group>
-						<Form.ControlLabel>数据内容</Form.ControlLabel>
+						<Form.ControlLabel>{t('modal.content', { defaultValue: "数据内容" })}</Form.ControlLabel>
 						{renderValueInput()}
 					</Form.Group>
 				</Form>
 			</Modal.Body>
 			<Modal.Footer>
 				<Button onClick={onClose} appearance="subtle">
-					取消
+					{t('modal.cancel', { defaultValue: "取消" })}
 				</Button>
 				<Button onClick={handleSubmit} appearance="primary" loading={loading}>
-					{mode === 'create' ? '创建' : '更新'}
+					{mode === 'create' ? t('modal.create', { defaultValue: "创建" }) : t('modal.update', { defaultValue: "更新" })}
 				</Button>
 			</Modal.Footer>
 		</Modal>

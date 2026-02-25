@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { Container, Header, Content, Button, Form, Input } from 'rsuite';
 import { Key, Lock, ArrowRight } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import '../styles/WebUIConsole.less';
 
@@ -10,6 +11,7 @@ const LoginPage: React.FC = () => {
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState('');
 	const { login, isAuthenticated, isLoading } = useAuth();
+	const { t } = useTranslation();
 	const navigate = useNavigate();
 
 	if (isLoading) {
@@ -17,7 +19,7 @@ const LoginPage: React.FC = () => {
 			<Container className="login-container">
 				<div className="login-loading">
 					<div className="login-spinner"></div>
-					<p>加载中...</p>
+					<p>{t('login.loading', { defaultValue: "加载中..." })}</p>
 				</div>
 			</Container>
 		);
@@ -29,7 +31,7 @@ const LoginPage: React.FC = () => {
 
 	const handleSubmit = async () => {
 		if (!apiKey.trim()) {
-			setError('请输入 API Key');
+			setError(t('login.apiKeyRequired', { defaultValue: "请输入 API Key" }));
 			return;
 		}
 
@@ -41,7 +43,7 @@ const LoginPage: React.FC = () => {
 		if (result.success) {
 			navigate('/admin');
 		} else {
-			setError(result.error || '登录失败，请检查 API Key 后重试');
+			setError(result.error || t('login.loginFailed', { defaultValue: "登录失败，请检查 API Key 后重试" }));
 		}
 
 		setLoading(false);
@@ -61,13 +63,13 @@ const LoginPage: React.FC = () => {
 					<div className="login-icon">
 						<Key size={24} />
 					</div>
-					<h1 className="login-title">JSON Base</h1>
-					<p className="login-subtitle">Cloudflare Workers JSON 存储服务</p>
+					<h1 className="login-title">{t('login.title', { defaultValue: "JSON Base" })}</h1>
+					<p className="login-subtitle">{t('login.subtitle', { defaultValue: "Cloudflare Workers JSON 存储服务" })}</p>
 				</div>
 
 				<Form fluid onSubmit={handleSubmit}>
 					<Form.Group>
-						<Form.ControlLabel>API Key</Form.ControlLabel>
+						<Form.ControlLabel>{t('login.apiKeyLabel', { defaultValue: "API Key" })}</Form.ControlLabel>
 						<div className="login-input-wrapper">
 							<Lock size={16} className="login-input-icon" />
 							<Input
@@ -78,7 +80,7 @@ const LoginPage: React.FC = () => {
 									setError('');
 								}}
 								onKeyDown={handleKeyDown}
-								placeholder="请输入您的 API Key"
+								placeholder={t('login.placeholder', { defaultValue: "请输入您的 API Key" })}
 								size="lg"
 								disabled={loading}
 								className="login-input"
@@ -98,7 +100,7 @@ const LoginPage: React.FC = () => {
 							className="login-btn"
 						>
 							<span className="login-btn-content">
-								验证并登录
+								{t('login.submit', { defaultValue: "验证并登录" })}
 								<ArrowRight size={16} />
 							</span>
 						</Button>
@@ -106,7 +108,7 @@ const LoginPage: React.FC = () => {
 				</Form>
 
 				<div className="login-footer">
-					<p>输入 API Key 以访问管理控制台</p>
+					<p>{t('login.footer', { defaultValue: "输入 API Key 以访问管理控制台" })}</p>
 				</div>
 			</div>
 		</Container>

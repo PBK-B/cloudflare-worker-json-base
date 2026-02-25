@@ -1,0 +1,289 @@
+{
+  "api": {
+    "apiKeyInvalid": "Invalid API key",
+    "apiKeyInvalidRelogin": "Invalid API key, please sign in again",
+    "apiKeyInvalidRetry": "Invalid API key, please check and try again",
+    "apiKeyValid": "API key is valid",
+    "badRequest": "Invalid request parameters, please check file format",
+    "connectFailed": "Connection failed",
+    "consoleConfigFailed": "Failed to fetch console configuration",
+    "consoleHealthFailed": "Failed to fetch console health status",
+    "consoleInfoFailed": "Failed to fetch console information",
+    "consoleStatsFailed": "Failed to fetch console statistics",
+    "createFailed": "Create failed",
+    "deleteFailed": "Delete failed",
+    "fileTooLarge": "File is too large to upload",
+    "listFailed": "Failed to fetch data list",
+    "serverInternalError": "Internal server error",
+    "unknownError": "Unknown error",
+    "updateFailed": "Update failed",
+    "uploadFailed": "Upload failed"
+  },
+  "app": {
+    "loading": "Loading..."
+  },
+  "auth": {
+    "apiKeyInvalidRetry": "Invalid API key, please check and try again",
+    "apiKeyRequired": "API key is required",
+    "apiKeyValid": "API key is valid",
+    "apiNotFound": "API endpoint not found, please verify the service URL",
+    "networkError": "Unable to connect to the server, please check your network or service URL",
+    "requestFailed": "Request failed ({{status}})",
+    "serverUnavailable": "Server is temporarily unavailable, please try again later",
+    "tooManyRequests": "Too many requests, please try again later",
+    "unknownErrorRetry": "Unknown error, please try again later"
+  },
+  "autoDeployment": {
+    "title": "🚀 JSON Base Auto Deployment",
+    "subtitle": "Deploy and configure your Cloudflare Workers project in one click",
+    "autoModeTitle": "Auto Deploy Mode",
+    "autoModeDesc": "When enabled, all deployment steps run automatically",
+    "progress": "Deployment Progress",
+    "errors": {
+      "apiKeyRequired": "API key is required"
+    },
+    "auth": {
+      "title": "Cloudflare Account Authentication",
+      "description": "Please ensure you are logged in to Cloudflare and have permission to create Workers and KV namespaces.",
+      "loginHint": "If not logged in, run:",
+      "commandLogin": "wrangler login",
+      "verify": "Verify Authentication"
+    },
+    "config": {
+      "title": "Configure Project Parameters",
+      "apiKey": "API Key *",
+      "apiKeyText": "API Key",
+      "apiKeyPlaceholder": "Please enter your database access key",
+      "hide": "Hide",
+      "show": "Show",
+      "workerName": "Worker Name",
+      "kvNamespace": "KV Namespace",
+      "environment": "Deployment Environment",
+      "dev": "Development",
+      "prod": "Production",
+      "save": "Save Configuration"
+    },
+    "kvCreate": {
+      "title": "Create KV Namespace",
+      "descriptionPrefix": "The system will create a KV namespace named",
+      "descriptionSuffix": ".",
+      "command": "Run command",
+      "commandCreate": "wrangler kv:namespace create \"{{value}}\"",
+      "submit": "Create KV Namespace"
+    },
+    "kvBind": {
+      "title": "Bind KV Namespace",
+      "description": "Bind the created KV namespace to the Worker so it can access data storage.",
+      "bindingConfig": "Binding configuration:",
+      "variableType": "Variable type: KV Namespace",
+      "variableName": "Variable name: {{value}}",
+      "namespace": "KV namespace: {{value}}",
+      "submit": "Bind KV Namespace"
+    },
+    "deploy": {
+      "title": "Deploy Worker",
+      "description": "Build and deploy the project to Cloudflare Workers.",
+      "steps": "Execution steps:",
+      "commandBuild": "1. npm run webui:build",
+      "commandDeploy": "2. wrangler deploy",
+      "submit": "Start Deployment"
+    },
+    "test": {
+      "title": "Testing",
+      "description": "Verify deployment results and ensure all functions work properly.",
+      "submit": "Start Testing"
+    },
+    "actions": {
+      "prev": "Previous",
+      "running": "Running...",
+      "next": "Next",
+      "reset": "Reset Deployment"
+    },
+    "logs": {
+      "title": "Deployment Logs",
+      "clear": "Clear Logs",
+      "empty": "No logs yet",
+      "authStart": "Starting Cloudflare authentication...",
+      "authDone": "Cloudflare authentication completed",
+      "validateConfig": "Validating configuration parameters...",
+      "configValid": "Configuration validation passed",
+      "workerName": "Worker name: {{value}}",
+      "kvNamespace": "KV namespace: {{value}}",
+      "environment": "Environment: {{value}}",
+      "kvCreateStart": "Creating KV namespace...",
+      "kvCreateDone": "KV namespace {{value}} created successfully",
+      "kvBindStart": "Binding KV namespace to Worker...",
+      "kvBindDone": "KV namespace binding completed",
+      "deployStart": "Starting Worker deployment...",
+      "buildWebui": "Building WebUI...",
+      "deployToCloudflare": "Deploying to Cloudflare Workers...",
+      "deployDone": "Deployment completed",
+      "testStart": "Testing deployment results...",
+      "apiTestPass": "API test passed",
+      "webuiTestPass": "WebUI test passed"
+    },
+    "done": {
+      "title": "🎉 Deployment Complete!",
+      "desc": "Your JSON Base service has been successfully deployed to Cloudflare Workers.",
+      "openWebui": "Open WebUI Console",
+      "redeploy": "Deploy Again"
+    }
+  },
+  "console": {
+    "actions": {
+      "create": {
+        "description": "Quickly create new JSON records",
+        "title": "Create Data"
+      },
+      "manage": {
+        "description": "View and manage all records",
+        "title": "Manage Data"
+      },
+      "storeText": {
+        "description": "Store plain text content",
+        "title": "Store Text"
+      },
+      "upload": {
+        "description": "Store binary file data",
+        "title": "Upload File"
+      }
+    },
+    "apiTestDescription": "Use create and query functions in Data Management to test the API.",
+    "apiTestTitle": "API Test Tool",
+    "quickApiExample": "Quick API Example",
+    "quickApiSample": "Create data:\nPOST /data/example\nAuthorization: Bearer YOUR_API_KEY\n{\"name\": \"example\", \"value\": \"data\"}\n\nGet data:\nGET /data/example\nAuthorization: Bearer YOUR_API_KEY\n-> {\"name\": \"example\", \"value\": \"data\"}\n",
+    "stats": {
+      "pageCount": "Total Pages",
+      "totalCount": "Total Records",
+      "totalSize": "Storage Size"
+    }
+  },
+  "data": {
+    "create": "Create Data",
+    "delete": {
+      "cancel": "Cancel",
+      "confirm": "OK",
+      "confirmHint": "This action cannot be undone. Data will be permanently removed.",
+      "confirmText": "Are you sure you want to delete \"{{id}}\"?",
+      "confirmTitle": "Confirm Delete",
+      "failed": "An error occurred while deleting data",
+      "failedTitle": "Delete Failed",
+      "submit": "Delete"
+    },
+    "pagination": "Total {{total}} records, page {{page}}",
+    "search": "Search",
+    "searchPlaceholder": "Search data...",
+    "sort": "Sort:",
+    "sortPath": "Path",
+    "sortSize": "Size",
+    "sortUpdatedAt": "Updated",
+    "table": {
+      "actions": "Actions",
+      "icon": "Type",
+      "path": "Path",
+      "size": "Size",
+      "type": "Type",
+      "updatedAt": "Updated"
+    },
+    "title": "Data Management"
+  },
+  "layout": {
+    "consoleTitle": "JSON Base Admin Console",
+    "createData": "Create Data",
+    "createFailed": "Create failed",
+    "createSuccess": "Created successfully",
+    "editData": "Edit Data",
+    "logout": "Sign Out",
+    "navConsole": "Console",
+    "navData": "Data",
+    "updateFailed": "Update failed",
+    "updateSuccess": "Updated successfully"
+  },
+  "deploymentGuide": {
+    "title": "🚀 Deployment Guide",
+    "subtitle": "Follow the steps below to quickly deploy your JSON Base service",
+    "notifications": {
+      "apiKeyRequired": "Please enter an API key",
+      "configSaved": "Configuration saved, please continue to the next step",
+      "deployComplete": "Deployment complete! WebUI console is ready"
+    },
+    "step1": {
+      "title": "Step 1: Configure API Key",
+      "apiKey": "API Key",
+      "apiKeyPlaceholder": "Please enter your database access key",
+      "hide": "Hide",
+      "show": "Show",
+      "workerName": "Worker Name",
+      "kvNamespace": "KV Namespace",
+      "saving": "Saving...",
+      "save": "Save Configuration"
+    },
+    "step2": {
+      "title": "Step 2: Bind KV Namespace",
+      "instructions": "Steps:",
+      "login": "Log in to",
+      "cloudflareDashboard": "Cloudflare Dashboard",
+      "navigateKv": "Navigate to Workers and Pages -> KV -> Create namespace",
+      "addBinding": "Add a KV binding in Workers and Pages -> worker-json-base -> Settings -> Variables",
+      "envConfig": "Environment variable configuration:",
+      "variableType": "Variable type: KV Namespace",
+      "variableName": "Variable name: JSONBIN",
+      "kvSelect": "KV namespace: select the namespace you created",
+      "done": "I have completed KV binding"
+    },
+    "step3": {
+      "title": "Step 3: Deploy Worker",
+      "installDeps": "Install dependencies:",
+      "commandInstall": "npm install",
+      "deployToCf": "Deploy to Cloudflare Workers:",
+      "commandDeploy": "npm run deploy",
+      "notice": "Note:",
+      "firstDeployLogin": "You need to log in to your Cloudflare account for the first deployment",
+      "commandLogin": "wrangler login",
+      "next": "Deployment completed, continue"
+    },
+    "step4": {
+      "title": "Step 4: Test Features",
+      "ready": "🎉 Congratulations! Your JSON Base service is ready",
+      "validation": "Validation:",
+      "apiTest": "API endpoint test",
+      "webui": "WebUI console",
+      "openWebui": "Open WebUI Console"
+    }
+  },
+  "login": {
+    "title": "JSON Base",
+    "apiKeyLabel": "API Key",
+    "apiKeyRequired": "Please enter an API key",
+    "footer": "Enter your API key to access the admin console",
+    "loading": "Loading...",
+    "loginFailed": "Login failed, please verify your API key and try again",
+    "placeholder": "Please enter your API key",
+    "submit": "Verify and Sign In",
+    "subtitle": "Cloudflare Workers JSON Storage Service"
+  },
+  "modal": {
+    "cancel": "Cancel",
+    "content": "Content",
+    "contentRequired": "Please enter content",
+    "create": "Create",
+    "fileDropHint": "Click or drag a file here to upload",
+    "fileProcessing": "Processing file...",
+    "fileStorageHint": "Files are automatically converted to Base64 and stored on the backend",
+    "fileSupportHint": "Any file format is supported",
+    "jsonInvalid": "Invalid JSON format, please check your input",
+    "kbUnit": "KB",
+    "jsonPlaceholder": "Enter JSON data, e.g. {\"key\": \"value\"}",
+    "path": "Path",
+    "pathHint": "Use path format such as /demo/user/profile",
+    "pathPlaceholder": "/example/data",
+    "pathRequired": "Please enter a path",
+    "textPlaceholder": "Enter text content",
+    "type": "Data Type",
+    "typeBinary": "Binary File",
+    "typeJson": "JSON Data",
+    "typeText": "Text",
+    "update": "Update",
+    "uploadRequired": "Please upload a file"
+  }
+}

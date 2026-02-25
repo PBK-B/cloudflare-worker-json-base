@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import axios, { AxiosError } from 'axios';
 import useAxios, { configure } from 'axios-hooks';
+import i18n from '../i18n';
 import { ApiResponse, StorageData, CreateDataRequest, UpdateDataRequest, PaginatedResponse } from '../types';
 
 const API_BASE_URL = '/._jsondb_/api';
@@ -61,14 +62,14 @@ export const useApi = () => {
 			if (response.data.data?.apiKey?.valid) {
 				return {
 					success: true,
-					message: 'API Key 有效',
+					message: i18n.t('api.apiKeyValid', { defaultValue: "API Key 有效" }),
 					timestamp: new Date().toISOString(),
 					data: response.data.data,
 				};
 			}
 			return {
 				success: false,
-				error: 'API Key 无效',
+				error: i18n.t('api.apiKeyInvalid', { defaultValue: "API Key 无效" }),
 				timestamp: new Date().toISOString(),
 			};
 		} catch (error) {
@@ -78,20 +79,20 @@ export const useApi = () => {
 				if (statusCode === 401 || statusCode === 403) {
 					return {
 						success: false,
-						error: 'API Key 无效，请检查后重试',
+						error: i18n.t('api.apiKeyInvalidRetry', { defaultValue: "API Key 无效，请检查后重试" }),
 						timestamp: new Date().toISOString(),
 					};
 				}
 
 				return {
 					success: false,
-					error: error.response?.data?.error || '连接失败',
+					error: error.response?.data?.error || i18n.t('api.connectFailed', { defaultValue: "连接失败" }),
 					timestamp: new Date().toISOString(),
 				};
 			}
 			return {
 				success: false,
-				error: '未知错误',
+				error: i18n.t('api.unknownError', { defaultValue: "未知错误" }),
 				timestamp: new Date().toISOString(),
 			};
 		} finally {
@@ -107,7 +108,7 @@ export const useApi = () => {
 			if (axios.isAxiosError(error)) {
 				return {
 					success: false,
-					error: error.response?.data?.error || '创建失败',
+					error: error.response?.data?.error || i18n.t('api.createFailed', { defaultValue: "创建失败" }),
 					timestamp: new Date().toISOString(),
 				};
 			}
@@ -130,16 +131,16 @@ export const useApi = () => {
 		} catch (error) {
 			if (axios.isAxiosError(error)) {
 				const statusCode = error.response?.status;
-				let errorMessage = '上传失败';
+				let errorMessage = i18n.t('api.uploadFailed', { defaultValue: "上传失败" });
 
 				if (statusCode === 400) {
-					errorMessage = error.response?.data?.error || '请求参数错误，请检查文件格式';
+					errorMessage = error.response?.data?.error || i18n.t('api.badRequest', { defaultValue: "请求参数错误，请检查文件格式" });
 				} else if (statusCode === 401 || statusCode === 403) {
-					errorMessage = 'API Key 无效，请重新登录';
+					errorMessage = i18n.t('api.apiKeyInvalidRelogin', { defaultValue: "API Key 无效，请重新登录" });
 				} else if (statusCode === 413) {
-					errorMessage = '文件过大，无法上传';
+					errorMessage = i18n.t('api.fileTooLarge', { defaultValue: "文件过大，无法上传" });
 				} else if (statusCode === 500) {
-					errorMessage = error.response?.data?.error || '服务器内部错误';
+					errorMessage = error.response?.data?.error || i18n.t('api.serverInternalError', { defaultValue: "服务器内部错误" });
 				}
 
 				return {
@@ -160,7 +161,7 @@ export const useApi = () => {
 			if (axios.isAxiosError(error)) {
 				return {
 					success: false,
-					error: error.response?.data?.error || '更新失败',
+					error: error.response?.data?.error || i18n.t('api.updateFailed', { defaultValue: "更新失败" }),
 					timestamp: new Date().toISOString(),
 				};
 			}
@@ -185,7 +186,7 @@ export const useApi = () => {
 				}
 				return {
 					success: false,
-					error: error.response?.data?.error || '删除失败',
+					error: error.response?.data?.error || i18n.t('api.deleteFailed', { defaultValue: "删除失败" }),
 					timestamp: new Date().toISOString(),
 				};
 			}
@@ -216,7 +217,7 @@ export const useApi = () => {
 				if (axios.isAxiosError(error)) {
 					return {
 						success: false,
-						error: error.response?.data?.error || '获取列表失败',
+						error: error.response?.data?.error || i18n.t('api.listFailed', { defaultValue: "获取列表失败" }),
 						timestamp: new Date().toISOString(),
 					};
 				}
@@ -234,7 +235,7 @@ export const useApi = () => {
 			if (axios.isAxiosError(error)) {
 				return {
 					success: false,
-					error: error.response?.data?.error || '获取控制台统计失败',
+					error: error.response?.data?.error || i18n.t('api.consoleStatsFailed', { defaultValue: "获取控制台统计失败" }),
 					timestamp: new Date().toISOString(),
 				};
 			}
@@ -250,7 +251,7 @@ export const useApi = () => {
 			if (axios.isAxiosError(error)) {
 				return {
 					success: false,
-					error: error.response?.data?.error || '获取控制台信息失败',
+					error: error.response?.data?.error || i18n.t('api.consoleInfoFailed', { defaultValue: "获取控制台信息失败" }),
 					timestamp: new Date().toISOString(),
 				};
 			}
@@ -266,7 +267,7 @@ export const useApi = () => {
 			if (axios.isAxiosError(error)) {
 				return {
 					success: false,
-					error: error.response?.data?.error || '获取控制台健康状态失败',
+					error: error.response?.data?.error || i18n.t('api.consoleHealthFailed', { defaultValue: "获取控制台健康状态失败" }),
 					timestamp: new Date().toISOString(),
 				};
 			}
@@ -282,7 +283,7 @@ export const useApi = () => {
 			if (axios.isAxiosError(error)) {
 				return {
 					success: false,
-					error: error.response?.data?.error || '获取控制台配置失败',
+					error: error.response?.data?.error || i18n.t('api.consoleConfigFailed', { defaultValue: "获取控制台配置失败" }),
 					timestamp: new Date().toISOString(),
 				};
 			}

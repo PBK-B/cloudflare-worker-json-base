@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import axios from 'axios';
+import i18n from '../i18n';
 import { ApiResponse } from '../types';
 
 interface AuthContextType {
@@ -44,7 +45,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 		if (!apiKeyToUse.trim()) {
 			return {
 				success: false,
-				error: 'API Key 不能为空',
+				error: i18n.t('auth.apiKeyRequired', { defaultValue: "API Key 不能为空" }),
 				timestamp: new Date().toISOString()
 			};
 		}
@@ -58,7 +59,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 			if (response.data.data?.apiKey?.valid) {
 				return {
 					success: true,
-					message: 'API Key 有效',
+					message: i18n.t('auth.apiKeyValid', { defaultValue: "API Key 有效" }),
 					timestamp: new Date().toISOString(),
 					data: response.data.data
 				};
@@ -66,7 +67,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 			
 			return {
 				success: false,
-				error: 'API Key 无效，请检查后重试',
+				error: i18n.t('auth.apiKeyInvalidRetry', { defaultValue: "API Key 无效，请检查后重试" }),
 				timestamp: new Date().toISOString()
 			};
 		} catch (error) {
@@ -76,7 +77,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 				if (statusCode === 401 || statusCode === 403) {
 					return {
 						success: false,
-						error: 'API Key 无效，请检查后重试',
+						error: i18n.t('auth.apiKeyInvalidRetry', { defaultValue: "API Key 无效，请检查后重试" }),
 						timestamp: new Date().toISOString(),
 					};
 				}
@@ -84,7 +85,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 				if (statusCode === 404) {
 					return {
 						success: false,
-						error: 'API 接口不存在，请确认服务地址是否正确',
+						error: i18n.t('auth.apiNotFound', { defaultValue: "API 接口不存在，请确认服务地址是否正确" }),
 						timestamp: new Date().toISOString(),
 					};
 				}
@@ -92,7 +93,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 				if (statusCode === 429) {
 					return {
 						success: false,
-						error: '请求过于频繁，请稍后再试',
+						error: i18n.t('auth.tooManyRequests', { defaultValue: "请求过于频繁，请稍后再试" }),
 						timestamp: new Date().toISOString(),
 					};
 				}
@@ -100,14 +101,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 				if (statusCode && statusCode >= 500) {
 					return {
 						success: false,
-						error: '服务器暂时无法访问，请稍后再试',
+						error: i18n.t('auth.serverUnavailable', { defaultValue: "服务器暂时无法访问，请稍后再试" }),
 						timestamp: new Date().toISOString(),
 					};
 				}
 				
 				return {
 					success: false,
-					error: error.response?.data?.error || `请求失败 (${statusCode || '未知'})`,
+					error: error.response?.data?.error || i18n.t('auth.requestFailed', { defaultValue: "请求失败 ({{status}})", status: statusCode || 'unknown' }),
 					timestamp: new Date().toISOString(),
 				};
 			}
@@ -115,14 +116,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 			if (error instanceof Error && error.message.includes('Network Error')) {
 				return {
 					success: false,
-					error: '无法连接到服务器，请检查网络连接或服务地址',
+					error: i18n.t('auth.networkError', { defaultValue: "无法连接到服务器，请检查网络连接或服务地址" }),
 					timestamp: new Date().toISOString(),
 				};
 			}
 			
 			return {
 				success: false,
-				error: '未知错误，请稍后重试',
+				error: i18n.t('auth.unknownErrorRetry', { defaultValue: "未知错误，请稍后重试" }),
 				timestamp: new Date().toISOString(),
 			};
 		}

@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { Container, Content, Button, Input, Table, Pagination, Modal } from 'rsuite';
 import { Search, Edit, Trash2, FileText, Paperclip, Plus, AlertTriangle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useApi } from '../../hooks/useApi';
 import { StorageData } from '../../types';
 import '../../styles/WebUIConsole.less';
@@ -17,6 +18,7 @@ interface AdminContext {
 const AdminDataPage: React.FC = () => {
 	const { onOpenCreateModal, onOpenEditModal, refreshKey } = useOutletContext<AdminContext>();
 	const { listData, deleteData } = useApi();
+	const { t } = useTranslation();
 
 	const [dataList, setDataList] = useState<StorageData[]>([]);
 	const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0 });
@@ -48,7 +50,7 @@ const AdminDataPage: React.FC = () => {
 			}
 		} catch (err) {
 			if ((err as Error).name !== 'AbortError') {
-				console.error('加载数据失败:', err);
+				console.error(t('api.listFailed', { defaultValue: "获取列表失败" }), err);
 			}
 		} finally {
 			setLoading(false);
@@ -105,11 +107,11 @@ const AdminDataPage: React.FC = () => {
 				setDeletingId(null);
 				await loadData();
 			} else {
-				setErrorMessage(response.error || '删除数据时发生错误');
+				setErrorMessage(response.error || t('data.delete.failed', { defaultValue: "删除数据时发生错误" }));
 				setErrorModalOpen(true);
 			}
 		} catch {
-			setErrorMessage('删除数据时发生错误');
+			setErrorMessage(t('data.delete.failed', { defaultValue: "删除数据时发生错误" }));
 			setErrorModalOpen(true);
 		} finally {
 			setLoading(false);
@@ -149,30 +151,30 @@ const AdminDataPage: React.FC = () => {
 			<div className="data-controls">
 				<div className="data-header">
 					<h4 className="section-title">
-						<span>数据管理</span>
+						<span>{t('data.title', { defaultValue: "数据管理" })}</span>
 					</h4>
 				</div>
 
 				<div className="data-controls-row">
-					<Input className="data-controls-row-search" placeholder="搜索数据..." value={searchQuery} onChange={setSearchQuery} />
+					<Input className="data-controls-row-search" placeholder={t('data.searchPlaceholder', { defaultValue: "搜索数据..." })} value={searchQuery} onChange={setSearchQuery} />
 					<Button onClick={handleSearch} className="btn-search">
-						<Search size={16} /> 搜索
+						<Search size={16} /> {t('data.search', { defaultValue: "搜索" })}
 					</Button>
 				</div>
 
 				<div className="data-controls-row-sort">
 					<Button className="create-btn" size="sm" appearance="primary" onClick={() => onOpenCreateModal()}>
-						<Plus size={14} /> 创建数据
+						<Plus size={14} /> {t('data.create', { defaultValue: "创建数据" })}
 					</Button>
-					<span style={{ marginLeft: 'auto' }}>排序：</span>
+					<span style={{ marginLeft: 'auto' }}>{t('data.sort', { defaultValue: "排序：" })}</span>
 					<Button size="sm" appearance={sortBy === 'updated_at' ? 'primary' : 'subtle'} onClick={() => handleSort('updated_at')}>
-						<span className="sort-btn-content">更新时间 {sortBy === 'updated_at' && (sortOrder === 'asc' ? '↑' : '↓')}</span>
+						<span className="sort-btn-content">{t('data.sortUpdatedAt', { defaultValue: "更新时间" })} {sortBy === 'updated_at' && (sortOrder === 'asc' ? '↑' : '↓')}</span>
 					</Button>
 					<Button size="sm" appearance={sortBy === 'id' ? 'primary' : 'subtle'} onClick={() => handleSort('id')}>
-						<span className="sort-btn-content">路径 {sortBy === 'id' && (sortOrder === 'asc' ? '↑' : '↓')}</span>
+						<span className="sort-btn-content">{t('data.sortPath', { defaultValue: "路径" })} {sortBy === 'id' && (sortOrder === 'asc' ? '↑' : '↓')}</span>
 					</Button>
 					<Button size="sm" appearance={sortBy === 'size' ? 'primary' : 'subtle'} onClick={() => handleSort('size')}>
-						<span className="sort-btn-content">大小 {sortBy === 'size' && (sortOrder === 'asc' ? '↑' : '↓')}</span>
+						<span className="sort-btn-content">{t('data.sortSize', { defaultValue: "大小" })} {sortBy === 'size' && (sortOrder === 'asc' ? '↑' : '↓')}</span>
 					</Button>
 				</div>
 			</div>
@@ -180,17 +182,17 @@ const AdminDataPage: React.FC = () => {
 			<div className="data-table-container">
 				<Table height={400} data={dataList} loading={loading} autoHeight wordWrap="break-all" rowKey="id">
 					<Column width={50} fixed>
-						<HeaderCell>类型</HeaderCell>
+						<HeaderCell>{t('data.table.icon', { defaultValue: "类型" })}</HeaderCell>
 						<Cell>{(rowData) => <span className="table-type-icon">{getTypeIcon(rowData.type)}</span>}</Cell>
 					</Column>
 
 					<Column flexGrow={1} fullText>
-						<HeaderCell>路径</HeaderCell>
+						<HeaderCell>{t('data.table.path', { defaultValue: "路径" })}</HeaderCell>
 						<Cell dataKey="id" />
 					</Column>
 
 					<Column width={100}>
-						<HeaderCell>类型</HeaderCell>
+						<HeaderCell>{t('data.table.type', { defaultValue: "类型" })}</HeaderCell>
 						<Cell>
 							{(rowData) => (
 								<span className={`type-badge type-badge-${rowData.type || 'unknown'}`}>{(rowData.type || 'UNKNOWN').toUpperCase()}</span>
@@ -199,17 +201,17 @@ const AdminDataPage: React.FC = () => {
 					</Column>
 
 					<Column width={100}>
-						<HeaderCell>大小</HeaderCell>
+						<HeaderCell>{t('data.table.size', { defaultValue: "大小" })}</HeaderCell>
 						<Cell>{(rowData) => formatSize(rowData.size)}</Cell>
 					</Column>
 
 					<Column width={152}>
-						<HeaderCell>更新时间</HeaderCell>
+						<HeaderCell>{t('data.table.updatedAt', { defaultValue: "更新时间" })}</HeaderCell>
 						<Cell>{(rowData) => formatDate(rowData.updated_at)}</Cell>
 					</Column>
 
 					<Column width={120} fixed="right">
-						<HeaderCell>操作</HeaderCell>
+						<HeaderCell>{t('data.table.actions', { defaultValue: "操作" })}</HeaderCell>
 						<Cell>
 							{(rowData: StorageData) => (
 								<ButtonToolbar>
@@ -227,9 +229,7 @@ const AdminDataPage: React.FC = () => {
 			</div>
 
 			<div className="data-pagination">
-				<span>
-					共 {pagination.total} 条数据，第 {pagination.page} 页
-				</span>
+				<span>{t('data.pagination', { defaultValue: "共 {{total}} 条数据，第 {{page}} 页", total: pagination.total, page: pagination.page })}</span>
 				<Pagination
 					total={pagination.total}
 					limit={pagination.limit}
@@ -244,19 +244,19 @@ const AdminDataPage: React.FC = () => {
 				<Modal.Header>
 					<Modal.Title style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
 						<AlertTriangle size={18} style={{ color: '#ff4d4f' }} />
-						确认删除
+						{t('data.delete.confirmTitle', { defaultValue: "确认删除" })}
 					</Modal.Title>
 				</Modal.Header>
 				<Modal.Body>
-					<p>确定要删除 <strong>"{deletingId}"</strong> 吗？</p>
-					<p style={{ color: '#999', marginTop: '8px', fontSize: '12px' }}>此操作不可撤销，数据将被永久删除。</p>
+					<p>{t('data.delete.confirmText', { defaultValue: "确定要删除 \"{{id}}\" 吗？", id: deletingId })}</p>
+					<p style={{ color: '#999', marginTop: '8px', fontSize: '12px' }}>{t('data.delete.confirmHint', { defaultValue: "此操作不可撤销，数据将被永久删除。" })}</p>
 				</Modal.Body>
 				<Modal.Footer>
 					<Button onClick={() => setDeleteModalOpen(false)} appearance="subtle">
-						取消
+						{t('data.delete.cancel', { defaultValue: "取消" })}
 					</Button>
 					<Button onClick={confirmDelete} appearance="primary" color="red" loading={loading}>
-						删除
+						{t('data.delete.submit', { defaultValue: "删除" })}
 					</Button>
 				</Modal.Footer>
 			</Modal>
@@ -265,7 +265,7 @@ const AdminDataPage: React.FC = () => {
 				<Modal.Header>
 					<Modal.Title style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
 						<AlertTriangle size={18} style={{ color: '#ff4d4f' }} />
-						删除失败
+						{t('data.delete.failedTitle', { defaultValue: "删除失败" })}
 					</Modal.Title>
 				</Modal.Header>
 				<Modal.Body>
@@ -273,7 +273,7 @@ const AdminDataPage: React.FC = () => {
 				</Modal.Body>
 				<Modal.Footer>
 					<Button onClick={() => setErrorModalOpen(false)} appearance="primary">
-						确定
+						{t('data.delete.confirm', { defaultValue: "确定" })}
 					</Button>
 				</Modal.Footer>
 			</Modal>

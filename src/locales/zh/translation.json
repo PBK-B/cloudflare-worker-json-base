@@ -1,0 +1,289 @@
+{
+  "api": {
+    "apiKeyInvalid": "API Key 无效",
+    "apiKeyInvalidRelogin": "API Key 无效，请重新登录",
+    "apiKeyInvalidRetry": "API Key 无效，请检查后重试",
+    "apiKeyValid": "API Key 有效",
+    "badRequest": "请求参数错误，请检查文件格式",
+    "connectFailed": "连接失败",
+    "consoleConfigFailed": "获取控制台配置失败",
+    "consoleHealthFailed": "获取控制台健康状态失败",
+    "consoleInfoFailed": "获取控制台信息失败",
+    "consoleStatsFailed": "获取控制台统计失败",
+    "createFailed": "创建失败",
+    "deleteFailed": "删除失败",
+    "fileTooLarge": "文件过大，无法上传",
+    "listFailed": "获取列表失败",
+    "serverInternalError": "服务器内部错误",
+    "unknownError": "未知错误",
+    "updateFailed": "更新失败",
+    "uploadFailed": "上传失败"
+  },
+  "app": {
+    "loading": "加载中..."
+  },
+  "auth": {
+    "apiKeyInvalidRetry": "API Key 无效，请检查后重试",
+    "apiKeyRequired": "API Key 不能为空",
+    "apiKeyValid": "API Key 有效",
+    "apiNotFound": "API 接口不存在，请确认服务地址是否正确",
+    "networkError": "无法连接到服务器，请检查网络连接或服务地址",
+    "requestFailed": "请求失败 ({{status}})",
+    "serverUnavailable": "服务器暂时无法访问，请稍后再试",
+    "tooManyRequests": "请求过于频繁，请稍后再试",
+    "unknownErrorRetry": "未知错误，请稍后重试"
+  },
+  "autoDeployment": {
+    "title": "🚀 JSON Base 自动部署",
+    "subtitle": "一键完成 Cloudflare Workers 项目的部署和配置",
+    "autoModeTitle": "自动部署模式",
+    "autoModeDesc": "启用后将自动执行所有部署步骤",
+    "progress": "部署进度",
+    "errors": {
+      "apiKeyRequired": "API Key 不能为空"
+    },
+    "auth": {
+      "title": "Cloudflare 账户认证",
+      "description": "请确保您已登录 Cloudflare 账户并具有创建 Workers 和 KV 命名空间的权限。",
+      "loginHint": "如果未登录，请执行以下命令：",
+      "commandLogin": "wrangler login",
+      "verify": "验证认证状态"
+    },
+    "config": {
+      "title": "配置项目参数",
+      "apiKey": "API Key *",
+      "apiKeyText": "API Key",
+      "apiKeyPlaceholder": "请输入您的数据库访问密钥",
+      "hide": "隐藏",
+      "show": "显示",
+      "workerName": "Worker 名称",
+      "kvNamespace": "KV 命名空间",
+      "environment": "部署环境",
+      "dev": "开发环境",
+      "prod": "生产环境",
+      "save": "保存配置"
+    },
+    "kvCreate": {
+      "title": "创建 KV 命名空间",
+      "descriptionPrefix": "系统将为您创建名为",
+      "descriptionSuffix": "的 KV 命名空间。",
+      "command": "执行命令",
+      "commandCreate": "wrangler kv:namespace create \"{{value}}\"",
+      "submit": "创建 KV 命名空间"
+    },
+    "kvBind": {
+      "title": "绑定 KV 命名空间",
+      "description": "将创建的 KV 命名空间绑定到 Worker，使其可以访问数据存储。",
+      "bindingConfig": "绑定配置：",
+      "variableType": "Variable type: KV Namespace",
+      "variableName": "Variable name: {{value}}",
+      "namespace": "KV namespace: {{value}}",
+      "submit": "绑定 KV 命名空间"
+    },
+    "deploy": {
+      "title": "部署 Worker",
+      "description": "将项目构建并部署到 Cloudflare Workers 平台。",
+      "steps": "执行步骤：",
+      "commandBuild": "1. npm run webui:build",
+      "commandDeploy": "2. wrangler deploy",
+      "submit": "开始部署"
+    },
+    "test": {
+      "title": "测试验证",
+      "description": "验证部署结果，确保所有功能正常运行。",
+      "submit": "开始测试"
+    },
+    "actions": {
+      "prev": "上一步",
+      "running": "执行中...",
+      "next": "下一步",
+      "reset": "重置部署"
+    },
+    "logs": {
+      "title": "部署日志",
+      "clear": "清空日志",
+      "empty": "暂无日志",
+      "authStart": "开始 Cloudflare 认证...",
+      "authDone": "Cloudflare 认证完成",
+      "validateConfig": "验证配置参数...",
+      "configValid": "配置验证通过",
+      "workerName": "Worker 名称: {{value}}",
+      "kvNamespace": "KV 命名空间: {{value}}",
+      "environment": "环境: {{value}}",
+      "kvCreateStart": "创建 KV 命名空间...",
+      "kvCreateDone": "KV 命名空间 {{value}} 创建成功",
+      "kvBindStart": "绑定 KV 命名空间到 Worker...",
+      "kvBindDone": "KV 命名空间绑定完成",
+      "deployStart": "开始部署 Worker...",
+      "buildWebui": "构建 WebUI...",
+      "deployToCloudflare": "部署到 Cloudflare Workers...",
+      "deployDone": "部署完成",
+      "testStart": "测试部署结果...",
+      "apiTestPass": "API 测试通过",
+      "webuiTestPass": "WebUI 测试通过"
+    },
+    "done": {
+      "title": "🎉 部署完成！",
+      "desc": "您的 JSON Base 服务已成功部署到 Cloudflare Workers。",
+      "openWebui": "访问 WebUI 控制台",
+      "redeploy": "重新部署"
+    }
+  },
+  "console": {
+    "actions": {
+      "create": {
+        "description": "快速创建新的 JSON 数据",
+        "title": "创建数据"
+      },
+      "manage": {
+        "description": "查看和管理所有数据",
+        "title": "数据管理"
+      },
+      "storeText": {
+        "description": "存储纯文本内容",
+        "title": "存储文本"
+      },
+      "upload": {
+        "description": "存储二进制文件数据",
+        "title": "上传文件"
+      }
+    },
+    "apiTestDescription": "在数据管理中使用创建和查询功能来测试 API。",
+    "apiTestTitle": "API 测试工具",
+    "quickApiExample": "快速 API 示例",
+    "quickApiSample": "创建数据:\nPOST /data/example\nAuthorization: Bearer YOUR_API_KEY\n{\"name\": \"example\", \"value\": \"data\"}\n\n获取数据:\nGET /data/example\nAuthorization: Bearer YOUR_API_KEY\n-> {\"name\": \"example\", \"value\": \"data\"}\n",
+    "stats": {
+      "pageCount": "总页数",
+      "totalCount": "数据总数",
+      "totalSize": "存储大小"
+    }
+  },
+  "data": {
+    "create": "创建数据",
+    "delete": {
+      "cancel": "取消",
+      "confirm": "确定",
+      "confirmHint": "此操作不可撤销，数据将被永久删除。",
+      "confirmText": "确定要删除 \"{{id}}\" 吗？",
+      "confirmTitle": "确认删除",
+      "failed": "删除数据时发生错误",
+      "failedTitle": "删除失败",
+      "submit": "删除"
+    },
+    "pagination": "共 {{total}} 条数据，第 {{page}} 页",
+    "search": "搜索",
+    "searchPlaceholder": "搜索数据...",
+    "sort": "排序：",
+    "sortPath": "路径",
+    "sortSize": "大小",
+    "sortUpdatedAt": "更新时间",
+    "table": {
+      "actions": "操作",
+      "icon": "类型",
+      "path": "路径",
+      "size": "大小",
+      "type": "类型",
+      "updatedAt": "更新时间"
+    },
+    "title": "数据管理"
+  },
+  "layout": {
+    "consoleTitle": "JSON Base 管理控制台",
+    "createData": "创建数据",
+    "createFailed": "创建失败",
+    "createSuccess": "创建成功",
+    "editData": "编辑数据",
+    "logout": "退出",
+    "navConsole": "控制台",
+    "navData": "数据管理",
+    "updateFailed": "更新失败",
+    "updateSuccess": "更新成功"
+  },
+  "deploymentGuide": {
+    "title": "🚀 部署引导",
+    "subtitle": "按照以下步骤快速部署您的 JSON Base 服务",
+    "notifications": {
+      "apiKeyRequired": "请输入 API Key",
+      "configSaved": "配置已保存，请继续下一步",
+      "deployComplete": "部署完成！WebUI 控制台已准备就绪"
+    },
+    "step1": {
+      "title": "步骤 1: 配置 API Key",
+      "apiKey": "API Key",
+      "apiKeyPlaceholder": "请输入您的数据库访问密钥",
+      "hide": "隐藏",
+      "show": "显示",
+      "workerName": "Worker 名称",
+      "kvNamespace": "KV 命名空间",
+      "saving": "保存中...",
+      "save": "保存配置"
+    },
+    "step2": {
+      "title": "步骤 2: 绑定 KV 命名空间",
+      "instructions": "操作步骤：",
+      "login": "登录",
+      "cloudflareDashboard": "Cloudflare Dashboard",
+      "navigateKv": "导航到 Workers and Pages -> KV -> Create namespace",
+      "addBinding": "在 Workers and Pages -> worker-json-base -> Settings -> Variables 中添加 KV 绑定",
+      "envConfig": "环境变量配置：",
+      "variableType": "Variable type: KV Namespace",
+      "variableName": "Variable name: JSONBIN",
+      "kvSelect": "KV namespace: 选择您创建的命名空间",
+      "done": "我已完成 KV 绑定"
+    },
+    "step3": {
+      "title": "步骤 3: 部署 Worker",
+      "installDeps": "安装依赖：",
+      "commandInstall": "npm install",
+      "deployToCf": "部署到 Cloudflare Workers：",
+      "commandDeploy": "npm run deploy",
+      "notice": "注意：",
+      "firstDeployLogin": "首次部署需要登录 Cloudflare 账户",
+      "commandLogin": "wrangler login",
+      "next": "部署完成，进入下一步"
+    },
+    "step4": {
+      "title": "步骤 4: 测试功能",
+      "ready": "🎉 恭喜！您的 JSON Base 服务已准备就绪",
+      "validation": "功能验证：",
+      "apiTest": "API 接口测试",
+      "webui": "WebUI 控制台",
+      "openWebui": "进入 WebUI 控制台"
+    }
+  },
+  "login": {
+    "title": "JSON Base",
+    "apiKeyLabel": "API Key",
+    "apiKeyRequired": "请输入 API Key",
+    "footer": "输入 API Key 以访问管理控制台",
+    "loading": "加载中...",
+    "loginFailed": "登录失败，请检查 API Key 后重试",
+    "placeholder": "请输入您的 API Key",
+    "submit": "验证并登录",
+    "subtitle": "Cloudflare Workers JSON 存储服务"
+  },
+  "modal": {
+    "cancel": "取消",
+    "content": "数据内容",
+    "contentRequired": "请输入数据内容",
+    "create": "创建",
+    "fileDropHint": "点击或拖拽文件到此处上传",
+    "fileProcessing": "文件处理中...",
+    "fileStorageHint": "文件将在后端自动转换为 Base64 编码存储",
+    "fileSupportHint": "支持任意文件格式",
+    "jsonInvalid": "JSON 格式错误，请检查数据格式",
+    "kbUnit": "KB",
+    "jsonPlaceholder": "输入 JSON 数据，例如: {\"key\": \"value\"}",
+    "path": "路径",
+    "pathHint": "建议使用路径格式，如 /demo/user/profile",
+    "pathPlaceholder": "/example/data",
+    "pathRequired": "请输入路径",
+    "textPlaceholder": "输入文本内容",
+    "type": "数据类型",
+    "typeBinary": "二进制文件",
+    "typeJson": "JSON 数据",
+    "typeText": "文本内容",
+    "update": "更新",
+    "uploadRequired": "请上传文件"
+  }
+}
