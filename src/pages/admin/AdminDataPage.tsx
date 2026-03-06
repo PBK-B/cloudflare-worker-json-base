@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { Container, Content, Button, Input, Table, Pagination, Modal } from 'rsuite';
-import { Search, Edit, Trash2, FileText, Paperclip, Plus, AlertTriangle } from 'lucide-react';
+import { Button, Input, Table, Pagination, Modal } from 'rsuite';
+import { Search, Edit, Trash2, FileText, Paperclip, Plus, AlertTriangle, ArrowUp, ArrowDown } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useApi } from '../../hooks/useApi';
 import { StorageData } from '../../types';
@@ -146,6 +146,22 @@ const AdminDataPage: React.FC = () => {
 		}
 	};
 
+	const renderSortHeader = (field: string, label: string) => {
+		const isActive = sortBy === field;
+		const SortIcon = isActive && sortOrder === 'asc' ? ArrowUp : ArrowDown;
+
+		return (
+			<button
+				type="button"
+				className={`table-sort-trigger${isActive ? ' is-active' : ''}`}
+				onClick={() => handleSort(field)}
+			>
+				<span>{label}</span>
+				<SortIcon size={14} className="table-sort-icon" />
+			</button>
+		);
+	};
+
 	return (
 		<div className="admin-data-page">
 			<div className="data-controls">
@@ -166,16 +182,6 @@ const AdminDataPage: React.FC = () => {
 					<Button className="create-btn" size="sm" appearance="primary" onClick={() => onOpenCreateModal()}>
 						<Plus size={14} /> {t('data.create', { defaultValue: "创建数据" })}
 					</Button>
-					<span style={{ marginLeft: 'auto' }}>{t('data.sort', { defaultValue: "排序：" })}</span>
-					<Button size="sm" appearance={sortBy === 'updated_at' ? 'primary' : 'subtle'} onClick={() => handleSort('updated_at')}>
-						<span className="sort-btn-content">{t('data.sortUpdatedAt', { defaultValue: "更新时间" })} {sortBy === 'updated_at' && (sortOrder === 'asc' ? '↑' : '↓')}</span>
-					</Button>
-					<Button size="sm" appearance={sortBy === 'id' ? 'primary' : 'subtle'} onClick={() => handleSort('id')}>
-						<span className="sort-btn-content">{t('data.sortPath', { defaultValue: "路径" })} {sortBy === 'id' && (sortOrder === 'asc' ? '↑' : '↓')}</span>
-					</Button>
-					<Button size="sm" appearance={sortBy === 'size' ? 'primary' : 'subtle'} onClick={() => handleSort('size')}>
-						<span className="sort-btn-content">{t('data.sortSize', { defaultValue: "大小" })} {sortBy === 'size' && (sortOrder === 'asc' ? '↑' : '↓')}</span>
-					</Button>
 				</div>
 			</div>
 
@@ -187,7 +193,7 @@ const AdminDataPage: React.FC = () => {
 					</Column>
 
 					<Column flexGrow={1} fullText>
-						<HeaderCell>{t('data.table.path', { defaultValue: "路径" })}</HeaderCell>
+						<HeaderCell>{renderSortHeader('id', t('data.table.path', { defaultValue: "路径" }))}</HeaderCell>
 						<Cell dataKey="id" />
 					</Column>
 
@@ -201,12 +207,12 @@ const AdminDataPage: React.FC = () => {
 					</Column>
 
 					<Column width={100}>
-						<HeaderCell>{t('data.table.size', { defaultValue: "大小" })}</HeaderCell>
+						<HeaderCell>{renderSortHeader('size', t('data.table.size', { defaultValue: "大小" }))}</HeaderCell>
 						<Cell>{(rowData) => formatSize(rowData.size)}</Cell>
 					</Column>
 
 					<Column width={152}>
-						<HeaderCell>{t('data.table.updatedAt', { defaultValue: "更新时间" })}</HeaderCell>
+						<HeaderCell>{renderSortHeader('updated_at', t('data.table.updatedAt', { defaultValue: "更新时间" }))}</HeaderCell>
 						<Cell>{(rowData) => formatDate(rowData.updated_at)}</Cell>
 					</Column>
 

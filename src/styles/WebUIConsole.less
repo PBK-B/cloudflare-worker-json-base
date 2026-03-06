@@ -406,11 +406,6 @@
     flex-shrink: 0;
     padding: @space-xs 0;
   }
-
-  .rs-btn {
-    margin-right: @space-xs;
-    margin-bottom: @space-xs;
-  }
 }
 
 // 未配置状态面板
@@ -499,6 +494,38 @@
   display: inline-flex;
   align-items: center;
   gap: @space-xs;
+}
+
+.table-sort-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: @space-xs;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.2s ease;
+
+  &:hover {
+    color: #1677ff;
+  }
+
+  &.is-active {
+    color: #1677ff;
+  }
+}
+
+.table-sort-icon {
+  color: #9aa4b2;
+  transition: color 0.2s ease;
+}
+
+.table-sort-trigger:hover .table-sort-icon,
+.table-sort-trigger.is-active .table-sort-icon {
+  color: currentColor;
 }
 
 // 模态框标题
@@ -624,6 +651,17 @@
     background: var(--rs-bg-card);
     color: var(--rs-text-secondary);
     border-color: var(--rs-table-border-color);
+  }
+
+  .table-sort-trigger {
+    &:hover,
+    &.is-active {
+      color: var(--rs-primary-500);
+    }
+  }
+
+  .table-sort-icon {
+    color: var(--rs-text-tertiary);
   }
 
   .rs-panel {
