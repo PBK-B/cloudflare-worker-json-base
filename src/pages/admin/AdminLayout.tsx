@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { Container, Header, Content, Button } from 'rsuite';
-import { Settings, Database, RefreshCw, LogOut, LayoutDashboard } from 'lucide-react';
+import { Settings, Database, RefreshCw, LogOut, LayoutDashboard, Menu } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
@@ -23,6 +23,7 @@ const AdminLayout: React.FC = () => {
 	const { logout } = useAuth();
 	const { t } = useTranslation();
 	const navigate = useNavigate();
+	const location = useLocation();
 	const { createData, uploadFile, replaceFile, updateData } = useApi();
 
 	const [showCreateModal, setShowCreateModal] = useState(false);
@@ -31,12 +32,18 @@ const AdminLayout: React.FC = () => {
 	const [refreshKey, setRefreshKey] = useState(0);
 	const [createDefaultType, setCreateDefaultType] = useState<'json' | 'text' | 'binary'>('json');
 	const [submitLoading, setSubmitLoading] = useState(false);
+	const [mobileNavOpen, setMobileNavOpen] = useState(false);
 	const submitAbortRef = useRef<AbortController | null>(null);
 
 	const handleLogout = () => {
+		setMobileNavOpen(false);
 		logout();
 		navigate('/login');
 	};
+
+	useEffect(() => {
+		setMobileNavOpen(false);
+	}, [location.pathname]);
 
 	const handleOpenCreateModal = (defaultType?: 'json' | 'text' | 'binary') => {
 		setCreateDefaultType(defaultType || 'json');
@@ -169,7 +176,7 @@ const AdminLayout: React.FC = () => {
 						<LayoutDashboard size={24} />
 						<span>{t('layout.consoleTitle', { defaultValue: "JSON Base 管理控制台" })}</span>
 					</div>
-					<div className="admin-nav">
+					<div className="admin-nav admin-nav-desktop">
 						<NavLink
 							to="/admin"
 							end
@@ -187,16 +194,60 @@ const AdminLayout: React.FC = () => {
 						</NavLink>
 					</div>
 					<div className="admin-actions">
-						<Button appearance="subtle" onClick={() => window.location.reload()}>
+						<Button
+							appearance="subtle"
+							onClick={() => setMobileNavOpen(prev => !prev)}
+							className="admin-menu-toggle"
+							aria-label={t('layout.openMenu', { defaultValue: "打开菜单" })}
+							aria-expanded={mobileNavOpen}
+						>
+							<Menu size={18} />
+						</Button>
+						<Button
+							appearance="subtle"
+							onClick={() => window.location.reload()}
+							className="admin-refresh-btn"
+							aria-label={t('layout.refresh', { defaultValue: "刷新" })}
+						>
 							<RefreshCw size={16} />
 						</Button>
-						<Button appearance="subtle" onClick={handleLogout} className="admin-logout-btn">
+						<Button
+							appearance="subtle"
+							onClick={handleLogout}
+							className="admin-logout-btn"
+							aria-label={t('layout.logout', { defaultValue: "退出" })}
+						>
 							<LogOut size={16} />
-							{t('layout.logout', { defaultValue: "退出" })}
+							<span className="admin-logout-text">{t('layout.logout', { defaultValue: "退出" })}</span>
 						</Button>
 					</div>
 				</div>
+
+				{mobileNavOpen && (
+					<div className="admin-mobile-nav-shell">
+						<div className="admin-mobile-nav-panel">
+							<div className="admin-nav admin-nav-mobile">
+								<NavLink
+									to="/admin"
+									end
+									className={({ isActive }) => `admin-nav-link admin-nav-link-mobile ${isActive ? 'active' : ''}`}
+								>
+									<Settings size={16} />
+									{t('layout.navConsole', { defaultValue: "控制台" })}
+								</NavLink>
+								<NavLink
+									to="/admin/data"
+									className={({ isActive }) => `admin-nav-link admin-nav-link-mobile ${isActive ? 'active' : ''}`}
+								>
+									<Database size={16} />
+									{t('layout.navData', { defaultValue: "数据管理" })}
+								</NavLink>
+							</div>
+						</div>
+					</div>
+				)}
 			</Header>
+
 			<Content className="admin-content">
 				<Outlet context={{ onOpenCreateModal: handleOpenCreateModal, onOpenEditModal: handleOpenEditModal, refreshKey }} />
 			</Content>

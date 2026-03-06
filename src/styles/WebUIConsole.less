@@ -108,15 +108,20 @@
 
 // 统计区域
 .stats-container {
-  display: flex;
-  justify-content: center;
-  gap: @space-xxl;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: @space-lg;
   padding: @space-xl 0;
   margin-bottom: @space-xl;
 }
 
 .stat-item {
   text-align: center;
+  min-width: 0;
+  padding: @space-lg;
+  background: white;
+  border: @card-border;
+  border-radius: @card-radius;
 
   .stat-number {
     font-size: 24px;
@@ -124,6 +129,7 @@
     color: #1890ff;
     display: block;
     margin-bottom: @space-xs;
+    overflow-wrap: anywhere;
   }
 
   .stat-label {
@@ -185,6 +191,7 @@
     line-height: 1.5;
     margin: 0;
     text-align: center;
+    overflow-wrap: anywhere;
   }
 }
 
@@ -229,11 +236,69 @@
 .console-code-block {
   font-family: monospace;
   font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
   background: white;
   padding: @space-md;
   border-radius: @card-radius;
   margin-top: @space-md;
   overflow: auto;
+}
+
+@media (max-width: (@grid-breakpoint-md - 1px)) {
+  .stats-container {
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: @space-md;
+  }
+
+  .quick-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .action-card {
+    min-height: 0;
+    padding: @space-md;
+  }
+
+  .console-card {
+    padding: @space-md;
+  }
+}
+
+@media (max-width: (@grid-breakpoint-sm - 1px)) {
+  .stats-container {
+    grid-template-columns: 1fr;
+    padding-top: @space-md;
+  }
+
+  .stat-item {
+    padding: @space-md;
+  }
+
+  .quick-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .action-card {
+    align-items: flex-start;
+    text-align: left;
+
+    .action-icon,
+    .action-title,
+    .action-description {
+      text-align: left;
+    }
+  }
+
+  .console-card-code {
+    padding: @space-sm;
+  }
+
+  .console-code-block {
+    padding: @space-sm;
+    font-size: 11px;
+  }
 }
 
 // API 测试区
@@ -486,6 +551,11 @@
 
   .stat-label {
     color: var(--rs-text-secondary);
+  }
+
+  .stat-item {
+    background: var(--rs-bg-card);
+    border-color: var(--rs-border-primary);
   }
 
   .console-card {

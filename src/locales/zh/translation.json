@@ -196,6 +196,8 @@
     "logout": "退出",
     "navConsole": "控制台",
     "navData": "数据管理",
+    "openMenu": "打开菜单",
+    "refresh": "刷新",
     "updateFailed": "更新失败",
     "updateSuccess": "更新成功"
   },
