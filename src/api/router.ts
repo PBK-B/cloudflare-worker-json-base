@@ -1,5 +1,4 @@
 import { DataController, HealthController } from './controllers';
-import { StorageController } from './storageController';
 import { ConsoleController } from './consoleController';
 import { ResourceController } from './resourceController';
 import { CorsHandler } from '../utils/response';
@@ -11,7 +10,6 @@ const API_PATH = '/._jsondb_/api';
 export class Router {
 	private dataController!: DataController;
 	private healthController!: HealthController;
-	private storageController!: StorageController;
 	private consoleController!: ConsoleController;
 	private resourceController!: ResourceController;
 	private initError: Error | null = null;
@@ -20,7 +18,6 @@ export class Router {
 		try {
 			this.dataController = new DataController(env);
 			this.healthController = new HealthController(env);
-			this.storageController = new StorageController(env);
 			this.consoleController = new ConsoleController(env);
 			this.resourceController = new ResourceController(env);
 		} catch (error) {
@@ -61,8 +58,6 @@ export class Router {
 
 				if (path === '/health' || path === '/test') {
 					response = await this.healthController.health(request);
-				} else if (path.startsWith('/storage')) {
-					response = await this.handleStorageRoutes(request, pathname, method);
 				} else if (path.startsWith('/data')) {
 					response = await this.handleDataRoutes(request, pathname, method);
 				} else if (path.startsWith('/console')) {
@@ -102,33 +97,6 @@ export class Router {
 
 	static getApiPath(): string {
 		return API_PATH;
-	}
-
-	private async handleStorageRoutes(request: Request, pathname: string, method: string): Promise<Response> {
-		const path = pathname.replace('/._jsondb_/api', '');
-		switch (method) {
-			case 'GET':
-				if (path === '/storage') {
-					return await this.storageController.list(request);
-				} else if (path.endsWith('/verify')) {
-					return await this.storageController.verify(request);
-				} else if (path.endsWith('/meta') || path.endsWith('/metadata')) {
-					return await this.storageController.getMetadata(request);
-				}
-				return await this.storageController.download(request);
-
-			case 'POST':
-				return await this.storageController.upload(request);
-
-			case 'DELETE':
-				return await this.storageController.delete(request);
-
-			default:
-				return new Response('Method Not Allowed', {
-					status: 405,
-					headers: { Allow: 'GET, POST, DELETE' },
-				});
-		}
 	}
 
 	private async handleDataRoutes(request: Request, pathname: string, method: string): Promise<Response> {
@@ -189,7 +157,6 @@ export class Router {
 					endpoints: {
 						health: '/api/health',
 						data: '/api/data',
-						storage: '/api/storage',
 						test: '/api/data/test',
 					},
 					documentation: '/api/docs',

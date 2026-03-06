@@ -285,6 +285,7 @@ export class StorageAdapter {
   }
 
   async list(params: {
+    prefix?: string;
     search?: string;
     page?: number;
     limit?: number;
@@ -299,7 +300,7 @@ export class StorageAdapter {
   }> {
     await this.ensureInitialized();
 
-    const { search, page = 1, limit = 20, sort, order = 'desc' } = params;
+    const { prefix, search, page = 1, limit = 20, sort, order = 'desc' } = params;
     const offset = (page - 1) * limit;
 
     let allPaths = await this.pathMapper.listPaths(100000, 0);
@@ -351,6 +352,10 @@ export class StorageAdapter {
         } else {
           value = '[Binary data]';
           type = 'binary';
+        }
+
+        if (prefix && !mapping.path.startsWith(prefix)) {
+          continue;
         }
 
         if (search) {
@@ -412,8 +417,8 @@ export class StorageAdapter {
     }
 
     total = items.length;
-    const hasMore = offset + items.length < total;
     const resultItems = items.slice(offset, offset + limit);
+    const hasMore = offset + resultItems.length < total;
 
     return {
       items: resultItems,

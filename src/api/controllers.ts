@@ -8,6 +8,8 @@ import { Config } from '../utils/config'
 export class DataController {
   private storageAdapter: StorageAdapter
 
+  private static readonly API_PATH_PREFIX = '/._jsondb_/api/data'
+
   constructor(env: WorkerEnv) {
     (globalThis as any).ENV = env;
     Config.getInstance(env);
@@ -28,32 +30,43 @@ export class DataController {
   async get(request: Request): Promise<Response> {
     try {
       const url = new URL(request.url)
-      const pathname = url.pathname.replace('/._jsondb_/api/data', '') || '/'
+      const pathname = this.getResourcePath(url.pathname)
+
+      if (pathname === '/test') {
+        const auth = await AuthMiddleware.requireAuth(request)
+        return ResponseBuilder.success({
+          status: 'ok',
+          message: 'JSON Base API is working',
+          timestamp: new Date().toISOString(),
+          version: '2.0.0',
+          apiKey: {
+            valid: true,
+            method: auth.method
+          }
+        })
+      }
 
       ValidationMiddleware.validatePathname(pathname)
       
       const auth = await AuthMiddleware.requireAuth(request)
 
-      if (pathname === '/test') {
-        return ResponseBuilder.success({
-          status: 'ok',
-          message: 'JSON Base API is working',
-          timestamp: new Date().toISOString(),
-          version: '2.0.0'
-        })
-      }
-
       const data = await this.storageAdapter.get(pathname)
 
-      if (data.type === 'binary') {
-        return ResponseBuilder.binary(
-          await this.dataUrlToArrayBuffer(data.value),
-          data.content_type || 'application/octet-stream',
-          data.id.split('/').pop()
-        )
-      }
+      Logger.info('Data retrieved', { pathname, auth: auth.apiKey.substring(0, 8), type: data.type })
 
-      return ResponseBuilder.success(data.value, 'Data retrieved successfully')
+      return ResponseBuilder.success({
+        id: data.id,
+        path: data.path || pathname,
+        value: data.value,
+        type: data.type,
+        size: data.size,
+        content_type: data.content_type,
+        created_at: data.created_at,
+        updated_at: data.updated_at,
+        storage_location: data.storage_location,
+        downloadable: data.type === 'binary',
+        downloadPath: pathname
+      }, 'Data retrieved successfully')
     } catch (error) {
       Logger.error('GET request failed', error)
       return this.handleError(error)
@@ -63,7 +76,7 @@ export class DataController {
   async post(request: Request): Promise<Response> {
     try {
       const url = new URL(request.url)
-      const pathname = url.pathname.replace('/._jsondb_/api/data', '') || '/'
+      const pathname = this.getResourcePath(url.pathname)
 
       ValidationMiddleware.validatePathname(pathname)
       
@@ -73,35 +86,9 @@ export class DataController {
       const contentType = request.headers.get('Content-Type') || ''
 
       if (contentType.includes('multipart/form-data')) {
-        const formData = await request.formData()
-        const file = formData.get('file') as File
-        const type = (formData.get('type') as string) || 'binary'
+        const data = await this.createOrUpdateFileResource(request, pathname, 'create')
 
-        if (!file) {
-          throw ApiError.badRequest('File is required')
-        }
-
-        if (file.size === 0) {
-          throw ApiError.badRequest('File is empty')
-        }
-
-        const maxSize = 100 * 1024 * 1024 // 100MB limit
-        if (file.size > maxSize) {
-          throw ApiError.badRequest(`File size exceeds maximum limit of ${maxSize / 1024 / 1024}MB`)
-        }
-
-        const arrayBuffer = await file.arrayBuffer()
-        const base64 = this.arrayBufferToBase64(arrayBuffer)
-        const mimeType = file.type || 'application/octet-stream'
-        const dataUrl = `data:${mimeType};base64,${base64}`
-
-        const data = await this.storageAdapter.create(pathname, {
-          value: dataUrl,
-          type: type as 'json' | 'text' | 'binary',
-          content_type: mimeType
-        })
-
-        Logger.info('Data created from file', { pathname, filename: file.name, size: file.size, auth: auth.apiKey.substring(0, 8) })
+        Logger.info('Data created from file', { pathname, size: data.size, auth: auth.apiKey.substring(0, 8) })
         return ResponseBuilder.created(data, 'Data created successfully')
       }
 
@@ -127,12 +114,20 @@ export class DataController {
   async put(request: Request): Promise<Response> {
     try {
       const url = new URL(request.url)
-      const pathname = url.pathname.replace('/._jsondb_/api/data', '') || '/'
+      const pathname = this.getResourcePath(url.pathname)
 
       ValidationMiddleware.validatePathname(pathname)
       
       const auth = await AuthMiddleware.requireAuth(request)
       await RateLimiter.checkLimit(request, 100, 3600)
+
+      const contentType = request.headers.get('Content-Type') || ''
+
+      if (contentType.includes('multipart/form-data')) {
+        const data = await this.createOrUpdateFileResource(request, pathname, 'update')
+        Logger.info('Data updated from file', { pathname, size: data.size, auth: auth.apiKey.substring(0, 8) })
+        return ResponseBuilder.success(data, 'Data updated successfully')
+      }
 
       const requestData = await this.parseRequestBody(request)
 
@@ -149,7 +144,7 @@ export class DataController {
   async delete(request: Request): Promise<Response> {
     try {
       const url = new URL(request.url)
-      const pathname = url.pathname.replace('/._jsondb_/api/data', '') || '/'
+      const pathname = this.getResourcePath(url.pathname)
 
       ValidationMiddleware.validatePathname(pathname)
       
@@ -181,6 +176,7 @@ export class DataController {
       const auth = await AuthMiddleware.requireAuth(request)
 
       const result = await this.storageAdapter.list({
+        prefix,
         search,
         page,
         limit: Math.min(limit, 1000),
@@ -238,32 +234,52 @@ export class DataController {
     }
   }
 
+  private getResourcePath(pathname: string): string {
+    return pathname.replace(DataController.API_PATH_PREFIX, '') || '/'
+  }
+
+  private async createOrUpdateFileResource(
+    request: Request,
+    pathname: string,
+    mode: 'create' | 'update'
+  ) {
+    const formData = await request.formData()
+    const file = formData.get('file') as File | null
+
+    if (!file) {
+      throw ApiError.badRequest('File is required')
+    }
+
+    if (file.size === 0) {
+      throw ApiError.badRequest('File is empty')
+    }
+
+    const maxSize = 100 * 1024 * 1024
+    if (file.size > maxSize) {
+      throw ApiError.badRequest(`File size exceeds maximum limit of ${maxSize / 1024 / 1024}MB`)
+    }
+
+    const arrayBuffer = await file.arrayBuffer()
+    const base64 = this.arrayBufferToBase64(arrayBuffer)
+    const mimeType = file.type || 'application/octet-stream'
+    const dataUrl = `data:${mimeType};base64,${base64}`
+    const requestPayload = {
+      value: dataUrl,
+      type: 'binary' as const,
+      content_type: mimeType
+    }
+
+    return mode === 'create'
+      ? await this.storageAdapter.create(pathname, requestPayload)
+      : await this.storageAdapter.update(pathname, requestPayload)
+  }
+
   private isValidDataUrl(url: string): boolean {
     if (!url.startsWith('data:')) {
       return false;
     }
     const dataUrlPattern = /^data:([a-zA-Z0-9!#$&+^_.-]+\/[a-zA-Z0-9!#$&+^_.-]+);base64,/;
     return dataUrlPattern.test(url);
-  }
-
-  private async dataUrlToArrayBuffer(dataUrl: string): Promise<ArrayBuffer> {
-    const url = new URL(dataUrl)
-    if (url.protocol !== 'data:') {
-      throw ApiError.badRequest('Invalid data URL format')
-    }
-
-    const [mimeType, base64] = url.pathname.split(';base64,')
-    if (!base64) {
-      throw ApiError.badRequest('Invalid data URL format')
-    }
-
-    const binaryString = atob(base64)
-    const bytes = new Uint8Array(binaryString.length)
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i)
-    }
-
-    return bytes.buffer
   }
 
   private handleError(error: any): Response {

@@ -47,13 +47,12 @@ data/users/bin/cloudflare-worker-json-base/
 
 ```
 1. HTTP Request → index.ts (fetch handler)
-2. Extract path, method, headers
-3. router.ts → Validate path structure
-4. middleware.ts → Authentication check (requireAuth)
-5. resourceController.ts → Route to appropriate handler
-6. storageAdapter.ts → Abstract storage operations
-7. D1/KV → Data persistence
-8. Response → JSON/Text/File download
+2. /dash/* → WEBUI static assets for the console
+3. /._jsondb_/api/* → router.ts → console/management controllers
+4. /* → resourceController.ts → business resource CRUD
+5. storageAdapter.ts → unified path-based storage operations
+6. D1/KV → Data persistence
+7. Response → management JSON or raw resource content
 ```
 
 ---
@@ -62,20 +61,16 @@ data/users/bin/cloudflare-worker-json-base/
 
 ### 1. Router (`src/api/router.ts`)
 
-**Responsibility**: Request routing and path validation
+**Responsibility**: Route console and management API requests under `/._jsondb_/api/*`
 
 **Key Functions**:
-- `handleRequest()` - Main entry point
-- `validateResourcePath()` - Security validation
-
-**Flow**:
-```typescript
-Request → validate path → requireAuth → route to controller
-```
+- `handle()` - Main management API entry point
+- `handleDataRoutes()` - Console resource management routes
+- `handleConsoleRoutes()` - Console stats/health/config routes
 
 ### 2. ResourceController (`src/api/resourceController.ts`)
 
-**Responsibility**: CRUD operations for resources
+**Responsibility**: Business-facing CRUD operations for resources under `/*`
 
 **Methods**:
 - `handleGet(path)` - Retrieve resource
@@ -84,11 +79,22 @@ Request → validate path → requireAuth → route to controller
 - `handleDelete(path)` - Delete resource
 
 **Response Types**:
-- JSON: `{ success: true, data: ... }`
+- JSON: Raw JSON body
 - Text: Raw string
 - File: Binary download with proper Content-Type
 
-### 3. StorageAdapter (`src/storage/storageAdapter.ts`)
+### 3. DataController (`src/api/controllers.ts`)
+
+**Responsibility**: Console-facing resource management under `/._jsondb_/api/data/*`
+
+**Capabilities**:
+- Paginated resource listing
+- Resource metadata/value inspection for the WebUI
+- JSON/text creation and updates
+- Binary file creation and replacement via multipart form upload
+- Deletion by path
+
+### 4. StorageAdapter (`src/storage/storageAdapter.ts`)
 
 **Responsibility**: Unified interface to D1 and KV storage
 
@@ -103,7 +109,7 @@ Request → validate path → requireAuth → route to controller
 - Binary data handling (Uint8Array)
 - File size limits (10MB)
 
-### 4. Middleware (`src/utils/middleware.ts`)
+### 5. Middleware (`src/utils/middleware.ts`)
 
 **Responsibility**: Cross-cutting concerns
 
@@ -199,7 +205,17 @@ stmt.bind(path);
 const badQuery = `SELECT * FROM path_mapper WHERE resource_path = '${path}'`;
 ```
 
-### 2. Path Validation
+### 2. API Boundary
+
+Keep the API surface split by audience:
+
+- `/*` → application-facing business resource API
+- `/._jsondb_/api/data/*` → console-facing resource management API
+- `/._jsondb_/api/console/*` → console stats/config/health
+
+Do not reintroduce a separate `/._jsondb_/api/storage` path. Binary files are managed through the same path-based resource model as JSON and text.
+
+### 3. Path Validation
 
 **Always** validate paths before processing:
 
@@ -214,7 +230,7 @@ Reject paths containing:
 - `..` (path traversal)
 - Leading/trailing slashes (normalize first)
 
-### 3. Content-Type Handling
+### 4. Content-Type Handling
 
 For file responses:
 
@@ -226,7 +242,7 @@ if (data instanceof Uint8Array) {
 }
 ```
 
-### 4. Testing
+### 5. Testing
 
 **Test locations**:
 - Unit tests: `src/__tests__/*.test.ts`

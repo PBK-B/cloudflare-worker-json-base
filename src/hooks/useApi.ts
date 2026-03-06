@@ -18,6 +18,11 @@ axiosInstance.interceptors.request.use((config) => {
 	if (savedApiKey) {
 		config.headers.set('Authorization', `Bearer ${savedApiKey}`);
 	}
+
+	if (config.data instanceof FormData) {
+		config.headers.delete('Content-Type');
+	}
+
 	return config;
 });
 
@@ -120,13 +125,9 @@ export const useApi = () => {
 		try {
 			const formData = new FormData();
 			formData.append('file', file);
-			formData.append('path', path);
+			formData.append('type', 'binary');
 
-			const response = await axiosInstance.post(`/storage?path=${encodeURIComponent(path)}`, file, {
-				headers: {
-					'Content-Type': contentType || file.type,
-				},
-			});
+			const response = await axiosInstance.post(`/data${path}`, formData);
 			return response.data;
 		} catch (error) {
 			if (axios.isAxiosError(error)) {
@@ -146,6 +147,26 @@ export const useApi = () => {
 				return {
 					success: false,
 					error: errorMessage,
+					timestamp: new Date().toISOString(),
+				};
+			}
+			throw error;
+		}
+	}, []);
+
+	const replaceFile = useCallback(async (path: string, file: File): Promise<ApiResponse<StorageData>> => {
+		try {
+			const formData = new FormData();
+			formData.append('file', file);
+			formData.append('type', 'binary');
+
+			const response = await axiosInstance.put(`/data${path}`, formData);
+			return response.data;
+		} catch (error) {
+			if (axios.isAxiosError(error)) {
+				return {
+					success: false,
+					error: error.response?.data?.error || i18n.t('api.uploadFailed', { defaultValue: "上传失败" }),
 					timestamp: new Date().toISOString(),
 				};
 			}
@@ -299,6 +320,7 @@ export const useApi = () => {
 		testConnection,
 		createData,
 		uploadFile,
+		replaceFile,
 		updateData,
 		deleteData,
 		listData,

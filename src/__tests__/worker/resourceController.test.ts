@@ -1,289 +1,264 @@
-import { jest, describe, it, expect, beforeEach } from '@jest/globals'
-import { createMockEnv, MOCK_AUTH_HEADER } from './mocks/env'
-import { MOCK_JSON_DATA, MOCK_BINARY_DATA, MOCK_TEXT_DATA } from './mocks/storageAdapter'
-import { ApiError } from '@/utils/response'
-import { StorageAdapter } from '@/storage/storageAdapter'
+import { beforeEach, describe, expect, it, jest } from '@jest/globals'
+import { ResourceController } from '../../api/resourceController'
+import { createMockEnv, VALID_API_KEY } from './mocks/env'
+import { ApiError } from '../../utils/response'
+import { StorageAdapter } from '../../storage/storageAdapter'
 
 describe('资源控制器', () => {
   let mockEnv: ReturnType<typeof createMockEnv>
+  let store: Map<string, StoredEntry>
+  let controller: ResourceController
 
   beforeEach(() => {
     mockEnv = createMockEnv()
+    store = new Map<string, StoredEntry>()
+    controller = new ResourceController(mockEnv, createInMemoryStorageAdapter(store))
   })
 
   describe('路径过滤', () => {
     it('应该对 API 路径返回 null', async () => {
-      const mockAdapter = createMockAdapter({ get: async () => MOCK_JSON_DATA })
-      const controller = createController(mockAdapter)
-      const request = createMockRequest('GET', '/._jsondb_/api/data/test')
+      const request = createRequest('GET', '/._jsondb_/api/data/test')
       const response = await controller.handle(request)
       expect(response).toBeNull()
     })
 
     it('应该对根路径返回 null', async () => {
-      const mockAdapter = createMockAdapter({ get: async () => MOCK_JSON_DATA })
-      const controller = createController(mockAdapter)
-      const request = createMockRequest('GET', '/')
+      const request = createRequest('GET', '/')
       const response = await controller.handle(request)
       expect(response).toBeNull()
     })
 
     it('应该对静态资源路径返回 null', async () => {
-      const mockAdapter = createMockAdapter({ get: async () => MOCK_JSON_DATA })
-      const controller = createController(mockAdapter)
-      const request = createMockRequest('GET', '/assets/app.js')
+      const request = createRequest('GET', '/assets/app.js')
       const response = await controller.handle(request)
       expect(response).toBeNull()
     })
 
     it('应该对不支持的方法返回 405', async () => {
-      const mockAdapter = createMockAdapter({ get: async () => MOCK_JSON_DATA })
-      const controller = createController(mockAdapter)
-      const request = createMockRequest('PATCH', '/demo_bucket/test')
+      const request = createRequest('PATCH', '/demo_bucket/test')
       const response = await controller.handle(request)
       expect(response).not.toBeNull()
       expect(response!.status).toBe(405)
     })
   })
 
-  describe('GET 请求', () => {
-    it('应该返回 JSON 数据', async () => {
-      const mockAdapter = createMockAdapter({ 
-        get: async () => MOCK_JSON_DATA 
-      })
-      const controller = createController(mockAdapter)
-      const request = createMockRequest('GET', '/demo_bucket/hello')
-      const response = await controller.handle(request)
+  describe('JSON 资源 CRUD', () => {
+    it('应该完成 JSON 资源的增删改查', async () => {
+      const pathname = '/integration/json'
 
-      expect(response).not.toBeNull()
-      expect(response!.status).toBe(200)
-    })
+      const createResponse = await controller.handle(
+        createRequest('POST', pathname, JSON.stringify({ hello: 'world' }), 'application/json')
+      )
+      expect(createResponse).not.toBeNull()
+      expect(createResponse!.status).toBe(201)
 
-    it('应该返回文本数据', async () => {
-      const mockAdapter = createMockAdapter({ 
-        get: async () => MOCK_TEXT_DATA 
-      })
-      const controller = createController(mockAdapter)
-      const request = createMockRequest('GET', '/demo_bucket/readme.txt')
-      const response = await controller.handle(request)
+      const getResponse = await controller.handle(createRequest('GET', pathname))
+      expect(getResponse).not.toBeNull()
+      expect(getResponse!.status).toBe(200)
+      expect(await getResponse!.json()).toEqual({ hello: 'world' })
 
-      expect(response).not.toBeNull()
-      expect(response!.status).toBe(200)
-    })
+      const headResponse = await controller.handle(createRequest('HEAD', pathname))
+      expect(headResponse).not.toBeNull()
+      expect(headResponse!.status).toBe(200)
+      expect(headResponse!.headers.get('Content-Type')).toBe('application/json')
 
-    it('应该返回二进制数据', async () => {
-      const mockAdapter = createMockAdapter({ 
-        get: async () => MOCK_BINARY_DATA 
-      })
-      const controller = createController(mockAdapter)
-      const request = createMockRequest('GET', '/demo_bucket/logo.svg')
-      const response = await controller.handle(request)
+      const updateResponse = await controller.handle(
+        createRequest('PUT', pathname, JSON.stringify({ hello: 'updated', count: 2 }), 'application/json')
+      )
+      expect(updateResponse).not.toBeNull()
+      expect(updateResponse!.status).toBe(200)
 
-      expect(response).not.toBeNull()
-      expect(response!.status).toBe(200)
-    })
+      const updatedGetResponse = await controller.handle(createRequest('GET', pathname))
+      expect(updatedGetResponse).not.toBeNull()
+      expect(await updatedGetResponse!.json()).toEqual({ hello: 'updated', count: 2 })
 
-    it('应该对不存在的路径返回 404', async () => {
-      const mockAdapter = createMockAdapter({ 
-        get: async () => { throw ApiError.notFound('Not found') } 
-      })
-      const controller = createController(mockAdapter)
-      const request = createMockRequest('GET', '/demo_bucket/nonexistent')
-      const response = await controller.handle(request)
+      const deleteResponse = await controller.handle(createRequest('DELETE', pathname))
+      expect(deleteResponse).not.toBeNull()
+      expect(deleteResponse!.status).toBe(200)
 
-      expect(response).not.toBeNull()
-      expect(response!.status).toBe(404)
+      const missingResponse = await controller.handle(createRequest('GET', pathname))
+      expect(missingResponse).not.toBeNull()
+      expect(missingResponse!.status).toBe(404)
     })
   })
 
-  describe('POST 请求', () => {
-    it('应该创建 JSON 数据', async () => {
-      const mockAdapter = createMockAdapter({ 
-        create: async () => MOCK_JSON_DATA 
-      })
-      const controller = createController(mockAdapter)
-      const request = createMockRequest('POST', '/demo_bucket/hello', '{"hello":"world"}', 'application/json')
-      const response = await controller.handle(request)
+  describe('文本资源 CRUD', () => {
+    it('应该完成文本资源的增删改查', async () => {
+      const pathname = '/integration/readme.txt'
 
-      expect(response).not.toBeNull()
-      expect(response!.status).toBe(201)
-      const body = await response!.json()
-      expect(body.status).toBe(1)
-      expect(body.message).toBe('storage ok')
-    })
+      await controller.handle(createRequest('POST', pathname, 'hello text', 'text/plain'))
 
-    it('应该创建文本数据', async () => {
-      const mockAdapter = createMockAdapter({ 
-        create: async () => MOCK_TEXT_DATA 
-      })
-      const controller = createController(mockAdapter)
-      const request = createMockRequest('POST', '/demo_bucket/readme.txt', 'Hello World', 'text/plain')
-      const response = await controller.handle(request)
+      const getResponse = await controller.handle(createRequest('GET', pathname))
+      expect(getResponse).not.toBeNull()
+      expect(getResponse!.status).toBe(200)
+      expect(await getResponse!.text()).toBe('hello text')
 
-      expect(response).not.toBeNull()
-      expect(response!.status).toBe(201)
-    })
+      const updateResponse = await controller.handle(createRequest('PUT', pathname, 'updated text body', 'text/plain'))
+      expect(updateResponse).not.toBeNull()
+      expect(updateResponse!.status).toBe(200)
 
-    it('应该创建以 data: 前缀开头的文本数据', async () => {
-      const mockAdapter = createMockAdapter({ 
-        create: async () => MOCK_TEXT_DATA 
-      })
-      const controller = createController(mockAdapter)
-      const request = createMockRequest('POST', '/demo_bucket/test.txt', 'data:something', 'text/plain')
-      const response = await controller.handle(request)
+      const updatedGetResponse = await controller.handle(createRequest('GET', pathname))
+      expect(updatedGetResponse).not.toBeNull()
+      expect(await updatedGetResponse!.text()).toBe('updated text body')
 
-      expect(response).not.toBeNull()
-      expect(response!.status).toBe(201)
-    })
+      const deleteResponse = await controller.handle(createRequest('DELETE', pathname))
+      expect(deleteResponse).not.toBeNull()
+      expect(deleteResponse!.status).toBe(200)
 
-    it('应该在没有 content-type 头时创建纯文本数据', async () => {
-      const mockAdapter = createMockAdapter({ 
-        create: async () => MOCK_TEXT_DATA 
-      })
-      const controller = createController(mockAdapter)
-      const request = createMockRequest('POST', '/demo_bucket/test.txt', 'Hello World')
-      const response = await controller.handle(request)
-
-      expect(response).not.toBeNull()
-      expect(response!.status).toBe(201)
+      const missingResponse = await controller.handle(createRequest('GET', pathname))
+      expect(missingResponse).not.toBeNull()
+      expect(missingResponse!.status).toBe(404)
     })
   })
 
-  describe('PUT 请求', () => {
-    it('应该更新数据', async () => {
-      const mockAdapter = createMockAdapter({ 
-        update: async () => MOCK_JSON_DATA 
-      })
-      const controller = createController(mockAdapter)
-      const request = createMockRequest('PUT', '/demo_bucket/hello', '{"hello":"updated"}', 'application/json')
-      const response = await controller.handle(request)
+  describe('二进制资源 CRUD', () => {
+    it('应该完成二进制资源的增删改查', async () => {
+      const pathname = '/integration/file.dat'
+      const originalBinary = createBinaryPayload(1024)
+      const updatedBinary = createBinaryPayload(1536)
+      const originalDataUrl = toDataUrl(originalBinary, 'application/octet-stream')
+      const updatedDataUrl = toDataUrl(updatedBinary, 'application/octet-stream')
 
-      expect(response).not.toBeNull()
-      expect(response!.status).toBe(200)
-      const body = await response!.json()
-      expect(body.status).toBe(1)
-    })
-  })
+      const createResponse = await controller.handle(
+        createRequest('POST', pathname, originalDataUrl, 'application/octet-stream')
+      )
+      expect(createResponse).not.toBeNull()
+      expect(createResponse!.status).toBe(201)
 
-  describe('DELETE 请求', () => {
-    it('应该删除数据', async () => {
-      const mockAdapter = createMockAdapter({ 
-        delete: async () => undefined 
-      })
-      const controller = createController(mockAdapter)
-      const request = createMockRequest('DELETE', '/demo_bucket/hello')
-      const response = await controller.handle(request)
+      const getResponse = await controller.handle(createRequest('GET', pathname))
+      expect(getResponse).not.toBeNull()
+      expect(getResponse!.status).toBe(200)
+      expect(getResponse!.headers.get('Content-Type')).toBe('application/octet-stream')
+      expect(decodeStoredBinary(store, pathname)).toEqual(Array.from(originalBinary))
 
-      expect(response).not.toBeNull()
-      expect(response!.status).toBe(200)
-      const body = await response!.json()
-      expect(body.status).toBe(1)
-      expect(body.message).toBe('storage ok')
+      const headResponse = await controller.handle(createRequest('HEAD', pathname))
+      expect(headResponse).not.toBeNull()
+      expect(headResponse!.status).toBe(200)
+      expect(headResponse!.headers.get('Content-Length')).toBe(String(originalBinary.length))
+      expect(headResponse!.headers.get('Content-Disposition')).toContain('file.dat')
+
+      const updateResponse = await controller.handle(
+        createRequest('PUT', pathname, updatedDataUrl, 'application/octet-stream')
+      )
+      expect(updateResponse).not.toBeNull()
+      expect(updateResponse!.status).toBe(200)
+
+      const updatedGetResponse = await controller.handle(createRequest('GET', pathname))
+      expect(updatedGetResponse).not.toBeNull()
+      expect(updatedGetResponse!.status).toBe(200)
+      expect(decodeStoredBinary(store, pathname)).toEqual(Array.from(updatedBinary))
+
+      const deleteResponse = await controller.handle(createRequest('DELETE', pathname))
+      expect(deleteResponse).not.toBeNull()
+      expect(deleteResponse!.status).toBe(200)
+
+      const missingResponse = await controller.handle(createRequest('GET', pathname))
+      expect(missingResponse).not.toBeNull()
+      expect(missingResponse!.status).toBe(404)
     })
   })
 })
 
-function createController(mockStorageAdapter?: StorageAdapter): any {
-  const env = createMockEnv()
-  return {
-    handle: async (request: Request) => {
-      const url = new URL(request.url)
-      const pathname = url.pathname
-
-      const isApiPath = pathname.startsWith('/._jsondb_/') ||
-                        pathname === '/' ||
-                        pathname.startsWith('/assets/') ||
-                        pathname === '/vite.svg'
-
-      if (isApiPath) {
-        return null
-      }
-
-      if (!mockStorageAdapter) {
-        return null
-      }
-
-      const method = request.method.toUpperCase()
-
-      if (method === 'GET') {
-        try {
-          const data = await mockStorageAdapter!.get(pathname)
-          if (!data) {
-            throw ApiError.notFound('Not found')
-          }
-          return new Response('data', { status: 200 })
-        } catch (error) {
-          if (error instanceof ApiError && error.statusCode === 404) {
-            return new Response('Not Found', { status: 404 })
-          }
-          throw error
-        }
-      }
-
-      if (method === 'POST') {
-        await mockStorageAdapter!.create(pathname, { value: {}, type: 'json' })
-        return new Response(JSON.stringify({ status: 1, message: 'storage ok' }), { 
-          status: 201,
-          headers: { 'Content-Type': 'application/json' }
-        })
-      }
-
-      if (method === 'PUT') {
-        await mockStorageAdapter!.update(pathname, { value: {}, type: 'json' })
-        return new Response(JSON.stringify({ status: 1, message: 'storage ok' }), { 
-          status: 200,
-          headers: { 'Content-Type': 'application/json' }
-        })
-      }
-
-      if (method === 'DELETE') {
-        await mockStorageAdapter!.delete(pathname)
-        return new Response(JSON.stringify({ status: 1, message: 'storage ok', path: pathname }), { 
-          status: 200,
-          headers: { 'Content-Type': 'application/json' }
-        })
-      }
-
-      return new Response('Method Not Allowed', {
-        status: 405,
-        headers: { 'Allow': 'GET, POST, PUT, DELETE' }
-      })
-    }
-  }
+type StoredEntry = {
+  value: unknown
+  type: 'json' | 'text' | 'binary'
+  content_type?: string
 }
 
-function createMockRequest(
-  method: string,
-  pathname: string,
-  body?: string,
-  contentType?: string
-): Request {
-  const url = `https://test.workers.dev${pathname}`
+function createRequest(method: string, pathname: string, body?: BodyInit, contentType?: string): Request {
   const headers = new Headers()
   if (contentType) {
     headers.set('Content-Type', contentType)
   }
-  headers.set('Authorization', MOCK_AUTH_HEADER)
 
-  return new Request(url, {
+  return new Request(`https://example.com${pathname}?key=${VALID_API_KEY}`, {
     method,
     headers,
-    body: body,
+    body: method === 'GET' || method === 'HEAD' || method === 'DELETE' ? undefined : body
   })
 }
 
-function createMockAdapter(overrides: {
-  get?: () => Promise<any>
-  create?: () => Promise<any>
-  update?: () => Promise<any>
-  delete?: () => Promise<void>
-}): StorageAdapter {
+function createBinaryPayload(size: number): Uint8Array {
+  return Uint8Array.from({ length: size }, (_, index) => index % 128)
+}
+
+function toDataUrl(bytes: Uint8Array, mimeType: string): string {
+  return `data:${mimeType};base64,${Buffer.from(bytes).toString('base64')}`
+}
+
+function createInMemoryStorageAdapter(store: Map<string, StoredEntry>): StorageAdapter {
+  const toStoredData = (pathname: string): any => {
+    const item = store.get(pathname)
+    if (!item) {
+      throw ApiError.notFound(`Data not found at path: ${pathname}`)
+    }
+
+    return {
+      id: pathname,
+      path: pathname,
+      value: item.value,
+      type: item.type,
+      created_at: '2024-01-01T00:00:00.000Z',
+      updated_at: '2024-01-01T00:00:00.000Z',
+      size: getStoredSize(item),
+      content_type: item.content_type,
+      storage_location: 'd1'
+    }
+  }
+
   return {
-    get: overrides.get || (async () => null),
-    create: overrides.create || (async () => null),
-    update: overrides.update || (async () => null),
-    delete: overrides.delete || (async () => {}),
-    list: async () => ({ items: [], total: 0, page: 1, limit: 20, hasMore: false }),
-    getStats: async () => ({ total: 0, totalSize: 0 }),
+    get: jest.fn(async (pathname: string) => toStoredData(pathname)),
+    upsert: jest.fn(async (pathname: string, request: StoredEntry) => {
+      store.set(pathname, normalizeEntry(request))
+      return toStoredData(pathname)
+    }),
+    create: jest.fn(async (pathname: string, request: StoredEntry) => {
+      store.set(pathname, normalizeEntry(request))
+      return toStoredData(pathname)
+    }),
+    update: jest.fn(async (pathname: string, request: StoredEntry) => {
+      store.set(pathname, normalizeEntry(request))
+      return toStoredData(pathname)
+    }),
+    delete: jest.fn(async (pathname: string) => {
+      if (!store.has(pathname)) {
+        throw ApiError.notFound(`Data not found at path: ${pathname}`)
+      }
+      store.delete(pathname)
+    })
   } as unknown as StorageAdapter
+}
+
+function normalizeEntry(request: StoredEntry): StoredEntry {
+  if (request.type === 'json' && typeof request.value === 'string') {
+    try {
+      return { ...request, value: JSON.parse(request.value) }
+    } catch {
+      return request
+    }
+  }
+  return request
+}
+
+function getStoredSize(item: StoredEntry): number {
+  if (item.type === 'binary' && typeof item.value === 'string' && item.value.includes(';base64,')) {
+    const [, base64] = item.value.split(';base64,')
+    return Buffer.from(base64, 'base64').length
+  }
+
+  if (typeof item.value === 'string') {
+    return item.value.length
+  }
+
+  return JSON.stringify(item.value).length
+}
+
+function decodeStoredBinary(store: Map<string, StoredEntry>, pathname: string): number[] {
+  const item = store.get(pathname)
+  if (!item || item.type !== 'binary' || typeof item.value !== 'string') {
+    return []
+  }
+
+  const [, base64] = item.value.split(';base64,')
+  return Array.from(Buffer.from(base64, 'base64'))
 }

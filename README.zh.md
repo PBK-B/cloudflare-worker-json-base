@@ -95,16 +95,36 @@ curl -X DELETE https://your-worker.workers.dev/myapp/config \
 
 ## API 端点
 
+### 业务资源 API
+
+`/*` 路径用于业务侧直接读写资源。
+
 | 方法 | 端点 | 说明 |
 |------|------|------|
-| POST | `/{bucket}/{key}` | 创建/更新数据 |
-| GET | `/{bucket}/{key}` | 获取数据 |
-| PUT | `/{bucket}/{file}` | 上传文件 |
-| DELETE | `/{bucket}/{key}` | 删除数据 |
+| POST | `/{bucket}/{key}` | 创建资源 |
+| GET | `/{bucket}/{key}` | 获取资源 |
+| PUT | `/{bucket}/{key}` | 完整替换资源 |
+| DELETE | `/{bucket}/{key}` | 删除资源 |
+
+这些接口返回资源本体，适合业务系统直接调用。
+
+### 控制台管理 API
+
+`/._jsondb_/api/*` 路径用于 WebUI 和后台管理。
+
+| 方法 | 端点 | 说明 |
+|------|------|------|
+| GET | `/._jsondb_/api/health` | 校验 API Key 与服务健康状态 |
+| GET | `/._jsondb_/api/data` | 控制台资源列表 |
+| GET | `/._jsondb_/api/data/{path}` | 获取控制台资源详情 |
+| POST | `/._jsondb_/api/data/{path}` | 创建 JSON、文本或文件资源 |
+| PUT | `/._jsondb_/api/data/{path}` | 更新 JSON、文本或替换文件资源 |
+| DELETE | `/._jsondb_/api/data/{path}` | 删除控制台资源 |
+| GET | `/._jsondb_/api/console/*` | 控制台统计、配置和健康状态 |
 
 ## WebUI 控制台
 
-访问 `https://your-worker.workers.dev/` 进行可视化管理。
+访问 `https://your-worker.workers.dev/dash/` 进行可视化管理。
 
 ## 配置
 

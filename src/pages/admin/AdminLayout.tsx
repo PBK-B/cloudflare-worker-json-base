@@ -22,7 +22,7 @@ const AdminLayout: React.FC = () => {
 	const { logout } = useAuth();
 	const { t } = useTranslation();
 	const navigate = useNavigate();
-	const { createData, uploadFile, updateData } = useApi();
+	const { createData, uploadFile, replaceFile, updateData } = useApi();
 
 	const [showCreateModal, setShowCreateModal] = useState(false);
 	const [showEditModal, setShowEditModal] = useState(false);
@@ -96,10 +96,27 @@ const AdminLayout: React.FC = () => {
 		}
 	};
 
-	const handleEditSubmit = async (data: FormData) => {
+	const handleEditSubmit = async (data: FormData, file?: File) => {
 		setSubmitLoading(true);
 		try {
 			if (!selectedData) return;
+
+			if (selectedData.type === 'binary') {
+				if (!file) {
+					notify.error(t('layout.binaryReplaceOnly', { defaultValue: "请重新上传文件以替换当前资源" }));
+					return;
+				}
+
+				const response = await replaceFile(selectedData.id, file);
+				if (response.success) {
+					handleCloseModals();
+					notify.success(t('layout.updateSuccess', { defaultValue: "更新成功" }));
+					notifyRefresh();
+				} else {
+					notify.error(`${t('layout.updateFailed', { defaultValue: "更新失败" })}: ${response.error}`);
+				}
+				return;
+			}
 
 			let processedValue = data.value;
 			if (data.type === 'json') {
@@ -188,6 +205,7 @@ const AdminLayout: React.FC = () => {
 						value: typeof selectedData.value === 'string' ? selectedData.value : JSON.stringify(selectedData.value),
 						type: selectedData.type,
 					}}
+					allowBinaryEdit
 					mode="edit"
 				/>
 			)}

@@ -178,27 +178,16 @@ export class ResourceController {
     let result: ResourceResult
 
     if (contentType.includes('multipart/form-data')) {
-      const formData = await request.formData()
-      const file = formData.get('file') as File | null
-
-      if (file && file.size > 0) {
-        const arrayBuffer = await file.arrayBuffer()
-        const base64 = this.arrayBufferToBase64(arrayBuffer)
-        const mimeType = file.type || 'application/octet-stream'
-        const dataUrl = `data:${mimeType};base64,${base64}`
-
-        await this.storageAdapter.upsert(pathname, {
-          value: dataUrl,
-          type: 'binary',
-          content_type: mimeType
-        })
+      const payload = await this.parseMultipartFile(request)
+      if (payload) {
+        await this.storageAdapter.upsert(pathname, payload)
 
         result = {
           status: 1,
           message: 'storage ok',
           path: pathname,
-          size: file.size,
-          contentType: mimeType
+          size: payload.size,
+          contentType: payload.content_type
         }
 
         return new Response(JSON.stringify(result), {
@@ -231,6 +220,27 @@ export class ResourceController {
 
   private async put(pathname: string, request: Request): Promise<Response> {
     const contentType = request.headers.get('Content-Type') || ''
+
+    if (contentType.includes('multipart/form-data')) {
+      const payload = await this.parseMultipartFile(request)
+      if (payload) {
+        await this.storageAdapter.upsert(pathname, payload)
+
+        const result: ResourceResult = {
+          status: 1,
+          message: 'storage ok',
+          path: pathname,
+          size: payload.size,
+          contentType: payload.content_type
+        }
+
+        return new Response(JSON.stringify(result), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        })
+      }
+    }
+
     const body = await this.parseRequestBody(request, contentType)
 
     await this.storageAdapter.upsert(pathname, {
@@ -335,6 +345,31 @@ export class ResourceController {
       binary += String.fromCharCode(bytes[i])
     }
     return btoa(binary)
+  }
+
+  private async parseMultipartFile(request: Request): Promise<{
+    value: string
+    type: 'binary'
+    content_type: string
+    size: number
+  } | null> {
+    const formData = await request.formData()
+    const file = formData.get('file') as File | null
+
+    if (!file || file.size === 0) {
+      return null
+    }
+
+    const arrayBuffer = await file.arrayBuffer()
+    const base64 = this.arrayBufferToBase64(arrayBuffer)
+    const mimeType = file.type || 'application/octet-stream'
+
+    return {
+      value: `data:${mimeType};base64,${base64}`,
+      type: 'binary',
+      content_type: mimeType,
+      size: file.size
+    }
   }
 
   private async dataUrlToArrayBuffer(dataUrl: string): Promise<ArrayBuffer> {

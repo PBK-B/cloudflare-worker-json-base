@@ -215,7 +215,7 @@ const AdminDataPage: React.FC = () => {
 						<Cell>
 							{(rowData: StorageData) => (
 								<ButtonToolbar>
-									<Button size="sm" onClick={() => onOpenEditModal(rowData)}>
+									<Button size="sm" onClick={() => onOpenEditModal(rowData)} title={rowData.type === 'binary' ? t('data.replaceFile', { defaultValue: "替换文件" }) : t('data.edit', { defaultValue: "编辑" })}>
 										<Edit size={14} />
 									</Button>
 									<Button size="sm" color="red" onClick={() => handleDeleteData(rowData.id)}>

@@ -68,9 +68,8 @@ cloudflare-worker-json-base/
 ├── src/
 │   ├── api/                          # API 路由和控制器
 │   │   ├── router.ts                 # 主路由处理器
-│   │   ├── controllers.ts            # 数据控制器
-│   │   ├── resourceController.ts     # 资源 CRUD 控制器
-│   │   ├── storageController.ts      # 存储控制器
+│   │   ├── controllers.ts            # 控制台资源管理控制器
+│   │   ├── resourceController.ts     # 业务资源 CRUD 控制器
 │   │   ├── consoleController.ts      # 控制台控制器
 │   │   └── dataAccessController.ts   # 数据访问控制器
 │   │

@@ -95,16 +95,36 @@ curl -X DELETE https://your-worker.workers.dev/myapp/config \
 
 ## API Endpoints
 
+### Business Resource API
+
+Use `/*` paths as your application-facing resource endpoints.
+
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/{bucket}/{key}` | Create/update data |
-| GET | `/{bucket}/{key}` | Get data |
-| PUT | `/{bucket}/{file}` | Upload file |
-| DELETE | `/{bucket}/{key}` | Delete data |
+| POST | `/{bucket}/{key}` | Create a resource |
+| GET | `/{bucket}/{key}` | Read a resource |
+| PUT | `/{bucket}/{key}` | Replace a resource |
+| DELETE | `/{bucket}/{key}` | Delete a resource |
+
+These endpoints return the resource itself and are intended for application use.
+
+### Console Management API
+
+Use `/._jsondb_/api/*` for WebUI and management flows.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/._jsondb_/api/health` | Validate API key and inspect health |
+| GET | `/._jsondb_/api/data` | List resources for the console |
+| GET | `/._jsondb_/api/data/{path}` | Read resource metadata/value for the console |
+| POST | `/._jsondb_/api/data/{path}` | Create JSON/text/binary resources |
+| PUT | `/._jsondb_/api/data/{path}` | Update JSON/text or replace binary resources |
+| DELETE | `/._jsondb_/api/data/{path}` | Delete a resource from the console |
+| GET | `/._jsondb_/api/console/*` | Console stats, config, and health |
 
 ## WebUI Console
 
-Visit `https://your-worker.workers.dev/` for web management.
+Visit `https://your-worker.workers.dev/dash/` for web management.
 
 ## Configuration
 

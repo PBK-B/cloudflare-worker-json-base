@@ -19,6 +19,7 @@ interface ModalFormProps {
 	initialType?: 'json' | 'text' | 'binary';
 	loading?: boolean;
 	mode: 'create' | 'edit';
+	allowBinaryEdit?: boolean;
 }
 
 export const ModalForm: React.FC<ModalFormProps> = ({
@@ -30,6 +31,7 @@ export const ModalForm: React.FC<ModalFormProps> = ({
 	initialType = 'json',
 	loading = false,
 	mode,
+	allowBinaryEdit = false,
 }) => {
 	const { t } = useTranslation();
 	const [formData, setFormData] = React.useState<FormData>(
@@ -65,6 +67,11 @@ export const ModalForm: React.FC<ModalFormProps> = ({
 		if (formData.type === 'binary') {
 			if (!uploadedFile && !formData.value) {
 				notify.warning(t('modal.uploadRequired', { defaultValue: "请上传文件" }));
+				return;
+			}
+
+			if (mode === 'edit' && !allowBinaryEdit) {
+				notify.warning(t('modal.binaryEditDisabled', { defaultValue: "二进制文件不支持直接编辑" }));
 				return;
 			}
 		} else {
@@ -128,6 +135,9 @@ export const ModalForm: React.FC<ModalFormProps> = ({
 		if (formData.type === 'binary') {
 			return (
 				<div>
+					{mode === 'edit' && allowBinaryEdit ? (
+						<div className="form-hint">{t('modal.binaryReplaceHint', { defaultValue: "重新上传文件后会覆盖当前资源内容。" })}</div>
+					) : null}
 					<Uploader
 						fileList={uploadedFile ? [{ name: uploadedFile.name, fileKey: uploadedFile.name }] : []}
 						onChange={handleFileUpload}
@@ -203,7 +213,7 @@ export const ModalForm: React.FC<ModalFormProps> = ({
 							)}
 						</div>
 					</Uploader>
-					<div className="form-hint">{t('modal.fileStorageHint', { defaultValue: "文件将在后端自动转换为 Base64 编码存储" })}</div>
+					<div className="form-hint">{mode === 'edit' ? t('modal.fileReplaceStorageHint', { defaultValue: "上传新文件后会替换当前资源内容。" }) : t('modal.fileStorageHint', { defaultValue: "文件将在后端自动转换为 Base64 编码存储" })}</div>
 				</div>
 			);
 		}
