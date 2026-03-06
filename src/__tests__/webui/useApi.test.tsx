@@ -9,12 +9,13 @@ jest.mock('axios-hooks', () => ({
 }))
 
 const postMock = jest.fn()
+const putMock = jest.fn()
 
 jest.mock('axios', () => {
   const create = jest.fn(() => ({
     post: postMock,
     get: jest.fn(),
-    put: jest.fn(),
+    put: putMock,
     delete: jest.fn(),
     defaults: { headers: { common: {} } },
     interceptors: {
@@ -54,6 +55,13 @@ describe('useApi uploadFile', () => {
         timestamp: new Date().toISOString()
       }
     }))
+    putMock.mockImplementation(async () => ({
+      data: {
+        success: true,
+        data: { id: '/files/demo.txt' },
+        timestamp: new Date().toISOString()
+      }
+    }))
   })
 
   it('posts binary uploads to the data API with FormData', async () => {
@@ -82,6 +90,34 @@ describe('useApi uploadFile', () => {
     expect((body as FormData).get('file')).toBeInstanceOf(File)
 
     await uploadPromise
+  })
+
+  it('puts binary replacements to the data API with FormData', async () => {
+    let replacePromise: Promise<unknown> | null = null
+
+    const TestComponent = () => {
+      const { useApi } = require('../../hooks/useApi') as typeof import('../../hooks/useApi')
+      const api = useApi()
+
+      React.useEffect(() => {
+        const file = new File(['updated'], 'demo.txt', { type: 'text/plain' })
+        replacePromise = api.replaceFile('/files/demo.txt', file)
+      }, [api])
+
+      return null
+    }
+
+    render(<TestComponent />)
+
+    await waitFor(() => expect(putMock).toHaveBeenCalled())
+
+    const [url, body] = putMock.mock.calls[0] as [string, FormData]
+    expect(url).toBe('/data/files/demo.txt')
+    expect(body).toBeInstanceOf(FormData)
+    expect((body as FormData).get('type')).toBe('binary')
+    expect((body as FormData).get('file')).toBeInstanceOf(File)
+
+    await replacePromise
   })
 
 })

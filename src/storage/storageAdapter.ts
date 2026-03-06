@@ -164,7 +164,16 @@ export class StorageAdapter {
       data = this.textToUint8Array(jsonString);
       contentType = 'application/json';
     } else if (type === 'binary') {
-      if (typeof request.value === 'string' && request.value.startsWith('data:')) {
+      if (request.value instanceof Uint8Array) {
+        data = request.value;
+        contentType = request.content_type || 'application/octet-stream';
+      } else if (request.value instanceof ArrayBuffer) {
+        data = new Uint8Array(request.value);
+        contentType = request.content_type || 'application/octet-stream';
+      } else if (ArrayBuffer.isView(request.value)) {
+        data = new Uint8Array(request.value.buffer, request.value.byteOffset, request.value.byteLength).slice();
+        contentType = request.content_type || 'application/octet-stream';
+      } else if (typeof request.value === 'string' && request.value.startsWith('data:')) {
         const base64 = request.value.split(',')[1];
         const binaryString = atob(base64);
         data = new Uint8Array(binaryString.length);

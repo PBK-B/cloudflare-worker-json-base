@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
+import { Buffer } from 'node:buffer'
 import { ResourceController } from '../../api/resourceController'
 import { createMockEnv, VALID_API_KEY } from './mocks/env'
 import { ApiError } from '../../utils/response'
@@ -156,6 +157,30 @@ describe('资源控制器', () => {
       expect(missingResponse).not.toBeNull()
       expect(missingResponse!.status).toBe(404)
     })
+
+    it('应该将 multipart 文件解析为原始字节数组而不转为 data url', async () => {
+      const binary = createBinaryPayload(2 * 1024 * 1024)
+      const request = createRequest('POST', '/integration/large-file.bin', '--test-boundary--', 'multipart/form-data; boundary=test-boundary')
+      const file = {
+        size: binary.byteLength,
+        type: 'application/octet-stream',
+        arrayBuffer: jest.fn(async () => binary.buffer.slice(0))
+      } as unknown as File
+
+      Object.defineProperty(request, 'formData', {
+        value: jest.fn(async () => ({
+          get: (key: string) => (key === 'file' ? file : null)
+        }))
+      })
+
+      const payload = await (controller as any).parseMultipartFile(request)
+
+      expect(payload).not.toBeNull()
+      expect(payload.type).toBe('binary')
+      expect(payload.content_type).toBe('application/octet-stream')
+      expect(payload.value).toBeInstanceOf(Uint8Array)
+      expect(Array.from(payload.value as Uint8Array)).toEqual(Array.from(binary))
+    })
   })
 })
 
@@ -167,14 +192,22 @@ type StoredEntry = {
 
 function createRequest(method: string, pathname: string, body?: BodyInit, contentType?: string): Request {
   const headers = new Headers()
-  if (contentType) {
+  let requestBody = body
+
+  if (body instanceof FormData) {
+    const multipartResponse = new Response(body)
+    const multipartContentType = multipartResponse.headers.get('Content-Type')
+    if (multipartContentType) {
+      headers.set('Content-Type', multipartContentType)
+    }
+  } else if (contentType) {
     headers.set('Content-Type', contentType)
   }
 
   return new Request(`https://example.com${pathname}?key=${VALID_API_KEY}`, {
     method,
     headers,
-    body: method === 'GET' || method === 'HEAD' || method === 'DELETE' ? undefined : body
+    body: method === 'GET' || method === 'HEAD' || method === 'DELETE' ? undefined : requestBody
   })
 }
 
@@ -241,6 +274,10 @@ function normalizeEntry(request: StoredEntry): StoredEntry {
 }
 
 function getStoredSize(item: StoredEntry): number {
+  if (item.value instanceof Uint8Array) {
+    return item.value.byteLength
+  }
+
   if (item.type === 'binary' && typeof item.value === 'string' && item.value.includes(';base64,')) {
     const [, base64] = item.value.split(';base64,')
     return Buffer.from(base64, 'base64').length
@@ -255,7 +292,15 @@ function getStoredSize(item: StoredEntry): number {
 
 function decodeStoredBinary(store: Map<string, StoredEntry>, pathname: string): number[] {
   const item = store.get(pathname)
-  if (!item || item.type !== 'binary' || typeof item.value !== 'string') {
+  if (!item || item.type !== 'binary') {
+    return []
+  }
+
+  if (item.value instanceof Uint8Array) {
+    return Array.from(item.value)
+  }
+
+  if (typeof item.value !== 'string') {
     return []
   }
 

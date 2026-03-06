@@ -2,6 +2,7 @@ import { ResponseBuilder, ApiError } from '../utils/response'
 import { CorsHandler } from '../utils/response'
 import { AuthMiddleware, ValidationMiddleware, RateLimiter, Logger } from '../utils/middleware'
 import { StorageAdapter } from '../storage/storageAdapter'
+import { MAX_FILE_SIZE } from '../storage/interfaces'
 import { WorkerEnv } from '../types'
 import { Config } from '../utils/config'
 
@@ -16,15 +17,6 @@ export class DataController {
     this.storageAdapter = new StorageAdapter({ env })
     AuthMiddleware.initialize(env)
     RateLimiter.initialize(env)
-  }
-
-  private arrayBufferToBase64(buffer: ArrayBuffer): string {
-    const bytes = new Uint8Array(buffer)
-    let binary = ''
-    for (let i = 0; i < bytes.byteLength; i++) {
-      binary += String.fromCharCode(bytes[i])
-    }
-    return btoa(binary)
   }
 
   async get(request: Request): Promise<Response> {
@@ -54,19 +46,7 @@ export class DataController {
 
       Logger.info('Data retrieved', { pathname, auth: auth.apiKey.substring(0, 8), type: data.type })
 
-      return ResponseBuilder.success({
-        id: data.id,
-        path: data.path || pathname,
-        value: data.value,
-        type: data.type,
-        size: data.size,
-        content_type: data.content_type,
-        created_at: data.created_at,
-        updated_at: data.updated_at,
-        storage_location: data.storage_location,
-        downloadable: data.type === 'binary',
-        downloadPath: pathname
-      }, 'Data retrieved successfully')
+      return ResponseBuilder.success(this.formatDataResponse(data, pathname), 'Data retrieved successfully')
     } catch (error) {
       Logger.error('GET request failed', error)
       return this.handleError(error)
@@ -89,7 +69,7 @@ export class DataController {
         const data = await this.createOrUpdateFileResource(request, pathname, 'create')
 
         Logger.info('Data created from file', { pathname, size: data.size, auth: auth.apiKey.substring(0, 8) })
-        return ResponseBuilder.created(data, 'Data created successfully')
+        return ResponseBuilder.created(this.formatDataResponse(data, pathname), 'Data created successfully')
       }
 
       const requestData = await this.parseRequestBody(request)
@@ -104,7 +84,7 @@ export class DataController {
       })
       Logger.info('Data created', { pathname, auth: auth.apiKey.substring(0, 8) })
 
-      return ResponseBuilder.created(data, 'Data created successfully')
+      return ResponseBuilder.created(this.formatDataResponse(data, pathname), 'Data created successfully')
     } catch (error) {
       Logger.error('POST request failed', error)
       return this.handleError(error)
@@ -126,7 +106,7 @@ export class DataController {
       if (contentType.includes('multipart/form-data')) {
         const data = await this.createOrUpdateFileResource(request, pathname, 'update')
         Logger.info('Data updated from file', { pathname, size: data.size, auth: auth.apiKey.substring(0, 8) })
-        return ResponseBuilder.success(data, 'Data updated successfully')
+        return ResponseBuilder.success(this.formatDataResponse(data, pathname), 'Data updated successfully')
       }
 
       const requestData = await this.parseRequestBody(request)
@@ -134,7 +114,7 @@ export class DataController {
       const data = await this.storageAdapter.update(pathname, requestData)
       Logger.info('Data updated', { pathname, auth: auth.apiKey.substring(0, 8) })
 
-      return ResponseBuilder.success(data, 'Data updated successfully')
+      return ResponseBuilder.success(this.formatDataResponse(data, pathname), 'Data updated successfully')
     } catch (error) {
       Logger.error('PUT request failed', error)
       return this.handleError(error)
@@ -254,17 +234,15 @@ export class DataController {
       throw ApiError.badRequest('File is empty')
     }
 
-    const maxSize = 100 * 1024 * 1024
+    const maxSize = MAX_FILE_SIZE
     if (file.size > maxSize) {
       throw ApiError.badRequest(`File size exceeds maximum limit of ${maxSize / 1024 / 1024}MB`)
     }
 
     const arrayBuffer = await file.arrayBuffer()
-    const base64 = this.arrayBufferToBase64(arrayBuffer)
     const mimeType = file.type || 'application/octet-stream'
-    const dataUrl = `data:${mimeType};base64,${base64}`
     const requestPayload = {
-      value: dataUrl,
+      value: new Uint8Array(arrayBuffer),
       type: 'binary' as const,
       content_type: mimeType
     }
@@ -280,6 +258,27 @@ export class DataController {
     }
     const dataUrlPattern = /^data:([a-zA-Z0-9!#$&+^_.-]+\/[a-zA-Z0-9!#$&+^_.-]+);base64,/;
     return dataUrlPattern.test(url);
+  }
+
+  private formatDataResponse(data: any, pathname: string) {
+    const response = {
+      id: data.id,
+      path: data.path || pathname,
+      type: data.type,
+      size: data.size,
+      content_type: data.content_type,
+      created_at: data.created_at,
+      updated_at: data.updated_at,
+      storage_location: data.storage_location,
+      downloadable: data.type === 'binary',
+      downloadPath: pathname
+    } as Record<string, unknown>
+
+    if (data.type !== 'binary') {
+      response.value = data.value
+    }
+
+    return response
   }
 
   private handleError(error: any): Response {

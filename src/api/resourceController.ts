@@ -338,17 +338,8 @@ export class ResourceController {
     return dataUrlPattern.test(url);
   }
 
-  private arrayBufferToBase64(buffer: ArrayBuffer): string {
-    const bytes = new Uint8Array(buffer)
-    let binary = ''
-    for (let i = 0; i < bytes.byteLength; i++) {
-      binary += String.fromCharCode(bytes[i])
-    }
-    return btoa(binary)
-  }
-
   private async parseMultipartFile(request: Request): Promise<{
-    value: string
+    value: Uint8Array
     type: 'binary'
     content_type: string
     size: number
@@ -361,11 +352,10 @@ export class ResourceController {
     }
 
     const arrayBuffer = await file.arrayBuffer()
-    const base64 = this.arrayBufferToBase64(arrayBuffer)
     const mimeType = file.type || 'application/octet-stream'
 
     return {
-      value: `data:${mimeType};base64,${base64}`,
+      value: new Uint8Array(arrayBuffer),
       type: 'binary',
       content_type: mimeType,
       size: file.size
