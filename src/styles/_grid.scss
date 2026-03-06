@@ -1,0 +1,130 @@
+$grid-breakpoint-xs: 0;
+$grid-breakpoint-sm: 576px;
+$grid-breakpoint-md: 768px;
+$grid-breakpoint-lg: 992px;
+$grid-breakpoint-xl: 1200px;
+$grid-breakpoint-xxl: 1400px;
+
+$container-max-width-sm: 540px;
+$container-max-width-md: 720px;
+$container-max-width-lg: 960px;
+$container-max-width-xl: 1200px;
+$container-max-width-xxl: 1320px;
+
+$grid-gutter-xs: 12px;
+$grid-gutter-sm: 16px;
+$grid-gutter-md: 20px;
+$grid-gutter-lg: 24px;
+
+$space-xs: 4px;
+$space-sm: 8px;
+$space-md: 12px;
+$space-lg: 16px;
+$space-xl: 20px;
+$space-xxl: 24px;
+
+$card-radius: 4px;
+$card-border: 1px solid #e8e8e8;
+
+@mixin media-down($breakpoint) {
+  @media (max-width: #{$breakpoint - 1px}) {
+    @content;
+  }
+}
+
+@mixin media-up($breakpoint) {
+  @media (min-width: #{$breakpoint}) {
+    @content;
+  }
+}
+
+@mixin media-between($min-breakpoint, $max-breakpoint) {
+  @media (min-width: #{$min-breakpoint}) and (max-width: #{$max-breakpoint - 1px}) {
+    @content;
+  }
+}
+
+@mixin media-sm-down {
+  @include media-down($grid-breakpoint-sm) {
+    @content;
+  }
+}
+
+@mixin media-md-down {
+  @include media-down($grid-breakpoint-md) {
+    @content;
+  }
+}
+
+@mixin media-lg-down {
+  @include media-down($grid-breakpoint-lg) {
+    @content;
+  }
+}
+
+@mixin media-sm-up {
+  @include media-up($grid-breakpoint-sm) {
+    @content;
+  }
+}
+
+@mixin media-md-up {
+  @include media-up($grid-breakpoint-md) {
+    @content;
+  }
+}
+
+@mixin media-lg-up {
+  @include media-up($grid-breakpoint-lg) {
+    @content;
+  }
+}
+
+@mixin container-base {
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: $grid-gutter-md;
+  padding-right: $grid-gutter-md;
+}
+
+@mixin container-responsive {
+  @include container-base;
+
+  @media (max-width: #{$grid-breakpoint-sm}) {
+    padding-left: $grid-gutter-xs;
+    padding-right: $grid-gutter-xs;
+  }
+
+  @include media-sm-up {
+    max-width: $container-max-width-sm;
+  }
+
+  @include media-md-up {
+    max-width: $container-max-width-md;
+  }
+
+  @include media-lg-up {
+    max-width: $container-max-width-lg;
+  }
+
+  @include media-up($grid-breakpoint-xl) {
+    max-width: $container-max-width-xl;
+  }
+
+  @include media-up($grid-breakpoint-xxl) {
+    max-width: $container-max-width-xxl;
+  }
+}
+
+@mixin flex-between {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+@mixin flex-start {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+}

@@ -1,0 +1,164 @@
+@use '../styles/grid' as *;
+
+.loginContainer {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #f5f5f5;
+  position: relative;
+  overflow: hidden;
+}
+
+.loginLoading {
+  text-align: center;
+  color: #666;
+}
+
+.loginSpinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #e8e8e8;
+  border-top-color: #1890ff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto $space-md;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loginCard {
+  background: #fff;
+  border: 1px solid #e8e8e8;
+  border-radius: $card-radius;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+  padding: $space-xxl * 2;
+  width: 100%;
+  max-width: 420px;
+  position: relative;
+  z-index: 1;
+  margin: $space-md;
+}
+
+.loginHeader {
+  text-align: center;
+  margin-bottom: $space-xl;
+}
+
+.loginIcon {
+  width: 48px;
+  height: 48px;
+  background: #1890ff;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  margin: 0 auto $space-md;
+}
+
+.loginTitle {
+  margin: 0 0 $space-sm;
+  font-size: 20px;
+  font-weight: 600;
+  color: #262626;
+}
+
+.loginSubtitle {
+  margin: 0;
+  font-size: 14px;
+  color: #666;
+}
+
+.loginInputWrapper {
+  position: relative;
+}
+
+.loginInputIcon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #999;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.loginInput {
+  &:global(.rs-input) {
+    padding-left: 42px;
+  }
+}
+
+.loginError {
+  background: #fff2f0;
+  border: 1px solid #ffccc7;
+  color: #cf1322;
+  padding: $space-md;
+  border-radius: $card-radius;
+  margin-bottom: $space-lg;
+  font-size: 14px;
+}
+
+.loginButton {
+  height: 40px;
+  font-size: 14px;
+  background: #1890ff;
+  border: 1px solid #1890ff;
+
+  &:hover {
+    background: #40a9ff;
+    border-color: #40a9ff;
+  }
+}
+
+.loginButtonContent {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: $space-sm;
+}
+
+.loginFooter {
+  margin-top: $space-lg;
+  text-align: center;
+
+  p {
+    margin: 0;
+    font-size: 12px;
+    color: #999;
+  }
+}
+
+:global(.rs-theme-dark) .loginContainer {
+  background: var(--rs-body);
+}
+
+:global(.rs-theme-dark) .loginCard {
+  background: var(--rs-bg-card);
+  border-color: var(--rs-border-primary);
+}
+
+:global(.rs-theme-dark) .loginTitle {
+  color: var(--rs-text-primary);
+}
+
+:global(.rs-theme-dark) .loginSubtitle,
+:global(.rs-theme-dark) .loginLoading {
+  color: var(--rs-text-secondary);
+}
+
+:global(.rs-theme-dark) .loginError {
+  background: rgba(207, 18, 34, 0.1);
+  border-color: rgba(207, 18, 34, 0.3);
+  color: #ff7875;
+}
+
+:global(.rs-theme-dark) .loginSpinner {
+  border-color: var(--rs-border-primary);
+  border-top-color: var(--rs-primary-500);
+}

@@ -3,6 +3,7 @@ import { Modal, Form, Input, InputPicker, Button, Uploader } from 'rsuite';
 import { Plus, Edit, Upload, File, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { notify } from '../../utils/notification';
+import styles from './ModalForm.module.scss';
 
 interface FormData {
 	path: string;
@@ -140,7 +141,7 @@ export const ModalForm: React.FC<ModalFormProps> = ({
 			return (
 				<div>
 					{mode === 'edit' && allowBinaryEdit ? (
-						<div className="form-hint">{t('modal.binaryReplaceHint', { defaultValue: "重新上传文件后会覆盖当前资源内容。" })}</div>
+						<div className={styles.formHint}>{t('modal.binaryReplaceHint', { defaultValue: "重新上传文件后会覆盖当前资源内容。" })}</div>
 					) : null}
 					<Uploader
 						fileList={uploadedFile ? [{ name: uploadedFile.name, fileKey: uploadedFile.name }] : []}
@@ -217,7 +218,7 @@ export const ModalForm: React.FC<ModalFormProps> = ({
 							)}
 						</div>
 					</Uploader>
-					<div className="form-hint">{mode === 'edit' ? t('modal.fileReplaceStorageHint', { defaultValue: "上传新文件后会替换当前资源内容。" }) : t('modal.fileStorageHint', { defaultValue: "文件将在后端自动转换为 Base64 编码存储" })}</div>
+					<div className={styles.formHint}>{mode === 'edit' ? t('modal.fileReplaceStorageHint', { defaultValue: "上传新文件后会替换当前资源内容。" }) : t('modal.fileStorageHint', { defaultValue: "文件将在后端自动转换为 Base64 编码存储" })}</div>
 				</div>
 			);
 		}
@@ -237,8 +238,8 @@ export const ModalForm: React.FC<ModalFormProps> = ({
 	return (
 		<Modal open={show} onClose={onClose} backdrop={backdrop} keyboard={keyboard}>
 			<Modal.Header>
-				<Modal.Title className="modal-title" style={{ display: 'flex', flexDirection: 'row' }}>
-					<li style={{ display: 'flex', flexDirection: 'row' }}>{mode === 'create' ? <Plus size={18} /> : <Edit size={18} />}</li>
+				<Modal.Title className={styles.modalTitle}>
+					<span className={styles.modalTitleIcon}>{mode === 'create' ? <Plus size={18} /> : <Edit size={18} />}</span>
 					{title}
 				</Modal.Title>
 			</Modal.Header>
@@ -253,7 +254,7 @@ export const ModalForm: React.FC<ModalFormProps> = ({
 							size="lg"
 							disabled={mode === 'edit'}
 						/>
-						<div className="form-hint">{t('modal.pathHint', { defaultValue: "建议使用路径格式，如 /demo/user/profile" })}</div>
+						<div className={styles.formHint}>{t('modal.pathHint', { defaultValue: "建议使用路径格式，如 /demo/user/profile" })}</div>
 					</Form.Group>
 
 					<Form.Group>

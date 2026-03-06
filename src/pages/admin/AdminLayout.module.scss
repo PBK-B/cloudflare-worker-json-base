@@ -1,0 +1,248 @@
+@use '../../styles/grid' as *;
+
+.adminLayout {
+  min-height: 100vh;
+  background: #f5f5f5;
+}
+
+.adminHeader {
+  background: #fff;
+  border-bottom: 1px solid #e5e5e5;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.adminHeaderContent {
+  @include container-responsive;
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: $space-md;
+  padding-top: $space-sm;
+  padding-bottom: $space-sm;
+}
+
+.adminLogo {
+  display: flex;
+  align-items: center;
+  gap: $space-sm;
+  font-size: 18px;
+  font-weight: 600;
+  color: #262626;
+  min-width: 0;
+  max-width: 100%;
+
+  span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  svg {
+    color: #667eea;
+    flex-shrink: 0;
+  }
+}
+
+.adminNav {
+  display: flex;
+  justify-content: center;
+  gap: $space-md;
+  min-width: 0;
+}
+
+.adminNavDesktop {
+  display: flex;
+}
+
+.adminNavMobile {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: 100%;
+  gap: $space-sm;
+  align-items: stretch;
+}
+
+.adminNavLink {
+  display: flex;
+  align-items: center;
+  gap: $space-xs;
+  width: max-content;
+  max-width: 100%;
+  padding: $space-sm $space-md;
+  border-radius: $card-radius;
+  color: #666;
+  text-decoration: none !important;
+  font-size: 14px;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: #f5f5f5;
+    color: #262626;
+  }
+}
+
+.navLinkActive {
+  background: #e6f7ff;
+  color: #1890ff;
+}
+
+.adminNavLinkMobile {
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
+  justify-content: center;
+}
+
+.adminActions {
+  display: flex;
+  align-items: center;
+  justify-self: end;
+  gap: $space-sm;
+}
+
+.adminMenuToggle {
+  display: none;
+}
+
+.adminRefreshButton {
+  flex-shrink: 0;
+}
+
+.adminMobileNavShell {
+  display: none;
+  border-top: 1px solid #f0f0f0;
+}
+
+.adminMobileNavPanel {
+  @include container-responsive;
+  padding-top: $space-sm;
+  padding-bottom: $space-sm;
+}
+
+.adminLogoutButton {
+  color: #666;
+  gap: $space-xs;
+
+  &:hover {
+    color: #cf1322;
+    background: #fff1f0;
+  }
+}
+
+.adminLogoutText {
+  display: inline;
+}
+
+.adminContent {
+  @include container-responsive;
+  padding-top: $space-lg;
+  padding-bottom: $space-lg;
+}
+
+@include media-lg-down {
+  .adminHeaderContent {
+    grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto;
+  }
+}
+
+@include media-md-down {
+  .adminHeaderContent {
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding-top: $space-xs;
+    padding-bottom: $space-xs;
+    padding-left: $grid-gutter-xs;
+    padding-right: $grid-gutter-xs;
+  }
+
+  .adminLogo {
+    font-size: 15px;
+  }
+
+  .adminNavDesktop,
+  .adminLogoutText {
+    display: none;
+  }
+
+  .adminMenuToggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .adminActions {
+    gap: $space-xs;
+    width: auto;
+
+    :global(.rs-btn) {
+      min-width: 32px;
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+  }
+
+  .adminMobileNavShell {
+    display: block;
+  }
+
+  .adminContent {
+    padding-top: $space-md;
+    padding-bottom: $space-md;
+    padding-left: $grid-gutter-xs;
+    padding-right: $grid-gutter-xs;
+  }
+}
+
+@include media-sm-down {
+  .adminLogo {
+    gap: $space-xs;
+    font-size: 14px;
+
+    span {
+      max-width: 150px;
+    }
+  }
+
+  .adminMobileNavPanel {
+    padding-top: $space-xs;
+    padding-bottom: $space-xs;
+  }
+}
+
+:global(.rs-theme-dark) .adminLayout {
+  background: var(--rs-body);
+}
+
+:global(.rs-theme-dark) .adminHeader {
+  background: var(--rs-bg-card);
+  border-bottom-color: var(--rs-border-primary);
+}
+
+:global(.rs-theme-dark) .adminLogo {
+  color: var(--rs-text-primary);
+}
+
+:global(.rs-theme-dark) .adminNavLink {
+  color: var(--rs-text-secondary);
+
+  &:hover {
+    background: var(--rs-state-hover-bg);
+    color: var(--rs-text-primary);
+  }
+}
+
+:global(.rs-theme-dark) .navLinkActive {
+  background: rgba(24, 144, 255, 0.15);
+  color: var(--rs-primary-500);
+}
+
+:global(.rs-theme-dark) .adminMobileNavShell {
+  border-top-color: var(--rs-border-primary);
+}

@@ -1,0 +1,22 @@
+@use '../../styles/grid' as *;
+
+.formHint {
+  margin-top: $space-xs;
+  font-size: 12px;
+  color: #999;
+}
+
+.modalTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: $space-sm;
+}
+
+.modalTitleIcon {
+  display: inline-flex;
+  align-items: center;
+}
+
+:global(.rs-theme-dark) .formHint {
+  color: var(--rs-text-secondary);
+}

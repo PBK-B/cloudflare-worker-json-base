@@ -1,0 +1,243 @@
+@use '../../styles/grid' as *;
+
+.adminDataPage {
+	width: 100%;
+}
+
+.dataControls {
+	@include container-responsive;
+	padding: 0;
+	padding-top: $space-xl;
+	width: 100%;
+}
+
+.dataHeader {
+	@include flex-between;
+	padding: 0;
+	margin-bottom: $space-lg;
+	width: 100%;
+}
+
+.sectionTitle {
+	display: inline-flex;
+	align-items: center;
+	gap: $space-sm;
+	margin: 0;
+}
+
+.controlsRow {
+	@include flex-between;
+	width: 100%;
+	padding: 0;
+	margin: 0 0 $space-lg;
+	max-width: none;
+	align-items: center;
+}
+
+.searchInput {
+	flex: 1;
+	margin-right: $space-sm;
+}
+
+.searchButton {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: $space-xs;
+	flex-shrink: 0;
+	white-space: nowrap;
+}
+
+.sortRow {
+	@include flex-start;
+	gap: $space-sm;
+	width: 100%;
+	padding: 0;
+	margin: 0 0 $space-lg;
+	max-width: none;
+	flex-wrap: wrap;
+	align-items: center;
+}
+
+.createButton {
+	gap: $space-xs;
+}
+
+.tableContainer {
+	@include container-responsive;
+	background: #fff;
+	border: $card-border;
+	border-radius: $card-radius;
+	overflow: hidden;
+	padding: 0;
+	width: 100%;
+	max-width: none;
+	margin: 0 auto;
+}
+
+.pagination {
+	@include container-responsive;
+	@include flex-between;
+	padding-top: $space-lg;
+	padding-bottom: $space-lg;
+	margin: 0;
+	width: 100%;
+}
+
+.buttonToolbar {
+	display: flex;
+	gap: $space-xs;
+}
+
+.tableTypeIcon {
+	font-size: 16px;
+	line-height: 1;
+}
+
+.typeBadge {
+	display: inline-block;
+	padding: 2px $space-md;
+	border-radius: $card-radius;
+	font-size: 12px;
+	font-weight: 600;
+	text-transform: uppercase;
+}
+
+.typeBadgeJson {
+	background: rgba(82, 196, 26, 0.1);
+	color: #389e0d;
+}
+
+.typeBadgeText {
+	background: rgba(24, 144, 255, 0.1);
+	color: #096dd9;
+}
+
+.typeBadgeBinary {
+	background: rgba(250, 173, 20, 0.1);
+	color: #d48806;
+}
+
+.tableSortTrigger {
+	display: inline-flex;
+	align-items: center;
+	gap: $space-xs;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: inherit;
+	font: inherit;
+	font-weight: 600;
+	cursor: pointer;
+	transition: color 0.2s ease;
+
+	&:hover {
+		color: #1677ff;
+	}
+}
+
+.tableSortActive {
+	color: #1677ff;
+}
+
+.tableSortIcon {
+	color: #9aa4b2;
+	transition: color 0.2s ease;
+}
+
+.tableSortTrigger:hover .tableSortIcon,
+.tableSortActive .tableSortIcon {
+	color: currentColor;
+}
+
+.modalTitle {
+	display: inline-flex;
+	align-items: center;
+	gap: $space-sm;
+}
+
+.modalAlertIcon {
+	color: #ff4d4f;
+}
+
+.deleteHint {
+	color: #999;
+	margin-top: $space-sm;
+	font-size: 12px;
+}
+
+@include media-sm-down {
+	.controlsRow,
+	.pagination {
+		gap: $space-sm;
+		align-items: stretch;
+		flex-direction: column;
+	}
+
+	.searchInput {
+		margin-right: 0;
+	}
+}
+
+:global(.rs-theme-dark) .sectionTitle {
+	color: var(--rs-text-primary);
+}
+
+:global(.rs-theme-dark) .tableContainer {
+	background: var(--rs-bg-card);
+	border-color: var(--rs-table-border-color);
+}
+
+:global(.rs-theme-dark) .pagination > span,
+:global(.rs-theme-dark) .deleteHint {
+	color: var(--rs-text-secondary);
+}
+
+:global(.rs-theme-dark) .tableContainer :global(.rs-table) {
+	background: var(--rs-bg-card);
+	border-color: var(--rs-table-border-color);
+}
+
+:global(.rs-theme-dark) .tableContainer :global(.rs-table-row) {
+	background: var(--rs-bg-card);
+}
+
+:global(.rs-theme-dark) .tableContainer :global(.rs-table-row:hover) {
+	background: var(--rs-state-hover-bg);
+}
+
+:global(.rs-theme-dark) .tableContainer :global(.rs-table-cell) {
+	background: var(--rs-bg-card);
+	color: var(--rs-text-primary);
+	border-color: var(--rs-table-border-color);
+}
+
+:global(.rs-theme-dark) .tableContainer :global(.rs-table-header-cell) {
+	background: var(--rs-bg-card);
+	color: var(--rs-text-secondary);
+	border-color: var(--rs-table-border-color);
+}
+
+:global(.rs-theme-dark) .tableSortTrigger:hover,
+:global(.rs-theme-dark) .tableSortActive {
+	color: var(--rs-primary-500);
+}
+
+:global(.rs-theme-dark) .tableSortIcon {
+	color: var(--rs-text-tertiary);
+}
+
+:global(.rs-theme-dark) .typeBadgeJson {
+	background: rgba(82, 196, 26, 0.15);
+	color: #52c41a;
+}
+
+:global(.rs-theme-dark) .typeBadgeText {
+	background: rgba(24, 144, 255, 0.15);
+	color: #177ddc;
+}
+
+:global(.rs-theme-dark) .typeBadgeBinary {
+	background: rgba(250, 173, 20, 0.15);
+	color: #ffc53d;
+}

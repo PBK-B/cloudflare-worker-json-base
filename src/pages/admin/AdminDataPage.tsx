@@ -5,7 +5,7 @@ import { Search, Edit, Trash2, FileText, Paperclip, Plus, AlertTriangle, ArrowUp
 import { useTranslation } from 'react-i18next';
 import { useApi } from '../../hooks/useApi';
 import { StorageData } from '../../types';
-import '../../styles/WebUIConsole.less';
+import styles from './AdminDataPage.module.scss';
 
 const { Column, HeaderCell, Cell } = Table;
 
@@ -153,43 +153,56 @@ const AdminDataPage: React.FC = () => {
 		return (
 			<button
 				type="button"
-				className={`table-sort-trigger${isActive ? ' is-active' : ''}`}
+				className={`${styles.tableSortTrigger} ${isActive ? styles.tableSortActive : ''}`}
 				onClick={() => handleSort(field)}
 			>
 				<span>{label}</span>
-				<SortIcon size={14} className="table-sort-icon" />
+				<SortIcon size={14} className={styles.tableSortIcon} />
 			</button>
 		);
 	};
 
+	const getTypeBadgeClassName = (type?: string) => {
+		switch (type) {
+			case 'json':
+				return `${styles.typeBadge} ${styles.typeBadgeJson}`;
+			case 'text':
+				return `${styles.typeBadge} ${styles.typeBadgeText}`;
+			case 'binary':
+				return `${styles.typeBadge} ${styles.typeBadgeBinary}`;
+			default:
+				return styles.typeBadge;
+		}
+	};
+
 	return (
-		<div className="admin-data-page">
-			<div className="data-controls">
-				<div className="data-header">
-					<h4 className="section-title">
+		<div className={styles.adminDataPage}>
+			<div className={styles.dataControls}>
+				<div className={styles.dataHeader}>
+					<h4 className={styles.sectionTitle}>
 						<span>{t('data.title', { defaultValue: "数据管理" })}</span>
 					</h4>
 				</div>
 
-				<div className="data-controls-row">
-					<Input className="data-controls-row-search" placeholder={t('data.searchPlaceholder', { defaultValue: "搜索数据..." })} value={searchQuery} onChange={setSearchQuery} />
-					<Button onClick={handleSearch} className="btn-search">
+				<div className={styles.controlsRow}>
+					<Input className={styles.searchInput} placeholder={t('data.searchPlaceholder', { defaultValue: "搜索数据..." })} value={searchQuery} onChange={setSearchQuery} />
+					<Button onClick={handleSearch} className={styles.searchButton}>
 						<Search size={16} /> {t('data.search', { defaultValue: "搜索" })}
 					</Button>
 				</div>
 
-				<div className="data-controls-row-sort">
-					<Button className="create-btn" size="sm" appearance="primary" onClick={() => onOpenCreateModal()}>
+				<div className={styles.sortRow}>
+					<Button className={styles.createButton} size="sm" appearance="primary" onClick={() => onOpenCreateModal()}>
 						<Plus size={14} /> {t('data.create', { defaultValue: "创建数据" })}
 					</Button>
 				</div>
 			</div>
 
-			<div className="data-table-container">
+			<div className={styles.tableContainer}>
 				<Table height={400} data={dataList} loading={loading} autoHeight wordWrap="break-all" rowKey="id">
 					<Column width={50} fixed>
 						<HeaderCell>{t('data.table.icon', { defaultValue: "类型" })}</HeaderCell>
-						<Cell>{(rowData) => <span className="table-type-icon">{getTypeIcon(rowData.type)}</span>}</Cell>
+						<Cell>{(rowData) => <span className={styles.tableTypeIcon}>{getTypeIcon(rowData.type)}</span>}</Cell>
 					</Column>
 
 					<Column flexGrow={1} fullText>
@@ -201,7 +214,7 @@ const AdminDataPage: React.FC = () => {
 						<HeaderCell>{t('data.table.type', { defaultValue: "类型" })}</HeaderCell>
 						<Cell>
 							{(rowData) => (
-								<span className={`type-badge type-badge-${rowData.type || 'unknown'}`}>{(rowData.type || 'UNKNOWN').toUpperCase()}</span>
+								<span className={getTypeBadgeClassName(rowData.type)}>{(rowData.type || 'UNKNOWN').toUpperCase()}</span>
 							)}
 						</Cell>
 					</Column>
@@ -234,7 +247,7 @@ const AdminDataPage: React.FC = () => {
 				</Table>
 			</div>
 
-			<div className="data-pagination">
+			<div className={styles.pagination}>
 				<span>{t('data.pagination', { defaultValue: "共 {{total}} 条数据，第 {{page}} 页", total: pagination.total, page: pagination.page })}</span>
 				<Pagination
 					total={pagination.total}
@@ -248,14 +261,14 @@ const AdminDataPage: React.FC = () => {
 
 			<Modal open={deleteModalOpen} onClose={() => setDeleteModalOpen(false)}>
 				<Modal.Header>
-					<Modal.Title style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-						<AlertTriangle size={18} style={{ color: '#ff4d4f' }} />
+					<Modal.Title className={styles.modalTitle}>
+						<AlertTriangle size={18} className={styles.modalAlertIcon} />
 						{t('data.delete.confirmTitle', { defaultValue: "确认删除" })}
 					</Modal.Title>
 				</Modal.Header>
 				<Modal.Body>
 					<p>{t('data.delete.confirmText', { defaultValue: "确定要删除 \"{{id}}\" 吗？", id: deletingId })}</p>
-					<p style={{ color: '#999', marginTop: '8px', fontSize: '12px' }}>{t('data.delete.confirmHint', { defaultValue: "此操作不可撤销，数据将被永久删除。" })}</p>
+					<p className={styles.deleteHint}>{t('data.delete.confirmHint', { defaultValue: "此操作不可撤销，数据将被永久删除。" })}</p>
 				</Modal.Body>
 				<Modal.Footer>
 					<Button onClick={() => setDeleteModalOpen(false)} appearance="subtle">
@@ -269,8 +282,8 @@ const AdminDataPage: React.FC = () => {
 
 			<Modal open={errorModalOpen} onClose={() => setErrorModalOpen(false)}>
 				<Modal.Header>
-					<Modal.Title style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-						<AlertTriangle size={18} style={{ color: '#ff4d4f' }} />
+					<Modal.Title className={styles.modalTitle}>
+						<AlertTriangle size={18} className={styles.modalAlertIcon} />
 						{t('data.delete.failedTitle', { defaultValue: "删除失败" })}
 					</Modal.Title>
 				</Modal.Header>
@@ -288,7 +301,7 @@ const AdminDataPage: React.FC = () => {
 };
 
 const ButtonToolbar: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-	<div style={{ display: 'flex', gap: '4px' }}>{children}</div>
+	<div className={styles.buttonToolbar}>{children}</div>
 );
 
 export default AdminDataPage;

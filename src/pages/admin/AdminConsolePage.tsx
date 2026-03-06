@@ -3,7 +3,7 @@ import { useNavigate, useOutletContext } from 'react-router-dom';
 import { Plus, FileText, Paperclip, Database } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useApi } from '../../hooks/useApi';
-import '../../styles/WebUIConsole.less';
+import styles from './AdminConsolePage.module.scss';
 
 interface AdminContext {
 	onOpenCreateModal: (defaultType?: 'json' | 'text' | 'binary') => void;
@@ -50,61 +50,61 @@ const AdminConsolePage: React.FC = () => {
 	};
 
 	return (
-		<div className="admin-console-page">
-			<div className="admin-section">
-				<div className="stats-container">
-					<div className="stat-item">
-						<span className="stat-number">{stats.totalCount}</span>
-						<span className="stat-label">{t('console.stats.totalCount', { defaultValue: "数据总数" })}</span>
+		<div className={styles.adminConsolePage}>
+			<div className={styles.adminSection}>
+				<div className={styles.statsContainer}>
+					<div className={styles.statItem}>
+						<span className={styles.statNumber}>{stats.totalCount}</span>
+						<span className={styles.statLabel}>{t('console.stats.totalCount', { defaultValue: "数据总数" })}</span>
 					</div>
-					<div className="stat-item">
-						<span className="stat-number">{formatSize(stats.totalSize)}</span>
-						<span className="stat-label">{t('console.stats.totalSize', { defaultValue: "存储大小" })}</span>
+					<div className={styles.statItem}>
+						<span className={styles.statNumber}>{formatSize(stats.totalSize)}</span>
+						<span className={styles.statLabel}>{t('console.stats.totalSize', { defaultValue: "存储大小" })}</span>
 					</div>
-					<div className="stat-item">
-						<span className="stat-number">{stats.pageCount}</span>
-						<span className="stat-label">{t('console.stats.pageCount', { defaultValue: "总页数" })}</span>
+					<div className={styles.statItem}>
+						<span className={styles.statNumber}>{stats.pageCount}</span>
+						<span className={styles.statLabel}>{t('console.stats.pageCount', { defaultValue: "总页数" })}</span>
 					</div>
 				</div>
 
-				<div className="quick-actions">
-					<div className="action-card" onClick={() => onOpenCreateModal('json')}>
-						<span className="action-icon">
+				<div className={styles.quickActions}>
+					<div className={styles.actionCard} onClick={() => onOpenCreateModal('json')}>
+						<span className={styles.actionIcon}>
 							<Plus size={24} />
 						</span>
-						<div className="action-title">{t('console.actions.create.title', { defaultValue: "创建数据" })}</div>
-						<div className="action-description">{t('console.actions.create.description', { defaultValue: "快速创建新的 JSON 数据" })}</div>
+						<div className={styles.actionTitle}>{t('console.actions.create.title', { defaultValue: "创建数据" })}</div>
+						<div className={styles.actionDescription}>{t('console.actions.create.description', { defaultValue: "快速创建新的 JSON 数据" })}</div>
 					</div>
-					<div className="action-card" onClick={() => onOpenCreateModal('text')}>
-						<span className="action-icon">
+					<div className={styles.actionCard} onClick={() => onOpenCreateModal('text')}>
+						<span className={styles.actionIcon}>
 							<FileText size={24} />
 						</span>
-						<div className="action-title">{t('console.actions.storeText.title', { defaultValue: "存储文本" })}</div>
-						<div className="action-description">{t('console.actions.storeText.description', { defaultValue: "存储纯文本内容" })}</div>
+						<div className={styles.actionTitle}>{t('console.actions.storeText.title', { defaultValue: "存储文本" })}</div>
+						<div className={styles.actionDescription}>{t('console.actions.storeText.description', { defaultValue: "存储纯文本内容" })}</div>
 					</div>
-					<div className="action-card" onClick={() => onOpenCreateModal('binary')}>
-						<span className="action-icon">
+					<div className={styles.actionCard} onClick={() => onOpenCreateModal('binary')}>
+						<span className={styles.actionIcon}>
 							<Paperclip size={24} />
 						</span>
-						<div className="action-title">{t('console.actions.upload.title', { defaultValue: "上传文件" })}</div>
-						<div className="action-description">{t('console.actions.upload.description', { defaultValue: "存储二进制文件数据" })}</div>
+						<div className={styles.actionTitle}>{t('console.actions.upload.title', { defaultValue: "上传文件" })}</div>
+						<div className={styles.actionDescription}>{t('console.actions.upload.description', { defaultValue: "存储二进制文件数据" })}</div>
 					</div>
-					<div className="action-card" onClick={() => navigate('/admin/data')}>
-						<span className="action-icon">
+					<div className={styles.actionCard} onClick={() => navigate('/admin/data')}>
+						<span className={styles.actionIcon}>
 							<Database size={24} />
 						</span>
-						<div className="action-title">{t('console.actions.manage.title', { defaultValue: "数据管理" })}</div>
-						<div className="action-description">{t('console.actions.manage.description', { defaultValue: "查看和管理所有数据" })}</div>
+						<div className={styles.actionTitle}>{t('console.actions.manage.title', { defaultValue: "数据管理" })}</div>
+						<div className={styles.actionDescription}>{t('console.actions.manage.description', { defaultValue: "查看和管理所有数据" })}</div>
 					</div>
 				</div>
 
-				<div className="console-card">
+				<div className={styles.consoleCard}>
 					<h4>{t('console.apiTestTitle', { defaultValue: "API 测试工具" })}</h4>
 					<p>{t('console.apiTestDescription', { defaultValue: "在数据管理中使用创建和查询功能来测试 API。" })}</p>
 
-					<div className="console-card-code">
+					<div className={styles.consoleCardCode}>
 						<h5>{t('console.quickApiExample', { defaultValue: "快速 API 示例" })}</h5>
-						<pre className="console-code-block">
+						<pre className={styles.consoleCodeBlock}>
 							{t('console.quickApiSample', { defaultValue: "创建数据:\nPOST /data/example\nAuthorization: Bearer YOUR_API_KEY\n{\"name\": \"example\", \"value\": \"data\"}\n\n获取数据:\nGET /data/example\nAuthorization: Bearer YOUR_API_KEY\n-> {\"name\": \"example\", \"value\": \"data\"}\n" })}
 						</pre>
 					</div>

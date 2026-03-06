@@ -1,0 +1,229 @@
+@use '../../styles/grid' as *;
+
+.adminConsolePage,
+.adminSection {
+  width: 100%;
+}
+
+.statsContainer {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: $space-lg;
+  padding: $space-xl 0;
+  margin-bottom: $space-xl;
+}
+
+.statItem {
+  text-align: center;
+  min-width: 0;
+  padding: $space-lg;
+  background: #fff;
+  border: $card-border;
+  border-radius: $card-radius;
+}
+
+.statNumber {
+  font-size: 24px;
+  font-weight: 600;
+  color: #1890ff;
+  display: block;
+  margin-bottom: $space-xs;
+  overflow-wrap: anywhere;
+}
+
+.statLabel {
+  font-size: 14px;
+  color: #666;
+}
+
+.quickActions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: $space-md;
+  width: 100%;
+}
+
+.actionCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  border: $card-border;
+  border-radius: $card-radius;
+  padding: $space-lg;
+  text-align: center;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  min-height: 120px;
+
+  &:hover {
+    border-color: #1890ff;
+    background: #f0f7ff;
+  }
+}
+
+.actionIcon {
+  flex-shrink: 0;
+  font-size: 28px;
+  margin-bottom: $space-sm;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.actionTitle {
+  flex-shrink: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #262626;
+  margin-bottom: $space-xs;
+  line-height: 1.3;
+  text-align: center;
+}
+
+.actionDescription {
+  flex-shrink: 0;
+  font-size: 13px;
+  color: #666;
+  line-height: 1.5;
+  margin: 0;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.consoleCard {
+  background: #fff;
+  border: $card-border;
+  border-radius: $card-radius;
+  padding: $space-lg;
+  margin-top: $space-lg;
+
+  h4 {
+    margin: 0 0 $space-md;
+  }
+
+  p {
+    margin: 0;
+    color: #666;
+  }
+}
+
+.consoleCardCode {
+  background: #fafafa;
+  border: $card-border;
+  border-radius: $card-radius;
+  padding: $space-md;
+  margin-top: $space-md;
+
+  h5 {
+    margin: 0 0 $space-sm;
+  }
+}
+
+.consoleCodeBlock {
+  font-family: monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: #fff;
+  padding: $space-md;
+  border-radius: $card-radius;
+  margin-top: $space-md;
+  overflow: auto;
+}
+
+@include media-md-down {
+  .statsContainer {
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: $space-md;
+  }
+
+  .quickActions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .actionCard {
+    min-height: 0;
+    padding: $space-md;
+  }
+
+  .consoleCard {
+    padding: $space-md;
+  }
+}
+
+@include media-sm-down {
+  .statsContainer {
+    grid-template-columns: 1fr;
+    padding-top: $space-md;
+  }
+
+  .statItem {
+    padding: $space-md;
+  }
+
+  .quickActions {
+    grid-template-columns: 1fr;
+  }
+
+  .actionCard {
+    align-items: flex-start;
+    text-align: left;
+  }
+
+  .actionIcon,
+  .actionTitle,
+  .actionDescription {
+    text-align: left;
+  }
+
+  .consoleCardCode {
+    padding: $space-sm;
+  }
+
+  .consoleCodeBlock {
+    padding: $space-sm;
+    font-size: 11px;
+  }
+}
+
+:global(.rs-theme-dark) .statItem,
+:global(.rs-theme-dark) .consoleCard,
+:global(.rs-theme-dark) .actionCard {
+  background: var(--rs-bg-card);
+  border-color: var(--rs-border-primary);
+}
+
+:global(.rs-theme-dark) .actionCard:hover {
+  border-color: var(--rs-primary-500);
+  background: var(--rs-state-hover-bg);
+}
+
+:global(.rs-theme-dark) .statNumber {
+  color: var(--rs-primary-500);
+}
+
+:global(.rs-theme-dark) .statLabel,
+:global(.rs-theme-dark) .actionDescription,
+:global(.rs-theme-dark) .consoleCard p {
+  color: var(--rs-text-secondary);
+}
+
+:global(.rs-theme-dark) .actionTitle,
+:global(.rs-theme-dark) .consoleCard h4,
+:global(.rs-theme-dark) .consoleCardCode h5 {
+  color: var(--rs-text-primary);
+}
+
+:global(.rs-theme-dark) .consoleCardCode,
+:global(.rs-theme-dark) .consoleCodeBlock {
+  background: var(--rs-bg-overlay);
+  border-color: var(--rs-border-primary);
+  color: var(--rs-text-primary);
+}
+
+:global(.rs-theme-dark) .quickActions {
+  background: transparent;
+}

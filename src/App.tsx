@@ -1,13 +1,14 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import LoginPage from './pages/LoginPage';
-import AdminLayout from './pages/admin/AdminLayout';
-import AdminConsolePage from './pages/admin/AdminConsolePage';
-import AdminDataPage from './pages/admin/AdminDataPage';
 import { ToastContainer } from './utils/notification';
-import './styles/App.less';
+import styles from './App.module.scss';
+
+const LoginPage = lazy(() => import('./pages/LoginPage'));
+const AdminLayout = lazy(() => import('./pages/admin/AdminLayout'));
+const AdminConsolePage = lazy(() => import('./pages/admin/AdminConsolePage'));
+const AdminDataPage = lazy(() => import('./pages/admin/AdminDataPage'));
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 	const { isAuthenticated, isLoading } = useAuth();
@@ -15,7 +16,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 
 	if (isLoading) {
 		return (
-			<div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+			<div className={styles.loadingState}>
 				{t('app.loading', { defaultValue: "加载中..." })}
 			</div>
 		);
@@ -29,23 +30,27 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 };
 
 const AppRoutes: React.FC = () => {
+	const { t } = useTranslation();
+
 	return (
-		<Routes>
-			<Route path="/login" element={<LoginPage />} />
-			<Route
-				path="/admin"
-				element={
-					<ProtectedRoute>
-						<AdminLayout />
-					</ProtectedRoute>
-				}
-			>
-				<Route index element={<AdminConsolePage />} />
-				<Route path="data" element={<AdminDataPage />} />
-			</Route>
-			<Route path="/" element={<Navigate to="/admin" replace />} />
-			<Route path="*" element={<Navigate to="/admin" replace />} />
-		</Routes>
+		<Suspense fallback={<div className={styles.loadingState}>{t('app.loading', { defaultValue: "加载中..." })}</div>}>
+			<Routes>
+				<Route path="/login" element={<LoginPage />} />
+				<Route
+					path="/admin"
+					element={
+						<ProtectedRoute>
+							<AdminLayout />
+						</ProtectedRoute>
+					}
+				>
+					<Route index element={<AdminConsolePage />} />
+					<Route path="data" element={<AdminDataPage />} />
+				</Route>
+				<Route path="/" element={<Navigate to="/admin" replace />} />
+				<Route path="*" element={<Navigate to="/admin" replace />} />
+			</Routes>
+		</Suspense>
 	);
 };
 

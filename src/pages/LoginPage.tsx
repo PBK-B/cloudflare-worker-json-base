@@ -4,7 +4,7 @@ import { Container, Header, Content, Button, Form, Input } from 'rsuite';
 import { Key, Lock, ArrowRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
-import '../styles/WebUIConsole.less';
+import styles from './LoginPage.module.scss';
 
 const LoginPage: React.FC = () => {
 	const [apiKey, setApiKey] = useState('');
@@ -16,9 +16,9 @@ const LoginPage: React.FC = () => {
 
 	if (isLoading) {
 		return (
-			<Container className="login-container">
-				<div className="login-loading">
-					<div className="login-spinner"></div>
+			<Container className={styles.loginContainer}>
+				<div className={styles.loginLoading}>
+					<div className={styles.loginSpinner}></div>
 					<p>{t('login.loading', { defaultValue: "加载中..." })}</p>
 				</div>
 			</Container>
@@ -57,21 +57,21 @@ const LoginPage: React.FC = () => {
 	};
 
 	return (
-		<Container className="login-container">
-			<div className="login-card">
-				<div className="login-header">
-					<div className="login-icon">
+		<Container className={styles.loginContainer}>
+			<div className={styles.loginCard}>
+				<div className={styles.loginHeader}>
+					<div className={styles.loginIcon}>
 						<Key size={24} />
 					</div>
-					<h1 className="login-title">{t('login.title', { defaultValue: "JSON Base" })}</h1>
-					<p className="login-subtitle">{t('login.subtitle', { defaultValue: "Cloudflare Workers JSON 存储服务" })}</p>
+					<h1 className={styles.loginTitle}>{t('login.title', { defaultValue: "JSON Base" })}</h1>
+					<p className={styles.loginSubtitle}>{t('login.subtitle', { defaultValue: "Cloudflare Workers JSON 存储服务" })}</p>
 				</div>
 
 				<Form fluid onSubmit={handleSubmit}>
 					<Form.Group>
 						<Form.ControlLabel>{t('login.apiKeyLabel', { defaultValue: "API Key" })}</Form.ControlLabel>
-						<div className="login-input-wrapper">
-							<Lock size={16} className="login-input-icon" />
+						<div className={styles.loginInputWrapper}>
+							<Lock size={16} className={styles.loginInputIcon} />
 							<Input
 								type="password"
 								value={apiKey}
@@ -83,12 +83,12 @@ const LoginPage: React.FC = () => {
 								placeholder={t('login.placeholder', { defaultValue: "请输入您的 API Key" })}
 								size="lg"
 								disabled={loading}
-								className="login-input"
+								className={styles.loginInput}
 							/>
 						</div>
 					</Form.Group>
 
-					{error && <div className="login-error">{error}</div>}
+					{error && <div className={styles.loginError}>{error}</div>}
 
 					<Form.Group>
 						<Button
@@ -97,9 +97,9 @@ const LoginPage: React.FC = () => {
 							loading={loading}
 							size="lg"
 							block
-							className="login-btn"
+							className={styles.loginButton}
 						>
-							<span className="login-btn-content">
+							<span className={styles.loginButtonContent}>
 								{t('login.submit', { defaultValue: "验证并登录" })}
 								<ArrowRight size={16} />
 							</span>
@@ -107,7 +107,7 @@ const LoginPage: React.FC = () => {
 					</Form.Group>
 				</Form>
 
-				<div className="login-footer">
+				<div className={styles.loginFooter}>
 					<p>{t('login.footer', { defaultValue: "输入 API Key 以访问管理控制台" })}</p>
 				</div>
 			</div>

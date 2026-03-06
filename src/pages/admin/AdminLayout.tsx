@@ -9,7 +9,7 @@ import { useApi } from '../../hooks/useApi';
 import { ModalForm } from '../../components/common/ModalForm';
 import { StorageData } from '../../types';
 import { notify } from '../../utils/notification';
-import '../../styles/WebUIConsole.less';
+import styles from './AdminLayout.module.scss';
 
 interface FormData {
 	path: string;
@@ -169,35 +169,35 @@ const AdminLayout: React.FC = () => {
 	};
 
 	return (
-		<Container className="admin-layout">
-			<Header className="admin-header">
-				<div className="admin-header-content">
-					<div className="admin-logo">
+		<Container className={styles.adminLayout}>
+			<Header className={styles.adminHeader}>
+				<div className={styles.adminHeaderContent}>
+					<div className={styles.adminLogo}>
 						<LayoutDashboard size={24} />
 						<span>{t('layout.consoleTitle', { defaultValue: "JSON Base 管理控制台" })}</span>
 					</div>
-					<div className="admin-nav admin-nav-desktop">
+					<div className={`${styles.adminNav} ${styles.adminNavDesktop}`}>
 						<NavLink
 							to="/admin"
 							end
-							className={({ isActive }) => `admin-nav-link ${isActive ? 'active' : ''}`}
+							className={({ isActive }) => `${styles.adminNavLink} ${isActive ? styles.navLinkActive : ''}`}
 						>
 							<Settings size={16} />
 							{t('layout.navConsole', { defaultValue: "控制台" })}
 						</NavLink>
 						<NavLink
 							to="/admin/data"
-							className={({ isActive }) => `admin-nav-link ${isActive ? 'active' : ''}`}
+							className={({ isActive }) => `${styles.adminNavLink} ${isActive ? styles.navLinkActive : ''}`}
 						>
 							<Database size={16} />
 							{t('layout.navData', { defaultValue: "数据管理" })}
 						</NavLink>
 					</div>
-					<div className="admin-actions">
+					<div className={styles.adminActions}>
 						<Button
 							appearance="subtle"
 							onClick={() => setMobileNavOpen(prev => !prev)}
-							className="admin-menu-toggle"
+							className={styles.adminMenuToggle}
 							aria-label={t('layout.openMenu', { defaultValue: "打开菜单" })}
 							aria-expanded={mobileNavOpen}
 						>
@@ -206,7 +206,7 @@ const AdminLayout: React.FC = () => {
 						<Button
 							appearance="subtle"
 							onClick={() => window.location.reload()}
-							className="admin-refresh-btn"
+							className={styles.adminRefreshButton}
 							aria-label={t('layout.refresh', { defaultValue: "刷新" })}
 						>
 							<RefreshCw size={16} />
@@ -214,30 +214,30 @@ const AdminLayout: React.FC = () => {
 						<Button
 							appearance="subtle"
 							onClick={handleLogout}
-							className="admin-logout-btn"
+							className={styles.adminLogoutButton}
 							aria-label={t('layout.logout', { defaultValue: "退出" })}
 						>
 							<LogOut size={16} />
-							<span className="admin-logout-text">{t('layout.logout', { defaultValue: "退出" })}</span>
+							<span className={styles.adminLogoutText}>{t('layout.logout', { defaultValue: "退出" })}</span>
 						</Button>
 					</div>
 				</div>
 
 				{mobileNavOpen && (
-					<div className="admin-mobile-nav-shell">
-						<div className="admin-mobile-nav-panel">
-							<div className="admin-nav admin-nav-mobile">
+					<div className={styles.adminMobileNavShell}>
+						<div className={styles.adminMobileNavPanel}>
+							<div className={`${styles.adminNav} ${styles.adminNavMobile}`}>
 								<NavLink
 									to="/admin"
 									end
-									className={({ isActive }) => `admin-nav-link admin-nav-link-mobile ${isActive ? 'active' : ''}`}
+									className={({ isActive }) => `${styles.adminNavLink} ${styles.adminNavLinkMobile} ${isActive ? styles.navLinkActive : ''}`}
 								>
 									<Settings size={16} />
 									{t('layout.navConsole', { defaultValue: "控制台" })}
 								</NavLink>
 								<NavLink
 									to="/admin/data"
-									className={({ isActive }) => `admin-nav-link admin-nav-link-mobile ${isActive ? 'active' : ''}`}
+									className={({ isActive }) => `${styles.adminNavLink} ${styles.adminNavLinkMobile} ${isActive ? styles.navLinkActive : ''}`}
 								>
 									<Database size={16} />
 									{t('layout.navData', { defaultValue: "数据管理" })}
@@ -248,7 +248,7 @@ const AdminLayout: React.FC = () => {
 				)}
 			</Header>
 
-			<Content className="admin-content">
+			<Content className={styles.adminContent}>
 				<Outlet context={{ onOpenCreateModal: handleOpenCreateModal, onOpenEditModal: handleOpenEditModal, refreshKey }} />
 			</Content>
 
