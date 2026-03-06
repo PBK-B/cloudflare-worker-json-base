@@ -173,6 +173,10 @@
     "pagination": "共 {{total}} 条数据，第 {{page}} 页",
     "search": "搜索",
     "searchPlaceholder": "搜索数据...",
+    "contextMenu": {
+      "openDataInNewTab": "新标签页打开数据",
+      "openFileInNewTab": "新标签页打开文件"
+    },
     "sort": "排序：",
     "sortPath": "路径",
     "sortSize": "大小",
@@ -181,6 +185,7 @@
       "actions": "操作",
       "icon": "类型",
       "path": "路径",
+      "pathContextHint": "右键打开菜单",
       "size": "大小",
       "type": "类型",
       "updatedAt": "更新时间"

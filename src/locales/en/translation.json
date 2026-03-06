@@ -173,6 +173,10 @@
 		"pagination": "Total {{total}} records, page {{page}}",
 		"search": "Search",
 		"searchPlaceholder": "Search data...",
+		"contextMenu": {
+			"openDataInNewTab": "Open data in new tab",
+			"openFileInNewTab": "Open file in new tab"
+		},
 		"sort": "Sort:",
 		"sortPath": "Path",
 		"sortSize": "Size",
@@ -181,6 +185,7 @@
 			"actions": "Actions",
 			"icon": "Type",
 			"path": "Path",
+			"pathContextHint": "Right-click to open menu",
 			"size": "Size",
 			"type": "Type",
 			"updatedAt": "Updated"

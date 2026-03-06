@@ -1,9 +1,12 @@
-import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { defineConfig } from 'vite';
+
+const workerTarget = 'http://localhost:8788';
+const resourceProxyPattern = '^/(?!dash(?:/|$)|\._jsondb_/api(?:/|$)|@vite/|@fs/|src/|node_modules/).*';
 
 export default defineConfig({
 	plugins: [react()],
-	base: './',
+	base: '/dash',
 	build: {
 		outDir: 'dist-webui/dash',
 		rollupOptions: {
@@ -43,17 +46,22 @@ export default defineConfig({
 	},
 	server: {
 		port: 3000,
+		open: '/dash',
 		proxy: {
 			'/._jsondb_/api': {
-				target: 'http://localhost:8788',
+				target: workerTarget,
 				changeOrigin: true,
-				configure: (proxy, options) => {
-					proxy.on('proxyReq', (proxyReq, req, res) => {
+				configure: (proxy) => {
+					proxy.on('proxyReq', (proxyReq, req) => {
 						if (req.headers.authorization) {
 							proxyReq.setHeader('Authorization', req.headers.authorization as string);
 						}
 					});
 				},
+			},
+			[resourceProxyPattern]: {
+				target: workerTarget,
+				changeOrigin: true,
 			},
 		},
 	},

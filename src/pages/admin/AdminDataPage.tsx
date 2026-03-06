@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { Button, Input, Table, Pagination, Modal } from 'rsuite';
-import { Search, Edit, Trash2, FileText, Paperclip, Plus, AlertTriangle, ArrowUp, ArrowDown } from 'lucide-react';
+import { Search, Edit, Trash2, FileText, Paperclip, Plus, AlertTriangle, ArrowUp, ArrowDown, ExternalLink } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useApi } from '../../hooks/useApi';
 import { StorageData } from '../../types';
@@ -13,6 +13,14 @@ interface AdminContext {
 	onOpenCreateModal: (defaultType?: 'json' | 'text' | 'binary') => void;
 	onOpenEditModal: (data: StorageData) => void;
 	refreshKey?: number;
+}
+
+interface ContextMenuState {
+	data: StorageData;
+	x: number;
+	y: number;
+	adjustedX?: number;
+	adjustedY?: number;
 }
 
 const AdminDataPage: React.FC = () => {
@@ -31,6 +39,8 @@ const AdminDataPage: React.FC = () => {
 	const [deletingId, setDeletingId] = useState<string | null>(null);
 	const [errorModalOpen, setErrorModalOpen] = useState(false);
 	const [errorMessage, setErrorMessage] = useState('');
+	const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+	const menuRef = useRef<HTMLDivElement | null>(null);
 
 	const loadData = useCallback(async () => {
 		if (abortRef.current) {
@@ -76,6 +86,64 @@ const AdminDataPage: React.FC = () => {
 		window.addEventListener('storage', handleStorageChange);
 		return () => window.removeEventListener('storage', handleStorageChange);
 	}, [loadData]);
+
+	useEffect(() => {
+		if (!contextMenu) {
+			return;
+		}
+
+		if (menuRef.current) {
+			const menuRect = menuRef.current.getBoundingClientRect();
+			const viewportWidth = window.innerWidth;
+			const viewportHeight = window.innerHeight;
+			const edgePadding = 12;
+			const nextX = Math.max(edgePadding, Math.min(contextMenu.x, viewportWidth - menuRect.width - edgePadding));
+			const nextY = Math.max(edgePadding, Math.min(contextMenu.y, viewportHeight - menuRect.height - edgePadding));
+
+			if (nextX !== contextMenu.adjustedX || nextY !== contextMenu.adjustedY) {
+				setContextMenu((prev) => {
+					if (!prev) {
+						return prev;
+					}
+
+					if (prev.adjustedX === nextX && prev.adjustedY === nextY) {
+						return prev;
+					}
+
+					return {
+						...prev,
+						adjustedX: nextX,
+						adjustedY: nextY,
+					};
+				});
+			}
+		}
+
+		const closeMenu = () => setContextMenu(null);
+		const handlePointerDown = (event: MouseEvent) => {
+			if (menuRef.current && event.target instanceof Node && menuRef.current.contains(event.target)) {
+				return;
+			}
+			closeMenu();
+		};
+		const handleEscape = (event: KeyboardEvent) => {
+			if (event.key === 'Escape') {
+				closeMenu();
+			}
+		};
+
+		window.addEventListener('mousedown', handlePointerDown);
+		window.addEventListener('scroll', closeMenu, true);
+		window.addEventListener('resize', closeMenu);
+		window.addEventListener('keydown', handleEscape);
+
+		return () => {
+			window.removeEventListener('mousedown', handlePointerDown);
+			window.removeEventListener('scroll', closeMenu, true);
+			window.removeEventListener('resize', closeMenu);
+			window.removeEventListener('keydown', handleEscape);
+		};
+	}, [contextMenu]);
 
 	const handleSearch = () => {
 		setPagination((prev) => ({ ...prev, page: 1 }));
@@ -175,6 +243,31 @@ const AdminDataPage: React.FC = () => {
 		}
 	};
 
+	const getResourceUrl = useCallback((id: string) => {
+		const apiKey = localStorage.getItem('jsonbase-api-key');
+		const url = new URL(id, window.location.origin);
+
+		if (apiKey) {
+			url.searchParams.set('key', apiKey);
+		}
+
+		return url.toString();
+	}, []);
+
+	const handleOpenInNewTab = useCallback((rowData: StorageData) => {
+		window.open(getResourceUrl(rowData.id), '_blank', 'noopener,noreferrer');
+		setContextMenu(null);
+	}, [getResourceUrl]);
+
+	const handlePathContextMenu = useCallback((event: React.MouseEvent<HTMLButtonElement>, rowData: StorageData) => {
+		event.preventDefault();
+		setContextMenu({
+			data: rowData,
+			x: event.clientX,
+			y: event.clientY,
+		});
+	}, []);
+
 	return (
 		<div className={styles.adminDataPage}>
 			<div className={styles.dataControls}>
@@ -207,7 +300,18 @@ const AdminDataPage: React.FC = () => {
 
 					<Column flexGrow={1} fullText>
 						<HeaderCell>{renderSortHeader('id', t('data.table.path', { defaultValue: "路径" }))}</HeaderCell>
-						<Cell dataKey="id" />
+						<Cell>
+							{(rowData: StorageData) => (
+								<button
+									type="button"
+									className={styles.pathCellButton}
+									onContextMenu={(event) => handlePathContextMenu(event, rowData)}
+									title={t('data.table.pathContextHint', { defaultValue: "右键打开菜单" })}
+								>
+									{rowData.id}
+								</button>
+							)}
+						</Cell>
 					</Column>
 
 					<Column width={100}>
@@ -246,6 +350,28 @@ const AdminDataPage: React.FC = () => {
 					</Column>
 				</Table>
 			</div>
+
+			{contextMenu ? (
+				<div
+					ref={menuRef}
+					className={styles.contextMenu}
+					style={{ left: contextMenu.adjustedX ?? contextMenu.x, top: contextMenu.adjustedY ?? contextMenu.y }}
+					role="menu"
+				>
+					<button
+						type="button"
+						className={styles.contextMenuAction}
+						onClick={() => handleOpenInNewTab(contextMenu.data)}
+					>
+						<ExternalLink size={14} />
+						<span>
+							{contextMenu.data.type === 'binary'
+								? t('data.contextMenu.openFileInNewTab', { defaultValue: "新标签页打开文件" })
+								: t('data.contextMenu.openDataInNewTab', { defaultValue: "新标签页打开数据" })}
+						</span>
+					</button>
+				</div>
+			) : null}
 
 			<div className={styles.pagination}>
 				<span>{t('data.pagination', { defaultValue: "共 {{total}} 条数据，第 {{page}} 页", total: pagination.total, page: pagination.page })}</span>
