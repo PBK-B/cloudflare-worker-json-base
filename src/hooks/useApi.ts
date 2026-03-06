@@ -40,6 +40,8 @@ axiosInstance.interceptors.response.use(
 
 configure({ axios: axiosInstance });
 
+const isCanceledError = (error: unknown) => axios.isCancel(error) || (axios.isAxiosError(error) && error.code === 'ERR_CANCELED');
+
 export const useApi = () => {
 	const [apiKey, setApiKeyState] = useState<string>('');
 	const [isConfigured, setIsConfigured] = useState(false);
@@ -105,11 +107,15 @@ export const useApi = () => {
 		}
 	}, []);
 
-	const createData = useCallback(async (path: string, data: CreateDataRequest): Promise<ApiResponse<StorageData>> => {
+	const createData = useCallback(async (path: string, data: CreateDataRequest, signal?: AbortSignal): Promise<ApiResponse<StorageData>> => {
 		try {
-			const response = await axiosInstance.post(`/data${path}`, data);
+			const response = await axiosInstance.post(`/data${path}`, data, { signal });
 			return response.data;
 		} catch (error) {
+			if (isCanceledError(error)) {
+				throw error;
+			}
+
 			if (axios.isAxiosError(error)) {
 				return {
 					success: false,
@@ -121,15 +127,19 @@ export const useApi = () => {
 		}
 	}, []);
 
-	const uploadFile = useCallback(async (path: string, file: File, contentType: string): Promise<ApiResponse<StorageData>> => {
+	const uploadFile = useCallback(async (path: string, file: File, contentType: string, signal?: AbortSignal): Promise<ApiResponse<StorageData>> => {
 		try {
 			const formData = new FormData();
 			formData.append('file', file);
 			formData.append('type', 'binary');
 
-			const response = await axiosInstance.post(`/data${path}`, formData);
+			const response = await axiosInstance.post(`/data${path}`, formData, { signal });
 			return response.data;
 		} catch (error) {
+			if (isCanceledError(error)) {
+				throw error;
+			}
+
 			if (axios.isAxiosError(error)) {
 				const statusCode = error.response?.status;
 				let errorMessage = i18n.t('api.uploadFailed', { defaultValue: "上传失败" });

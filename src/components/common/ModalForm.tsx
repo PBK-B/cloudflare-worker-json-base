@@ -20,6 +20,8 @@ interface ModalFormProps {
 	loading?: boolean;
 	mode: 'create' | 'edit';
 	allowBinaryEdit?: boolean;
+	backdrop?: boolean | 'static';
+	keyboard?: boolean;
 }
 
 export const ModalForm: React.FC<ModalFormProps> = ({
@@ -32,6 +34,8 @@ export const ModalForm: React.FC<ModalFormProps> = ({
 	loading = false,
 	mode,
 	allowBinaryEdit = false,
+	backdrop = true,
+	keyboard = true,
 }) => {
 	const { t } = useTranslation();
 	const [formData, setFormData] = React.useState<FormData>(
@@ -231,7 +235,7 @@ export const ModalForm: React.FC<ModalFormProps> = ({
 	};
 
 	return (
-		<Modal open={show} onClose={onClose}>
+		<Modal open={show} onClose={onClose} backdrop={backdrop} keyboard={keyboard}>
 			<Modal.Header>
 				<Modal.Title className="modal-title" style={{ display: 'flex', flexDirection: 'row' }}>
 					<li style={{ display: 'flex', flexDirection: 'row' }}>{mode === 'create' ? <Plus size={18} /> : <Edit size={18} />}</li>

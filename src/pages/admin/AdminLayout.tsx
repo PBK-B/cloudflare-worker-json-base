@@ -1,8 +1,9 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { Container, Header, Content, Button } from 'rsuite';
 import { Settings, Database, RefreshCw, LogOut, LayoutDashboard } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
 import { useApi } from '../../hooks/useApi';
 import { ModalForm } from '../../components/common/ModalForm';
@@ -30,6 +31,7 @@ const AdminLayout: React.FC = () => {
 	const [refreshKey, setRefreshKey] = useState(0);
 	const [createDefaultType, setCreateDefaultType] = useState<'json' | 'text' | 'binary'>('json');
 	const [submitLoading, setSubmitLoading] = useState(false);
+	const submitAbortRef = useRef<AbortController | null>(null);
 
 	const handleLogout = () => {
 		logout();
@@ -47,6 +49,11 @@ const AdminLayout: React.FC = () => {
 	};
 
 	const handleCloseModals = () => {
+		if (submitAbortRef.current) {
+			submitAbortRef.current.abort();
+			submitAbortRef.current = null;
+		}
+
 		setShowCreateModal(false);
 		setShowEditModal(false);
 		setSelectedData(null);
@@ -58,11 +65,14 @@ const AdminLayout: React.FC = () => {
 	};
 
 	const handleCreateSubmit = async (data: FormData, file?: File) => {
+		const controller = new AbortController();
+		submitAbortRef.current = controller;
 		setSubmitLoading(true);
 		try {
 			if (file) {
-				const response = await uploadFile(data.path, file, file.type);
+				const response = await uploadFile(data.path, file, file.type, controller.signal);
 				if (response.success) {
+					submitAbortRef.current = null;
 					handleCloseModals();
 					notify.success(t('layout.createSuccess', { defaultValue: "创建成功" }));
 					notifyRefresh();
@@ -78,9 +88,10 @@ const AdminLayout: React.FC = () => {
 				const response = await createData(data.path, {
 					value: processedValue,
 					type: data.type,
-				});
+				}, controller.signal);
 
 				if (response.success) {
+					submitAbortRef.current = null;
 					handleCloseModals();
 					notify.success(t('layout.createSuccess', { defaultValue: "创建成功" }));
 					notifyRefresh();
@@ -89,9 +100,16 @@ const AdminLayout: React.FC = () => {
 				}
 			}
 		} catch (error) {
+			if (axios.isCancel(error) || (axios.isAxiosError(error) && error.code === 'ERR_CANCELED')) {
+				return;
+			}
+
 			notify.error(t('layout.createFailed', { defaultValue: "创建失败" }));
 			console.error('Create error:', error);
 		} finally {
+			if (submitAbortRef.current === controller) {
+				submitAbortRef.current = null;
+			}
 			setSubmitLoading(false);
 		}
 	};
@@ -191,6 +209,8 @@ const AdminLayout: React.FC = () => {
 				loading={submitLoading}
 				mode="create"
 				initialType={createDefaultType}
+				backdrop="static"
+				keyboard={false}
 			/>
 
 			{selectedData && (

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { useNavigate, useOutletContext } from 'react-router-dom';
 import { Plus, FileText, Paperclip, Database } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useApi } from '../../hooks/useApi';
@@ -15,6 +15,7 @@ const AdminConsolePage: React.FC = () => {
 	const { onOpenCreateModal, refreshKey } = useOutletContext<AdminContext>();
 	const { listData, getConsoleStats, loading } = useApi();
 	const { t } = useTranslation();
+	const navigate = useNavigate();
 
 	const [stats, setStats] = useState({
 		totalCount: 0,
@@ -88,7 +89,7 @@ const AdminConsolePage: React.FC = () => {
 						<div className="action-title">{t('console.actions.upload.title', { defaultValue: "上传文件" })}</div>
 						<div className="action-description">{t('console.actions.upload.description', { defaultValue: "存储二进制文件数据" })}</div>
 					</div>
-					<div className="action-card">
+					<div className="action-card" onClick={() => navigate('/admin/data')}>
 						<span className="action-icon">
 							<Database size={24} />
 						</span>

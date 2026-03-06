@@ -9,47 +9,83 @@ interface Toast {
 
 let toastListeners: ((toasts: Toast[]) => void)[] = [];
 let currentToasts: Toast[] = [];
+let dismissTimer: ReturnType<typeof setTimeout> | null = null;
+let showTimer: ReturnType<typeof setTimeout> | null = null;
+let toastSequence = 0;
+const TOAST_SWITCH_DELAY = 300;
 
 const notifyListeners = () => {
   toastListeners.forEach(listener => listener([...currentToasts]));
 };
 
+const clearDismissTimer = () => {
+  if (dismissTimer) {
+    clearTimeout(dismissTimer);
+    dismissTimer = null;
+  }
+};
+
+const clearShowTimer = () => {
+  if (showTimer) {
+    clearTimeout(showTimer);
+    showTimer = null;
+  }
+};
+
+const removeToast = (id: string) => {
+  if (currentToasts.some(toast => toast.id === id)) {
+    currentToasts = currentToasts.filter(toast => toast.id !== id);
+    notifyListeners();
+  }
+};
+
+const showToast = (type: Toast['type'], message: string, duration?: number) => {
+  clearDismissTimer();
+  clearShowTimer();
+  toastSequence += 1;
+  const sequence = toastSequence;
+
+  const toast: Toast = { id: Date.now().toString() + Math.random(), type, message };
+
+  const renderToast = () => {
+    if (sequence !== toastSequence) {
+      return;
+    }
+
+    currentToasts = [toast];
+    notifyListeners();
+    showTimer = null;
+
+    if (duration) {
+      dismissTimer = setTimeout(() => {
+        removeToast(toast.id);
+        dismissTimer = null;
+      }, duration);
+    }
+  };
+
+  if (currentToasts.length > 0) {
+    currentToasts = [];
+    notifyListeners();
+    showTimer = setTimeout(renderToast, TOAST_SWITCH_DELAY);
+    return;
+  }
+
+  renderToast();
+};
+
 export const notify = {
   success: (message: string) => {
-    const toast: Toast = { id: Date.now().toString() + Math.random(), type: 'success', message };
-    currentToasts = [...currentToasts, toast];
-    notifyListeners();
-    setTimeout(() => {
-      currentToasts = currentToasts.filter(t => t.id !== toast.id);
-      notifyListeners();
-    }, 4000);
+    showToast('success', message, 4000);
   },
   error: (message: string) => {
-    const toast: Toast = { id: Date.now().toString() + Math.random(), type: 'error', message };
-    currentToasts = [...currentToasts, toast];
-    notifyListeners();
-    setTimeout(() => {
-      currentToasts = currentToasts.filter(t => t.id !== toast.id);
-      notifyListeners();
-    }, 4000);
+    showToast('error', message);
   },
   warning: (message: string) => {
-    const toast: Toast = { id: Date.now().toString() + Math.random(), type: 'warning', message };
-    currentToasts = [...currentToasts, toast];
-    notifyListeners();
-    setTimeout(() => {
-      currentToasts = currentToasts.filter(t => t.id !== toast.id);
-      notifyListeners();
-    }, 3500);
+    showToast('warning', message, 3500);
   },
   info: (message: string) => {
-    const toast: Toast = { id: Date.now().toString() + Math.random(), type: 'info', message };
-    currentToasts = [...currentToasts, toast];
-    notifyListeners();
-    setTimeout(() => {
-      currentToasts = currentToasts.filter(t => t.id !== toast.id);
-      notifyListeners();
-    }, 3000);
+    showToast('info', message, 3000);
   },
 };
 
@@ -64,6 +100,12 @@ export const ToastContainer: React.FC = () => {
     };
   }, []);
 
+  const handleClose = useCallback((id: string) => {
+    clearDismissTimer();
+    clearShowTimer();
+    removeToast(id);
+  }, []);
+
   return (
     <div style={{ position: 'fixed', top: 20, right: 20, zIndex: 9999 }}>
       {toasts.map(toast => (
@@ -72,10 +114,7 @@ export const ToastContainer: React.FC = () => {
             type={toast.type} 
             closable 
             style={{ width: 360 }}
-            onClose={() => {
-              currentToasts = currentToasts.filter(t => t.id !== toast.id);
-              notifyListeners();
-            }}
+            onClose={() => handleClose(toast.id)}
           >
             {toast.message}
           </Message>
