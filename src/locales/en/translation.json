@@ -198,6 +198,11 @@
 		"createFailed": "Create failed",
 		"createSuccess": "Created successfully",
 		"editData": "Edit Data",
+		"languageMenu": "Switch language",
+		"languages": {
+			"en": "English",
+			"zh": "Chinese"
+		},
 		"logout": "Sign Out",
 		"navConsole": "Console",
 		"navData": "Data",

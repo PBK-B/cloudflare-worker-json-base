@@ -104,6 +104,35 @@
   gap: $space-sm;
 }
 
+.languageMenu {
+  flex-shrink: 0;
+}
+
+.languageToggle {
+  gap: $space-xs;
+  color: #666;
+
+  &:hover {
+    color: #262626;
+    background: #f5f5f5;
+  }
+}
+
+.languageToggleText {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.languageMenuItemActive {
+  color: #1677ff;
+  font-weight: 600;
+}
+
+:global(.rs-dropdown-item-active).languageMenuItemActive {
+  background: #e6f4ff;
+  color: #1677ff;
+}
+
 .adminMenuToggle {
   display: none;
 }
@@ -163,7 +192,8 @@
   }
 
   .adminNavDesktop,
-  .adminLogoutText {
+  .adminLogoutText,
+  .languageToggleText {
     display: none;
   }
 
@@ -236,6 +266,24 @@
     background: var(--rs-state-hover-bg);
     color: var(--rs-text-primary);
   }
+}
+
+:global(.rs-theme-dark) .languageToggle {
+  color: var(--rs-text-secondary);
+
+  &:hover {
+    background: var(--rs-state-hover-bg);
+    color: var(--rs-text-primary);
+  }
+}
+
+:global(.rs-theme-dark) .languageMenuItemActive {
+  color: var(--rs-primary-500);
+}
+
+:global(.rs-theme-dark) :global(.rs-dropdown-item-active).languageMenuItemActive {
+  background: rgba(24, 144, 255, 0.18);
+  color: var(--rs-primary-500);
 }
 
 :global(.rs-theme-dark) .navLinkActive {

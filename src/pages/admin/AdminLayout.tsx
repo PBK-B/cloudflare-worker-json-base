@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
-import { Container, Header, Content, Button } from 'rsuite';
-import { Settings, Database, RefreshCw, LogOut, LayoutDashboard, Menu } from 'lucide-react';
+import { Container, Header, Content, Button, Dropdown } from 'rsuite';
+import { Settings, Database, RefreshCw, LogOut, LayoutDashboard, Menu, Languages } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
@@ -21,7 +21,7 @@ const DATA_REFRESH_EVENT = 'jsonbase-data-refresh';
 
 const AdminLayout: React.FC = () => {
 	const { logout } = useAuth();
-	const { t } = useTranslation();
+	const { t, i18n } = useTranslation();
 	const navigate = useNavigate();
 	const location = useLocation();
 	const { createData, uploadFile, replaceFile, updateData } = useApi();
@@ -34,6 +34,13 @@ const AdminLayout: React.FC = () => {
 	const [submitLoading, setSubmitLoading] = useState(false);
 	const [mobileNavOpen, setMobileNavOpen] = useState(false);
 	const submitAbortRef = useRef<AbortController | null>(null);
+	const currentLanguage = i18n.resolvedLanguage?.startsWith('en') ? 'en' : 'zh';
+
+	const handleLanguageChange = useCallback((language: 'zh' | 'en') => {
+		if (language !== currentLanguage) {
+			void i18n.changeLanguage(language);
+		}
+	}, [currentLanguage, i18n]);
 
 	const handleLogout = () => {
 		setMobileNavOpen(false);
@@ -211,6 +218,40 @@ const AdminLayout: React.FC = () => {
 						>
 							<RefreshCw size={16} />
 						</Button>
+						<Dropdown
+							placement="bottomEnd"
+							trigger="click"
+							className={styles.languageMenu}
+							renderToggle={(props, ref) => (
+								<Button
+									{...props}
+									ref={ref}
+									appearance="subtle"
+									className={styles.languageToggle}
+									aria-label={t('layout.languageMenu', { defaultValue: '切换语言' })}
+								>
+									<Languages size={16} />
+									<span className={styles.languageToggleText}>
+										{t(`layout.languages.${currentLanguage}`, { defaultValue: currentLanguage === 'en' ? 'English' : '中文' })}
+									</span>
+								</Button>
+							)}
+						>
+							<Dropdown.Item
+								active={currentLanguage === 'zh'}
+								className={currentLanguage === 'zh' ? styles.languageMenuItemActive : ''}
+								onClick={() => handleLanguageChange('zh')}
+							>
+								{t('layout.languages.zh', { defaultValue: '中文' })}
+							</Dropdown.Item>
+							<Dropdown.Item
+								active={currentLanguage === 'en'}
+								className={currentLanguage === 'en' ? styles.languageMenuItemActive : ''}
+								onClick={() => handleLanguageChange('en')}
+							>
+								{t('layout.languages.en', { defaultValue: 'English' })}
+							</Dropdown.Item>
+						</Dropdown>
 						<Button
 							appearance="subtle"
 							onClick={handleLogout}

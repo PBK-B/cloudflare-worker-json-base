@@ -3,7 +3,24 @@ import { initReactI18next } from 'react-i18next';
 import zhTranslation from './locales/zh/translation.json';
 import enTranslation from './locales/en/translation.json';
 
+const LANGUAGE_STORAGE_KEY = 'jsonbase-language';
+
+const getStoredLanguage = (): 'zh' | 'en' | null => {
+	if (typeof window === 'undefined') {
+		return null;
+	}
+
+	const storedLanguage = window.localStorage.getItem(LANGUAGE_STORAGE_KEY);
+
+	return storedLanguage === 'en' || storedLanguage === 'zh' ? storedLanguage : null;
+};
+
 const detectLanguage = (): 'zh' | 'en' => {
+	const storedLanguage = getStoredLanguage();
+	if (storedLanguage) {
+		return storedLanguage;
+	}
+
 	if (typeof navigator === 'undefined') {
 		return 'zh';
 	}
@@ -29,6 +46,16 @@ void i18n.use(initReactI18next).init({
 	interpolation: {
 		escapeValue: false,
 	},
+});
+
+i18n.on('languageChanged', (language) => {
+	if (typeof window === 'undefined') {
+		return;
+	}
+
+	if (language === 'en' || language === 'zh') {
+		window.localStorage.setItem(LANGUAGE_STORAGE_KEY, language);
+	}
 });
 
 export default i18n;

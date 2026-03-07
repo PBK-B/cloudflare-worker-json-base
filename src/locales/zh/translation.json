@@ -198,6 +198,11 @@
     "createFailed": "创建失败",
     "createSuccess": "创建成功",
     "editData": "编辑数据",
+    "languageMenu": "切换语言",
+    "languages": {
+      "en": "English",
+      "zh": "中文"
+    },
     "logout": "退出",
     "navConsole": "控制台",
     "navData": "数据管理",
