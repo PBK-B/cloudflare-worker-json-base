@@ -15,6 +15,31 @@ const log = {
 };
 
 type StorageBackend = 'd1' | 'kv' | 'hybrid';
+type MissingResourcePolicy = 'ask' | 'auto' | 'manual' | 'fail';
+
+interface DeployCommandOptions {
+	env?: string;
+	storage?: string;
+	apiKey?: string;
+	missingResource?: string;
+	skipMigrate?: boolean;
+	skipBuild?: boolean;
+	skipHealthcheck?: boolean;
+	yes?: boolean;
+	nonInteractive?: boolean;
+}
+
+interface ResolvedDeployOptions {
+	environment: string;
+	storageBackend: StorageBackend;
+	apiKey: string;
+	missingResourcePolicy: MissingResourcePolicy;
+	skipMigrate: boolean;
+	skipBuild: boolean;
+	skipHealthcheck: boolean;
+	yes: boolean;
+	nonInteractive: boolean;
+}
 
 interface WranglerConfig {
 	name: string;
@@ -118,12 +143,42 @@ function getProjectRoot(): string {
 	return process.cwd();
 }
 
-function getDistFolder(): string {
-	return path.join(getProjectRoot(), 'dist');
-}
-
 function getStatePath(): string {
 	return path.join(getProjectRoot(), '.wrangler', 'deploy', 'state.json');
+}
+
+function getWranglerCommand(): string {
+	return 'npx wrangler';
+}
+
+function getCommandOutput(command: string, timeout = 30000): string {
+	return execSync(command, {
+		cwd: getProjectRoot(),
+		encoding: 'utf8',
+		timeout,
+	});
+}
+
+function normalizeEnvironmentName(value?: string): string | undefined {
+	return value?.trim() || undefined;
+}
+
+function normalizeStorageBackend(value?: string): StorageBackend | undefined {
+	if (!value) return undefined;
+	if (value === 'd1' || value === 'kv' || value === 'hybrid') return value;
+	return undefined;
+}
+
+function normalizeMissingResourcePolicy(value?: string): MissingResourcePolicy | undefined {
+	if (!value) return undefined;
+	if (value === 'ask' || value === 'auto' || value === 'manual' || value === 'fail') return value;
+	return undefined;
+}
+
+function ensureInteractiveAllowed(nonInteractive: boolean, message: string): void {
+	if (nonInteractive) {
+		throw new Error(message);
+	}
 }
 
 function parseWranglerToml(): WranglerConfig {
@@ -292,6 +347,13 @@ function saveState(state: DeployState): void {
 	log.success(`状态已保存: ${statePath}`);
 }
 
+function getLastEnvironment(state: DeployState | null): string | undefined {
+	if (!state) return undefined;
+	const envEntries = Object.entries(state.environments);
+	if (envEntries.length === 0) return undefined;
+	return envEntries.sort((a, b) => new Date(b[1].deployed_at).getTime() - new Date(a[1].deployed_at).getTime())[0]?.[0];
+}
+
 function checkCommand(command: string): boolean {
 	try {
 		execSync(`which ${command}`, { stdio: 'ignore' });
@@ -303,7 +365,7 @@ function checkCommand(command: string): boolean {
 
 function checkWranglerLogin(): boolean {
 	try {
-		const result = execSync('wrangler whoami', { encoding: 'utf8', timeout: 10000 });
+		const result = getCommandOutput(`${getWranglerCommand()} whoami`, 10000);
 		if (result.includes('Getting User') || result.includes('email')) {
 			return true;
 		}
@@ -328,7 +390,7 @@ function executeCommand(command: string, description: string): Promise<boolean> 
 	return new Promise((resolve) => {
 		log.info(description);
 		log.info(`执行: ${command}`);
-		const child = spawn(command, { shell: true, stdio: 'inherit' });
+		const child = spawn(command, { shell: true, stdio: 'inherit', cwd: getProjectRoot() });
 		child.on('close', (code) => {
 			if (code === 0) {
 				log.success(`${description} 完成`);
@@ -345,397 +407,80 @@ function executeCommand(command: string, description: string): Promise<boolean> 
 	});
 }
 
-async function ensureD1Database(binding: D1Binding, env: string): Promise<ResourceInfo> {
-	async function selectD1Database(): Promise<ResourceInfo | null> {
-		log.info('获取 D1 数据库列表...');
-		try {
-			const result = execSync('wrangler d1 list --json', { encoding: 'utf8', timeout: 30000 });
-			const dbs: Array<{ uuid: string; name: string }> = JSON.parse(result);
-
-			if (dbs.length === 0) {
-				log.warning('未找到任何 D1 数据库');
-				return null;
-			}
-
-			const choices = dbs.map((db) => ({
-				name: `${db.name} (${db.uuid})`,
-				value: db.uuid,
-			}));
-
-			const answers = await inquirer.prompt([
-				{
-					type: 'list',
-					name: 'databaseId',
-					message: '选择要绑定的 D1 数据库:',
-					choices,
-				},
-			]);
-
-			const selected = dbs.find((db) => db.uuid === answers.databaseId);
-			if (selected) {
-				return { type: 'd1', binding: binding.binding, id: selected.uuid, status: 'existing' };
-			}
-		} catch (error) {
-			log.warning(`获取 D1 列表失败: ${error}`);
-		}
-		return null;
-	}
-
-	log.info(`检查 D1: ${binding.binding} (${binding.database_name})`);
-
-	try {
-		const result = execSync('wrangler d1 list --json', { encoding: 'utf8', timeout: 30000 });
-		const dbs: Array<{ uuid: string; name: string }> = JSON.parse(result);
-		const db = dbs.find((d) => d.name === binding.database_name);
-		if (db) {
-			log.success(`D1 ${binding.binding}: 已存在 ✓ (${db.uuid})`);
-			return { type: 'd1', binding: binding.binding, id: db.uuid, status: 'existing' };
-		}
-	} catch {
-		log.info('未找到现有数据库');
-	}
-
-	log.info(`创建 D1: ${binding.database_name}`);
-
-	let retries = 3;
-	while (retries > 0) {
-		try {
-			const createOutput = execSync(`npx wrangler d1 create ${binding.database_name}`, { encoding: 'utf8', timeout: 60000 });
-			log.success('D1 创建成功 ✓');
-
-			const idMatch = createOutput.match(/([a-f0-9-]{36})/);
-			if (idMatch) {
-				log.success(`获取 D1 ID: ${idMatch[1]}`);
-				return { type: 'd1', binding: binding.binding, id: idMatch[1], status: 'created' };
-			}
-
-			log.warning('无法从创建输出中提取 ID');
-			break;
-		} catch (error: any) {
-			if (error.message.includes('already exists')) {
-				log.info(`D1 ${binding.database_name} 已存在`);
-				break;
-			}
-			retries--;
-			if (retries > 0) {
-				log.warning(`创建失败，${retries} 次重试...`);
-				await new Promise((resolve) => setTimeout(resolve, 3000));
-			} else {
-				log.warning(`创建失败: ${error.message}`);
-			}
-		}
-	}
-
-	log.info('尝试从现有数据库中选择...');
-	const selected = await selectD1Database();
-	if (selected) {
-		return selected;
-	}
-
-	return { type: 'd1', binding: binding.binding, id: '', status: 'pending' };
+function escapeShellArg(value: string): string {
+	return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
-async function selectKVNamespace(binding: string): Promise<ResourceInfo | null> {
-	log.info('获取 KV 命名空间列表...');
-	try {
-		const result = execSync('wrangler kv:namespace list --json', { encoding: 'utf8', timeout: 30000 });
-		const namespaces: Array<{ id: string; title: string }> = JSON.parse(result);
-
-		if (namespaces.length === 0) {
-			log.warning('未找到任何 KV 命名空间');
-			return null;
-		}
-
-		const choices = namespaces.map((ns) => ({
-			name: `${ns.title} (${ns.id})`,
-			value: ns.id,
-		}));
-
-		const answers = await inquirer.prompt([
-			{
-				type: 'list',
-				name: 'namespaceId',
-				message: '选择要绑定的 KV 命名空间:',
-				choices,
-			},
-		]);
-
-		const selected = namespaces.find((ns) => ns.id === answers.namespaceId);
-		if (selected) {
-			return { type: 'kv', binding: binding, id: selected.id, status: 'existing' };
-		}
-	} catch (error) {
-		log.warning(`获取 KV 列表失败: ${error}`);
-	}
-	return null;
+function getEnvironmentChoices(config: WranglerConfig): string[] {
+	const envs = Object.keys(config.environments);
+	return envs.length > 0 ? envs : ['production'];
 }
 
-async function ensureKVNamespace(binding: KVBinding, env: string): Promise<ResourceInfo> {
-	log.info(`检查 KV: ${binding.binding}`);
-	try {
-		const result = execSync('wrangler kv:namespace list --json', { encoding: 'utf8', timeout: 30000 });
-		const namespaces: Array<{ id: string; title: string }> = JSON.parse(result);
-		const ns = namespaces.find((n) => n.title === binding.binding);
-		if (ns) {
-			log.success(`KV ${binding.binding}: ${ns.id}`);
-			return { type: 'kv', binding: binding.binding, id: ns.id, status: 'existing' };
-		}
-	} catch {
-		log.info('未找到现有 KV');
-	}
-	log.info(`创建 KV: ${binding.binding}`);
-
-	let retries = 3;
-	while (retries > 0) {
-		try {
-			const createOutput = execSync(`npx wrangler kv:namespace create "${binding.binding}"`, { encoding: 'utf8', timeout: 60000 });
-			log.success('KV 创建成功');
-
-			const idMatch = createOutput.match(/([a-f0-9-]{36})/);
-			if (idMatch) {
-				return { type: 'kv', binding: binding.binding, id: idMatch[1], status: 'created' };
-			}
-			log.warning('无法从创建输出中提取 ID');
-			break;
-		} catch (error) {
-			retries--;
-			if (retries > 0) {
-				log.warning(`创建失败，${retries} 次重试...`);
-				await new Promise((resolve) => setTimeout(resolve, 3000));
-			} else {
-				log.warning(`创建失败: ${error}`);
-			}
-		}
-	}
-
-	log.info('尝试从现有命名空间中选择...');
-	const selected = await selectKVNamespace(binding.binding);
-	if (selected) {
-		return selected;
-	}
-
-	return { type: 'kv', binding: binding.binding, id: '', status: 'pending' };
+function getWorkerName(config: WranglerConfig, environment: string): string {
+	return config.environments[environment]?.name || config.name;
 }
 
-async function ensureR2Bucket(binding: R2Binding, env: string): Promise<ResourceInfo> {
-	log.info(`检查 R2: ${binding.binding} (${binding.bucket_name})`);
-
-	try {
-		const result = execSync('wrangler r2 bucket list', { encoding: 'utf8', timeout: 30000 });
-		if (result.includes(binding.bucket_name)) {
-			log.success(`R2 ${binding.binding}: 已存在 ✓`);
-			return { type: 'r2', binding: binding.binding, id: binding.bucket_name, status: 'existing' };
-		}
-	} catch {
-		log.info('未找到现有 R2');
-	}
-
-	log.info(`创建 R2: ${binding.bucket_name}`);
-	try {
-		execSync(`npx wrangler r2 bucket create ${binding.bucket_name}`, { stdio: 'inherit', timeout: 60000 });
-		log.success('R2 创建成功 ✓');
-		return { type: 'r2', binding: binding.binding, id: binding.bucket_name, status: 'created' };
-	} catch (error: any) {
-		if (error.message.includes('already exists') || error.message.includes('Bucket already exists')) {
-			log.warning(`R2 ${binding.bucket_name} 已存在，使用现有存储桶`);
-			return { type: 'r2', binding: binding.binding, id: binding.bucket_name, status: 'existing' };
-		}
-		log.warning(`创建失败: ${error.message}`);
-	}
-
-	return { type: 'r2', binding: binding.binding, id: '', status: 'pending' };
+function getDefaultEnvironment(config: WranglerConfig, state: DeployState | null): string {
+	const environments = getEnvironmentChoices(config);
+	const lastEnvironment = getLastEnvironment(state);
+	if (lastEnvironment && environments.includes(lastEnvironment)) return lastEnvironment;
+	if (environments.includes('development')) return 'development';
+	return environments[0];
 }
 
-async function runMigrations(migrationsDir: string): Promise<void> {
-	const schemaPath = path.join(getProjectRoot(), 'src', 'database', 'schema.sql');
-	if (!fs.existsSync(schemaPath)) {
-		log.warning(`迁移文件不存在: ${schemaPath}`);
-		return;
-	}
-	log.info(`执行迁移: ${schemaPath}`);
-	try {
-		execSync(`npx wrangler d1 execute jsonbase --remote --file=${schemaPath}`, {
-			stdio: 'inherit',
-			timeout: 120000,
-		});
-		log.success('迁移完成');
-	} catch (error) {
-		log.warning(`迁移失败: ${error}`);
-	}
+function parseBooleanFlag(value: unknown): boolean {
+	return value === true;
 }
 
-async function setSecrets(apiKey: string, workerName?: string): Promise<void> {
-	log.info(`配置 Secrets (${workerName})`);
-
-	try {
-		const nameArg = workerName ? `--name ${workerName}` : '';
-		const output = execSync(`npx wrangler secret put API_KEY ${nameArg}`, {
-			stdio: 'pipe',
-			timeout: 60000,
-			input: apiKey,
-			encoding: 'utf8',
-		});
-
-		if (output && (output.includes('success') || output.includes('Success') || output.includes('Done') || output.includes('done'))) {
-			log.success('Secrets 配置完成');
-		} else {
-			log.warning('Secrets 设置输出未确认成功');
-		}
-	} catch (error) {
-		log.error(`Secrets 失败: ${error}`);
-		throw error;
-	}
-}
-
-function generateWranglerJsonc(
-	config: WranglerConfig,
-	environment: string,
-	storageBackend: StorageBackend,
-	resources: ResourceInfo[],
-): string {
-	const envConfig = config.environments[environment];
-	const workerName = envConfig?.name || `${config.name}`;
-
-	const wranglerConfig: any = {
-		$schema: '../node_modules/wrangler/config-schema.json',
-		name: workerName,
-		main: 'index.js',
-		compatibility_date: config.compatibility_date,
-		compatibility_flags: config.compatibility_flags,
-		build: config.build,
-		vars: {
-			...config.vars,
-			ENVIRONMENT: environment,
-			STORAGE_BACKEND: storageBackend,
+async function promptMissingResourceAction(resourceLabel: string): Promise<'auto' | 'manual' | 'fail'> {
+	const answers = await inquirer.prompt([
+		{
+			type: 'list',
+			name: 'action',
+			message: `${resourceLabel} 不存在，如何处理？`,
+			choices: [
+				{ name: '自动创建', value: 'auto' },
+				{ name: '手动选择已有资源', value: 'manual' },
+				{ name: '取消部署', value: 'fail' },
+			],
+			default: 'auto',
 		},
-	};
-
-	wranglerConfig.env = {};
-	wranglerConfig.env[environment] = {
-		name: workerName,
-		vars: {
-			...config.vars,
-			ENVIRONMENT: environment,
-			STORAGE_BACKEND: storageBackend,
-		},
-	};
-
-	if (storageBackend === 'd1' || storageBackend === 'hybrid') {
-		wranglerConfig.env[environment].d1_databases = config.d1_databases.map((db) => {
-			const resource = resources.find((r) => r.type === 'd1' && r.binding === db.binding);
-			return {
-				binding: db.binding,
-				database_name: db.database_name,
-				database_id: resource?.id || '',
-			};
-		});
-	}
-
-	if (storageBackend === 'kv' || storageBackend === 'hybrid') {
-		wranglerConfig.env[environment].kv_namespaces = config.kv_namespaces.map((kv) => {
-			const resource = resources.find((r) => r.type === 'kv' && r.binding === kv.binding);
-			return {
-				binding: kv.binding,
-				id: resource?.id || '',
-			};
-		});
-	}
-
-	if (envConfig?.assets) {
-		wranglerConfig.env[environment].assets = {
-			directory: '../' + envConfig.assets.directory,
-			binding: envConfig.assets.binding,
-			run_worker_first: envConfig.assets.run_worker_first,
-		};
-	}
-
-	return JSON.stringify(wranglerConfig, null, 2);
+	]);
+	return answers.action;
 }
 
-async function checkPrerequisites(): Promise<boolean> {
-	log.info('检查系统环境...');
-	const requirements = ['node', 'npm', 'npx'];
-	const missing = requirements.filter((cmd) => !checkCommand(cmd));
-	if (missing.length > 0) {
-		log.error(`缺少工具: ${missing.join(', ')}`);
-		return false;
-	}
-	if (!checkCommand('wrangler')) {
-		log.info('安装 wrangler...');
-		const success = await executeCommand('npm install -g wrangler', '安装 wrangler');
-		if (!success) return false;
-	}
-	log.success('环境检查完成');
-	return true;
+function resolveEffectiveMissingPolicy(basePolicy: MissingResourcePolicy, yes: boolean): MissingResourcePolicy {
+	if (basePolicy === 'ask' && yes) return 'auto';
+	return basePolicy;
 }
 
-async function getApiKey(): Promise<string> {
-	const envApiKey = process.env.API_KEY?.trim();
-	if (envApiKey && envApiKey.length >= 16) {
-		log.info('使用环境变量中的 API_KEY');
-		return envApiKey;
-	}
-
-	while (true) {
-		const inputAnswers = await inquirer.prompt([
-			{
-				type: 'password',
-				name: 'apiKey',
-				message: '输入 API Key (直接回车选择生成方式):',
-			},
-		]);
-
-		const inputKey = inputAnswers.apiKey?.trim();
-		if (inputKey && inputKey.length >= 16) {
-			return inputKey;
+async function resolveEnvironment(config: WranglerConfig, state: DeployState | null, options: DeployCommandOptions): Promise<string> {
+	const environments = getEnvironmentChoices(config);
+	const explicit = normalizeEnvironmentName(options.env || process.env.DEPLOY_ENV);
+	if (explicit) {
+		if (!environments.includes(explicit)) {
+			throw new Error(`未知环境: ${explicit}，可选值: ${environments.join(', ')}`);
 		}
-
-		if (!inputKey) {
-			const choiceAnswers = await inquirer.prompt([
-				{
-					type: 'list',
-					name: 'choice',
-					message: 'API Key 为空，请选择操作:',
-					choices: [
-						{ name: '生成随机密钥', value: 'generate' },
-						{ name: '重新输入', value: 'retry' },
-					],
-				},
-			]);
-
-			if (choiceAnswers.choice === 'generate') {
-				const newKey = generateSecureApiKey();
-				log.info(`密钥: ${newKey}`);
-				log.warning('设置环境变量: export API_KEY=' + newKey);
-				return newKey;
-			}
-		} else {
-			log.warning('API Key 至少需要 16 字符');
-		}
+		return explicit;
 	}
+	ensureInteractiveAllowed(parseBooleanFlag(options.nonInteractive), '缺少 --env，且当前为非交互模式');
+	const defaultEnvironment = getDefaultEnvironment(config, state);
+	const answers = await inquirer.prompt([
+		{ type: 'list', name: 'environment', message: '选择环境:', choices: environments, default: defaultEnvironment },
+	]);
+	return answers.environment;
 }
 
-async function checkCloudflareAuth(): Promise<boolean> {
-	log.info('检查 Cloudflare 认证...');
-	const hasApiToken = !!process.env.CLOUDFLARE_API_TOKEN;
-	const isLoggedIn = checkWranglerLogin();
-	if (hasApiToken || isLoggedIn) {
-		log.success('认证已配置');
-		return true;
-	}
-	log.warning('未检测到认证');
-	log.info('方式: wrangler login 或 CLOUDFLARE_API_TOKEN');
-	const answer = await inquirer.prompt([{ type: 'confirm', name: 'loginNow', message: '立即登录?', default: true }]);
-	if (answer.loginNow) return await executeCommand('wrangler login', '登录');
-	return false;
-}
-
-async function selectStorageBackend(): Promise<StorageBackend> {
-	const envBackend = process.env.STORAGE_BACKEND as StorageBackend;
-	if (envBackend && ['d1', 'kv', 'hybrid'].includes(envBackend)) {
-		log.info(`使用 STORAGE_BACKEND=${envBackend}`);
-		return envBackend;
-	}
+async function resolveStorageBackend(
+	options: DeployCommandOptions,
+	state: DeployState | null,
+	environment?: string,
+): Promise<StorageBackend> {
+	const explicit = normalizeStorageBackend(options.storage || process.env.STORAGE_BACKEND);
+	if (explicit) return explicit;
+	const cached = environment ? state?.environments[environment]?.storage_backend : undefined;
+	if (cached) return cached;
+	ensureInteractiveAllowed(parseBooleanFlag(options.nonInteractive), '缺少 --storage，且当前为非交互模式');
 	const answers = await inquirer.prompt([
 		{
 			type: 'list',
@@ -746,85 +491,441 @@ async function selectStorageBackend(): Promise<StorageBackend> {
 				{ name: 'KV 命名空间', value: 'kv' },
 				{ name: 'Hybrid (D1 + KV)', value: 'hybrid' },
 			],
-			default: 'd1',
+			default: cached || 'd1',
 		},
 	]);
 	return answers.backend;
 }
 
-async function deploy() {
+async function resolveApiKey(options: DeployCommandOptions): Promise<string> {
+	const explicit = options.apiKey?.trim() || process.env.API_KEY?.trim();
+	if (explicit) {
+		if (explicit.length < 16) throw new Error('API Key 至少需要 16 字符');
+		return explicit;
+	}
+	ensureInteractiveAllowed(parseBooleanFlag(options.nonInteractive), '缺少 --api-key/API_KEY，且当前为非交互模式');
+	while (true) {
+		const inputAnswers = await inquirer.prompt([{ type: 'password', name: 'apiKey', message: '输入 API Key (直接回车可选择自动生成):' }]);
+		const inputKey = inputAnswers.apiKey?.trim();
+		if (inputKey && inputKey.length >= 16) return inputKey;
+		if (!inputKey) {
+			const choiceAnswers = await inquirer.prompt([
+				{
+					type: 'list',
+					name: 'choice',
+					message: 'API Key 为空，请选择操作:',
+					choices: [
+						{ name: '生成随机密钥', value: 'generate' },
+						{ name: '重新输入', value: 'retry' },
+					],
+					default: 'generate',
+				},
+			]);
+			if (choiceAnswers.choice === 'generate') {
+				const newKey = generateSecureApiKey();
+				log.success('已生成 API Key，请妥善保存并按需写入环境变量');
+				console.log(newKey);
+				return newKey;
+			}
+		} else {
+			log.warning('API Key 至少需要 16 字符');
+		}
+	}
+}
+
+function resolveMissingResourcePolicy(options: DeployCommandOptions): MissingResourcePolicy {
+	const policy = normalizeMissingResourcePolicy(options.missingResource || process.env.DEPLOY_MISSING_RESOURCE_POLICY);
+	if (policy) return policy;
+	if (parseBooleanFlag(options.yes)) return 'auto';
+	return 'ask';
+}
+
+async function checkPrerequisites(): Promise<boolean> {
+	log.info('检查系统环境...');
+	const requirements = ['node', 'npm', 'npx'];
+	const missing = requirements.filter((cmd) => !checkCommand(cmd));
+	if (missing.length > 0) {
+		log.error(`缺少工具: ${missing.join(', ')}`);
+		return false;
+	}
+	try {
+		getCommandOutput(`${getWranglerCommand()} --version`, 10000);
+	} catch {
+		log.error('无法执行本地 Wrangler，请先运行 npm install');
+		return false;
+	}
+	log.success('环境检查完成');
+	return true;
+}
+
+async function checkCloudflareAuth(nonInteractive = false): Promise<boolean> {
+	log.info('检查 Cloudflare 认证...');
+	const hasApiToken = !!process.env.CLOUDFLARE_API_TOKEN;
+	const isLoggedIn = checkWranglerLogin();
+	if (hasApiToken || isLoggedIn) {
+		log.success('认证已配置');
+		return true;
+	}
+	log.warning('未检测到认证');
+	log.info('方式: npx wrangler login 或 CLOUDFLARE_API_TOKEN');
+	if (nonInteractive) return false;
+	const answer = await inquirer.prompt([{ type: 'confirm', name: 'loginNow', message: '立即登录?', default: true }]);
+	if (answer.loginNow) return await executeCommand(`${getWranglerCommand()} login`, '登录');
+	return false;
+}
+
+function listD1Databases(): Array<{ uuid: string; name: string }> {
+	return JSON.parse(getCommandOutput(`${getWranglerCommand()} d1 list --json`, 30000));
+}
+
+function listKVNamespaces(): Array<{ id: string; title: string }> {
+	return JSON.parse(getCommandOutput(`${getWranglerCommand()} kv namespace list --json`, 30000));
+}
+
+function listR2Buckets(): Array<{ name: string }> {
+	const output = getCommandOutput(`${getWranglerCommand()} r2 bucket list --json`, 30000);
+	return JSON.parse(output);
+}
+
+async function selectD1Database(binding: D1Binding, nonInteractive: boolean): Promise<ResourceInfo | null> {
+	log.info('获取 D1 数据库列表...');
+	try {
+		const dbs = listD1Databases();
+		if (dbs.length === 0) {
+			log.warning('未找到任何 D1 数据库');
+			return null;
+		}
+		ensureInteractiveAllowed(nonInteractive, `D1 ${binding.binding} 缺失，且当前为非交互模式`);
+		const answers = await inquirer.prompt([
+			{
+				type: 'list',
+				name: 'databaseId',
+				message: `选择要绑定到 ${binding.binding} 的 D1 数据库:`,
+				choices: dbs.map((db) => ({ name: `${db.name} (${db.uuid})`, value: db.uuid })),
+			},
+		]);
+		const selected = dbs.find((db) => db.uuid === answers.databaseId);
+		return selected ? { type: 'd1', binding: binding.binding, id: selected.uuid, status: 'existing' } : null;
+	} catch (error) {
+		log.warning(`获取 D1 列表失败: ${error}`);
+		return null;
+	}
+}
+
+async function selectKVNamespace(binding: string, nonInteractive: boolean): Promise<ResourceInfo | null> {
+	log.info('获取 KV 命名空间列表...');
+	try {
+		const namespaces = listKVNamespaces();
+		if (namespaces.length === 0) {
+			log.warning('未找到任何 KV 命名空间');
+			return null;
+		}
+		ensureInteractiveAllowed(nonInteractive, `KV ${binding} 缺失，且当前为非交互模式`);
+		const answers = await inquirer.prompt([
+			{
+				type: 'list',
+				name: 'namespaceId',
+				message: `选择要绑定到 ${binding} 的 KV 命名空间:`,
+				choices: namespaces.map((ns) => ({ name: `${ns.title} (${ns.id})`, value: ns.id })),
+			},
+		]);
+		const selected = namespaces.find((ns) => ns.id === answers.namespaceId);
+		return selected ? { type: 'kv', binding, id: selected.id, status: 'existing' } : null;
+	} catch (error) {
+		log.warning(`获取 KV 列表失败: ${error}`);
+		return null;
+	}
+}
+
+async function selectR2Bucket(binding: R2Binding, nonInteractive: boolean): Promise<ResourceInfo | null> {
+	log.info('获取 R2 存储桶列表...');
+	try {
+		const buckets = listR2Buckets();
+		if (buckets.length === 0) {
+			log.warning('未找到任何 R2 存储桶');
+			return null;
+		}
+		ensureInteractiveAllowed(nonInteractive, `R2 ${binding.binding} 缺失，且当前为非交互模式`);
+		const answers = await inquirer.prompt([
+			{
+				type: 'list',
+				name: 'bucketName',
+				message: `选择要绑定到 ${binding.binding} 的 R2 存储桶:`,
+				choices: buckets.map((bucket) => ({ name: bucket.name, value: bucket.name })),
+			},
+		]);
+		return { type: 'r2', binding: binding.binding, id: answers.bucketName, status: 'existing' };
+	} catch (error) {
+		log.warning(`获取 R2 列表失败: ${error}`);
+		return null;
+	}
+}
+
+async function ensureD1Database(binding: D1Binding, options: ResolvedDeployOptions): Promise<ResourceInfo> {
+	log.info(`检查 D1: ${binding.binding} (${binding.database_name})`);
+	try {
+		const dbs = listD1Databases();
+		const existing = dbs.find((db) => db.name === binding.database_name || db.uuid === binding.database_id);
+		if (existing) {
+			log.success(`D1 ${binding.binding}: 已存在 ✓ (${existing.uuid})`);
+			return { type: 'd1', binding: binding.binding, id: existing.uuid, status: 'existing' };
+		}
+	} catch {
+		log.info('未找到现有数据库');
+	}
+	const policy = resolveEffectiveMissingPolicy(options.missingResourcePolicy, options.yes);
+	const action = policy === 'ask' ? await promptMissingResourceAction(`D1 ${binding.binding}`) : policy;
+	if (action === 'fail') return { type: 'd1', binding: binding.binding, id: '', status: 'pending' };
+	if (action === 'manual')
+		return (await selectD1Database(binding, options.nonInteractive)) || { type: 'd1', binding: binding.binding, id: '', status: 'pending' };
+	let retries = 3;
+	while (retries > 0) {
+		try {
+			const createOutput = getCommandOutput(`${getWranglerCommand()} d1 create ${escapeShellArg(binding.database_name)}`, 60000);
+			const idMatch = createOutput.match(/([a-f0-9-]{36})/i);
+			if (idMatch) {
+				log.success(`D1 创建成功 ✓ (${idMatch[1]})`);
+				return { type: 'd1', binding: binding.binding, id: idMatch[1], status: 'created' };
+			}
+			log.warning('创建成功但未能解析 D1 ID，尝试重新查询');
+			const refreshed = listD1Databases().find((db) => db.name === binding.database_name);
+			if (refreshed) return { type: 'd1', binding: binding.binding, id: refreshed.uuid, status: 'created' };
+			break;
+		} catch (error: any) {
+			retries--;
+			if (error.message?.includes('already exists')) {
+				const refreshed = listD1Databases().find((db) => db.name === binding.database_name);
+				if (refreshed) return { type: 'd1', binding: binding.binding, id: refreshed.uuid, status: 'existing' };
+			}
+			if (retries > 0) {
+				log.warning(`创建失败，${retries} 次重试...`);
+				await new Promise((resolve) => setTimeout(resolve, 3000));
+			} else {
+				log.warning(`创建失败: ${error.message || error}`);
+			}
+		}
+	}
+	return (await selectD1Database(binding, options.nonInteractive)) || { type: 'd1', binding: binding.binding, id: '', status: 'pending' };
+}
+
+async function ensureKVNamespace(binding: KVBinding, options: ResolvedDeployOptions): Promise<ResourceInfo> {
+	log.info(`检查 KV: ${binding.binding}`);
+	try {
+		const namespaces = listKVNamespaces();
+		const existing = namespaces.find((ns) => ns.title === binding.binding || ns.id === binding.id);
+		if (existing) {
+			log.success(`KV ${binding.binding}: ${existing.id}`);
+			return { type: 'kv', binding: binding.binding, id: existing.id, status: 'existing' };
+		}
+	} catch {
+		log.info('未找到现有 KV');
+	}
+	const policy = resolveEffectiveMissingPolicy(options.missingResourcePolicy, options.yes);
+	const action = policy === 'ask' ? await promptMissingResourceAction(`KV ${binding.binding}`) : policy;
+	if (action === 'fail') return { type: 'kv', binding: binding.binding, id: '', status: 'pending' };
+	if (action === 'manual')
+		return (
+			(await selectKVNamespace(binding.binding, options.nonInteractive)) || {
+				type: 'kv',
+				binding: binding.binding,
+				id: '',
+				status: 'pending',
+			}
+		);
+	let retries = 3;
+	while (retries > 0) {
+		try {
+			const createOutput = getCommandOutput(`${getWranglerCommand()} kv namespace create ${escapeShellArg(binding.binding)}`, 60000);
+			const idMatch = createOutput.match(/([a-f0-9-]{32,36})/i);
+			if (idMatch) {
+				log.success(`KV 创建成功 ✓ (${idMatch[1]})`);
+				return { type: 'kv', binding: binding.binding, id: idMatch[1], status: 'created' };
+			}
+			const refreshed = listKVNamespaces().find((ns) => ns.title === binding.binding);
+			if (refreshed) return { type: 'kv', binding: binding.binding, id: refreshed.id, status: 'created' };
+			break;
+		} catch (error: any) {
+			retries--;
+			if (retries > 0) {
+				log.warning(`创建失败，${retries} 次重试...`);
+				await new Promise((resolve) => setTimeout(resolve, 3000));
+			} else {
+				log.warning(`创建失败: ${error.message || error}`);
+			}
+		}
+	}
+	return (
+		(await selectKVNamespace(binding.binding, options.nonInteractive)) || {
+			type: 'kv',
+			binding: binding.binding,
+			id: '',
+			status: 'pending',
+		}
+	);
+}
+
+async function ensureR2Bucket(binding: R2Binding, options: ResolvedDeployOptions): Promise<ResourceInfo> {
+	log.info(`检查 R2: ${binding.binding} (${binding.bucket_name})`);
+	try {
+		const buckets = listR2Buckets();
+		const existing = buckets.find((bucket) => bucket.name === binding.bucket_name);
+		if (existing) {
+			log.success(`R2 ${binding.binding}: 已存在 ✓`);
+			return { type: 'r2', binding: binding.binding, id: existing.name, status: 'existing' };
+		}
+	} catch {
+		log.info('未找到现有 R2');
+	}
+	const policy = resolveEffectiveMissingPolicy(options.missingResourcePolicy, options.yes);
+	const action = policy === 'ask' ? await promptMissingResourceAction(`R2 ${binding.binding}`) : policy;
+	if (action === 'fail') return { type: 'r2', binding: binding.binding, id: '', status: 'pending' };
+	if (action === 'manual')
+		return (await selectR2Bucket(binding, options.nonInteractive)) || { type: 'r2', binding: binding.binding, id: '', status: 'pending' };
+	try {
+		getCommandOutput(`${getWranglerCommand()} r2 bucket create ${escapeShellArg(binding.bucket_name)}`, 60000);
+		log.success('R2 创建成功 ✓');
+		return { type: 'r2', binding: binding.binding, id: binding.bucket_name, status: 'created' };
+	} catch (error: any) {
+		log.warning(`创建失败: ${error.message || error}`);
+	}
+	return (await selectR2Bucket(binding, options.nonInteractive)) || { type: 'r2', binding: binding.binding, id: '', status: 'pending' };
+}
+
+async function runMigrations(config: WranglerConfig, environment: string): Promise<void> {
+	const schemaPath = path.join(getProjectRoot(), 'src', 'database', 'schema.sql');
+	if (!fs.existsSync(schemaPath)) {
+		log.warning(`迁移文件不存在: ${schemaPath}`);
+		return;
+	}
+	const database = config.d1_databases[0];
+	if (!database) {
+		log.warning('当前配置没有 D1 绑定，跳过迁移');
+		return;
+	}
+	log.info(`执行迁移: ${schemaPath}`);
+	const envArg = environment ? ` --env ${escapeShellArg(environment)}` : '';
+	try {
+		getCommandOutput(
+			`${getWranglerCommand()} d1 execute ${escapeShellArg(database.database_name)} --remote --file=${escapeShellArg(schemaPath)}${envArg}`,
+			120000,
+		);
+		log.success('迁移完成');
+	} catch (error) {
+		log.warning(`迁移失败: ${error}`);
+		throw error;
+	}
+}
+
+async function setSecrets(apiKey: string, environment: string): Promise<void> {
+	log.info(`配置 Secrets (${environment})`);
+	try {
+		execSync(`${getWranglerCommand()} secret put API_KEY --env ${escapeShellArg(environment)}`, {
+			cwd: getProjectRoot(),
+			stdio: 'pipe',
+			timeout: 60000,
+			input: apiKey,
+			encoding: 'utf8',
+		});
+		log.success('Secrets 配置完成');
+	} catch (error) {
+		log.error(`Secrets 失败: ${error}`);
+		throw error;
+	}
+}
+
+async function resolveDeployOptions(
+	config: WranglerConfig,
+	state: DeployState | null,
+	options: DeployCommandOptions,
+): Promise<ResolvedDeployOptions> {
+	const nonInteractive = parseBooleanFlag(options.nonInteractive);
+	const yes = parseBooleanFlag(options.yes);
+	const environment = await resolveEnvironment(config, state, options);
+	const storageBackend = await resolveStorageBackend(options, state, environment);
+	const apiKey = await resolveApiKey(options);
+	return {
+		environment,
+		storageBackend,
+		apiKey,
+		missingResourcePolicy: resolveMissingResourcePolicy(options),
+		skipMigrate: parseBooleanFlag(options.skipMigrate),
+		skipBuild: parseBooleanFlag(options.skipBuild),
+		skipHealthcheck: parseBooleanFlag(options.skipHealthcheck),
+		yes,
+		nonInteractive,
+	};
+}
+
+async function deploy(options: DeployCommandOptions = {}) {
 	console.log(chalk.blue.bold('🚀 Cloudflare Worker 自动部署'));
 	console.log(chalk.gray('='.repeat(50)));
 
 	const config = parseWranglerToml();
+	const state = loadState();
 	console.log(`项目: ${config.name}`);
 	console.log(`资源: D1(${config.d1_databases.length}) KV(${config.kv_namespaces.length}) R2(${config.r2_buckets.length})`);
-	console.log(`环境: ${Object.keys(config.environments).join(', ')}`);
+	console.log(`环境: ${getEnvironmentChoices(config).join(', ')}`);
 
 	if (!(await checkPrerequisites())) process.exit(1);
-	if (!(await checkCloudflareAuth())) process.exit(1);
+	if (!(await checkCloudflareAuth(parseBooleanFlag(options.nonInteractive)))) process.exit(1);
 
-	const storageBackend = await selectStorageBackend();
-	const apiKey = await getApiKey();
-
-	const envAnswers = await inquirer.prompt([
-		{ type: 'list', name: 'env', message: '选择环境:', choices: Object.keys(config.environments), default: 'development' },
-	]);
-	const environment = envAnswers.env;
-	const envConfig = config.environments[environment];
-	const workerName = envConfig?.name || `${config.name}-${environment}`;
+	const resolvedOptions = await resolveDeployOptions(config, state, options);
+	const { environment, storageBackend, apiKey } = resolvedOptions;
+	const workerName = getWorkerName(config, environment);
 
 	console.log(chalk.blue.bold(`\n🚀 部署: ${workerName}`));
 	console.log(chalk.gray(`后端: ${storageBackend}`));
+	console.log(chalk.gray(`缺失资源策略: ${resolvedOptions.missingResourcePolicy}${resolvedOptions.yes ? ' (yes=auto)' : ''}`));
 	console.log(chalk.gray('='.repeat(50)));
 
 	const resources: ResourceInfo[] = [];
 	let step = 1;
-	const totalSteps = 7;
+	const totalSteps = [
+		true,
+		true,
+		config.r2_buckets.length > 0,
+		!resolvedOptions.skipMigrate && (storageBackend === 'd1' || storageBackend === 'hybrid'),
+		!resolvedOptions.skipBuild,
+		true,
+		!resolvedOptions.skipHealthcheck,
+	].filter(Boolean).length;
 
 	if (storageBackend === 'd1' || storageBackend === 'hybrid') {
 		log.info(`[${step++}/${totalSteps}] 准备 D1 数据库...`);
 		for (const db of config.d1_databases) {
-			resources.push(await ensureD1Database(db, environment));
+			resources.push(await ensureD1Database(db, resolvedOptions));
 		}
 	}
 
 	if (storageBackend === 'kv' || storageBackend === 'hybrid') {
 		log.info(`[${step++}/${totalSteps}] 准备 KV 命名空间...`);
 		for (const kv of config.kv_namespaces) {
-			resources.push(await ensureKVNamespace(kv, environment));
+			resources.push(await ensureKVNamespace(kv, resolvedOptions));
 		}
 	}
 
 	if (config.r2_buckets.length > 0) {
 		log.info(`[${step++}/${totalSteps}] 准备 R2 存储桶...`);
 		for (const r2 of config.r2_buckets) {
-			resources.push(await ensureR2Bucket(r2, environment));
+			resources.push(await ensureR2Bucket(r2, resolvedOptions));
 		}
 	}
 
-	if (storageBackend === 'd1' || storageBackend === 'hybrid') {
+	if (!resolvedOptions.skipMigrate && (storageBackend === 'd1' || storageBackend === 'hybrid')) {
 		log.info(`[${step++}/${totalSteps}] 执行迁移...`);
-		await runMigrations(config.deploy_options.migrations_dir);
+		await runMigrations(config, environment);
 	}
 
-	log.info(`[${step++}/${totalSteps}] 构建项目...`);
-	await executeCommand('npm run build:all', '构建');
-
-	const distFolder = getDistFolder();
-	if (!fs.existsSync(distFolder)) fs.mkdirSync(distFolder, { recursive: true });
-
-	log.info(`[${step++}/${totalSteps}] 生成配置...`);
-	const wranglerJsonc = generateWranglerJsonc(config, environment, storageBackend, resources);
-	fs.writeFileSync(path.join(distFolder, 'wrangler.jsonc'), wranglerJsonc);
-
-	const wranglerConfig = JSON.parse(wranglerJsonc);
-	const deployedWorkerName = wranglerConfig.name;
+	if (!resolvedOptions.skipBuild) {
+		log.info(`[${step++}/${totalSteps}] 构建项目...`);
+		const buildOk = await executeCommand('npm run build', '构建');
+		if (!buildOk) process.exit(1);
+	}
 
 	log.info(`[${step++}/${totalSteps}] 配置 Secrets...`);
-	await setSecrets(apiKey, deployedWorkerName);
+	await setSecrets(apiKey, environment);
 
-	const missingResources = resources.filter((r) => !r.id && (r.type === 'd1' || r.type === 'kv'));
+	const missingResources = resources.filter((r) => !r.id);
 	if (missingResources.length > 0) {
 		log.error(`部署失败: 以下资源缺少 ID: ${missingResources.map((r) => r.type + '.' + r.binding).join(', ')}`);
 		log.info('请手动创建资源后重试，或检查网络连接');
@@ -834,7 +935,7 @@ async function deploy() {
 	log.success('资源配置验证通过');
 
 	log.info(`[${step++}/${totalSteps}] 部署到 Cloudflare...`);
-	const deployOutput = execSync(`wrangler deploy --config dist/wrangler.jsonc --env ${environment}`, { encoding: 'utf8', timeout: 180000 });
+	const deployOutput = getCommandOutput(`${getWranglerCommand()} deploy --env ${escapeShellArg(environment)}`, 180000);
 	const urlMatch = deployOutput.match(/https:\/\/[^\s]*\.workers\.dev/);
 	const workerUrl = urlMatch?.[0] || `https://${workerName}.workers.dev`;
 
@@ -843,29 +944,36 @@ async function deploy() {
 
 	log.success('部署成功!');
 
-	try {
-		const response = await fetch(`${workerUrl}/._jsondb_/api/health`, { signal: AbortSignal.timeout(15000) });
-		if (response.ok) log.info(`健康检查: ${(await response.json()).status}`);
-	} catch {
-		log.warning('健康检查超时');
+	if (!resolvedOptions.skipHealthcheck) {
+		log.info(`[${step++}/${totalSteps}] 健康检查...`);
+		try {
+			const response = await fetch(`${workerUrl}/._jsondb_/api/health`, { signal: AbortSignal.timeout(15000) });
+			if (response.ok) {
+				log.info(`健康检查: ${(await response.json()).status}`);
+			} else {
+				log.warning(`健康检查返回异常状态: ${response.status}`);
+			}
+		} catch {
+			log.warning('健康检查超时');
+		}
 	}
 
-	const state = loadState() || {
+	const nextState = state || {
 		schema_version: '1.0',
 		project: config.name,
 		last_deployed: '',
 		environments: {},
 	};
 
-	state.environments[environment] = {
+	nextState.environments[environment] = {
 		worker_name: workerName,
 		version_id: versionId,
 		deployed_at: new Date().toISOString(),
 		storage_backend: storageBackend,
 		resources,
 	};
-	state.last_deployed = new Date().toISOString();
-	saveState(state);
+	nextState.last_deployed = new Date().toISOString();
+	saveState(nextState);
 
 	console.log(chalk.green.bold('\n🎉 部署成功!'));
 	console.log(chalk.gray(`后端: ${storageBackend}`));
@@ -881,9 +989,10 @@ async function check() {
 	console.log(`项目: ${config.name}`);
 	console.log(`资源: D1(${config.d1_databases.length}) KV(${config.kv_namespaces.length}) R2(${config.r2_buckets.length})`);
 
-	if (checkCommand('wrangler')) {
+	try {
+		getCommandOutput(`${getWranglerCommand()} --version`, 10000);
 		log.success(checkWranglerLogin() ? '已登录' : '未登录');
-	} else {
+	} catch {
 		log.error('wrangler 未安装');
 	}
 
@@ -930,7 +1039,7 @@ async function resources() {
 
 	console.log('\nD1 数据库:');
 	try {
-		const result = execSync('npx wrangler d1 list', { encoding: 'utf8', timeout: 30000 });
+		const result = getCommandOutput(`${getWranglerCommand()} d1 list`, 30000);
 		console.log(result);
 	} catch {
 		console.log('  无 D1 资源');
@@ -938,7 +1047,7 @@ async function resources() {
 
 	console.log('\nR2 存储桶:');
 	try {
-		const result = execSync('npx wrangler r2 bucket list', { encoding: 'utf8', timeout: 30000 });
+		const result = getCommandOutput(`${getWranglerCommand()} r2 bucket list`, 30000);
 		console.log(result);
 	} catch {
 		console.log('  无 R2 资源 (请在 Dashboard 启用 R2)');
@@ -954,11 +1063,18 @@ async function resources() {
 async function migrate() {
 	console.log(chalk.blue.bold('🗄️ 数据库迁移'));
 	const config = parseWranglerToml();
+	const environments = getEnvironmentChoices(config);
 	const envAnswers = await inquirer.prompt([
-		{ type: 'list', name: 'env', message: '选择环境:', choices: Object.keys(config.environments), default: 'development' },
+		{
+			type: 'list',
+			name: 'env',
+			message: '选择环境:',
+			choices: environments,
+			default: environments.includes('development') ? 'development' : environments[0],
+		},
 	]);
 	log.info(`执行 ${envAnswers.env} 迁移...`);
-	await runMigrations(config.deploy_options.migrations_dir);
+	await runMigrations(config, envAnswers.env);
 	log.success('迁移完成');
 }
 
@@ -971,7 +1087,19 @@ async function config() {
 
 program.name('deploy-cli').description('Cloudflare Worker 智能部署工具 (可扩展架构)').version('4.0.0');
 
-program.command('deploy').description('部署').action(deploy);
+program
+	.command('deploy')
+	.description('部署')
+	.option('--env <environment>', '指定部署环境')
+	.option('--storage <backend>', '指定存储后端: d1|kv|hybrid')
+	.option('--api-key <key>', '指定 API_KEY，跳过交互输入')
+	.option('--missing-resource <policy>', '缺失资源策略: ask|auto|manual|fail')
+	.option('--skip-migrate', '跳过数据库迁移')
+	.option('--skip-build', '跳过构建')
+	.option('--skip-healthcheck', '跳过健康检查')
+	.option('--yes', '对默认交互使用推荐值')
+	.option('--non-interactive', '禁用交互，缺少参数时直接失败')
+	.action(deploy);
 program.command('check').description('检查状态').action(check);
 program.command('status').description('详细状态').action(status);
 program.command('resources').description('云资源').action(resources);

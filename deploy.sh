@@ -38,7 +38,7 @@ echo "部署环境: $DEPLOY_ENV"
 echo "Dash 路由: $DASH_ROUTE"
 echo ""
 
-npm run build:all
+npm run build
 
 echo ""
 echo "配置 wrangler secrets..."
