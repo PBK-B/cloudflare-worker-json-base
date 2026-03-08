@@ -2,7 +2,17 @@ import { useState, useEffect, useCallback } from 'react';
 import axios, { AxiosError } from 'axios';
 import { configure } from 'axios-hooks';
 import i18n from '../i18n';
-import { ApiResponse, StorageData, CreateDataRequest, UpdateDataRequest, PaginatedResponse } from '../types';
+import {
+	ApiResponse,
+	StorageData,
+	CreateDataRequest,
+	UpdateDataRequest,
+	PaginatedResponse,
+	PermissionDecision,
+	PermissionEvaluationRequest,
+	PermissionRule,
+	PermissionRuleInput,
+} from '../types';
 import { navigateToRoute } from '../router';
 import { appRoutes } from '../router/routes';
 
@@ -327,6 +337,109 @@ export const useApi = () => {
 		}
 	}, []);
 
+	const listPermissionRules = useCallback(async (enabled?: boolean, search?: string): Promise<ApiResponse<{ items: PermissionRule[] }>> => {
+		try {
+			const params = new URLSearchParams();
+			if (typeof enabled === 'boolean') params.append('enabled', String(enabled));
+			if (search) params.append('search', search);
+
+			const response = await axiosInstance.get(`/permissions/rules${params.toString() ? `?${params.toString()}` : ''}`);
+			return response.data;
+		} catch (error) {
+			if (axios.isAxiosError(error)) {
+				return {
+					success: false,
+					error: error.response?.data?.error || i18n.t('permissions.messages.loadFailed', { defaultValue: '获取权限规则失败' }),
+					timestamp: new Date().toISOString(),
+				};
+			}
+			throw error;
+		}
+	}, []);
+
+	const createPermissionRule = useCallback(async (data: PermissionRuleInput): Promise<ApiResponse<PermissionRule>> => {
+		try {
+			const response = await axiosInstance.post('/permissions/rules', data);
+			return response.data;
+		} catch (error) {
+			if (axios.isAxiosError(error)) {
+				return {
+					success: false,
+					error: error.response?.data?.error || i18n.t('permissions.messages.createFailed', { defaultValue: '创建权限规则失败' }),
+					timestamp: new Date().toISOString(),
+				};
+			}
+			throw error;
+		}
+	}, []);
+
+	const updatePermissionRule = useCallback(async (id: string, data: PermissionRuleInput): Promise<ApiResponse<PermissionRule>> => {
+		try {
+			const response = await axiosInstance.put(`/permissions/rules/${id}`, data);
+			return response.data;
+		} catch (error) {
+			if (axios.isAxiosError(error)) {
+				return {
+					success: false,
+					error: error.response?.data?.error || i18n.t('permissions.messages.updateFailed', { defaultValue: '更新权限规则失败' }),
+					timestamp: new Date().toISOString(),
+				};
+			}
+			throw error;
+		}
+	}, []);
+
+	const setPermissionRuleStatus = useCallback(async (id: string, enabled: boolean): Promise<ApiResponse<PermissionRule>> => {
+		try {
+			const response = await axiosInstance.patch(`/permissions/rules/${id}/status`, { enabled });
+			return response.data;
+		} catch (error) {
+			if (axios.isAxiosError(error)) {
+				return {
+					success: false,
+					error: error.response?.data?.error || i18n.t('permissions.messages.statusFailed', { defaultValue: '切换规则状态失败' }),
+					timestamp: new Date().toISOString(),
+				};
+			}
+			throw error;
+		}
+	}, []);
+
+	const deletePermissionRule = useCallback(async (id: string): Promise<ApiResponse<void>> => {
+		try {
+			await axiosInstance.delete(`/permissions/rules/${id}`);
+			return {
+				success: true,
+				timestamp: new Date().toISOString(),
+			};
+		} catch (error) {
+			if (axios.isAxiosError(error)) {
+				return {
+					success: false,
+					error: error.response?.data?.error || i18n.t('permissions.messages.deleteFailed', { defaultValue: '删除权限规则失败' }),
+					timestamp: new Date().toISOString(),
+				};
+			}
+			throw error;
+		}
+	}, []);
+
+	const evaluatePermissionRule = useCallback(async (data: PermissionEvaluationRequest): Promise<ApiResponse<PermissionDecision>> => {
+		try {
+			const response = await axiosInstance.post('/permissions/evaluate', data);
+			return response.data;
+		} catch (error) {
+			if (axios.isAxiosError(error)) {
+				return {
+					success: false,
+					error: error.response?.data?.error || i18n.t('permissions.messages.evaluateFailed', { defaultValue: '权限规则测试失败' }),
+					timestamp: new Date().toISOString(),
+				};
+			}
+			throw error;
+		}
+	}, []);
+
 	return {
 		apiKey,
 		setApiKey,
@@ -343,6 +456,12 @@ export const useApi = () => {
 		getConsoleInfo,
 		getConsoleHealth,
 		getConsoleConfig,
+		listPermissionRules,
+		createPermissionRule,
+		updatePermissionRule,
+		setPermissionRuleStatus,
+		deletePermissionRule,
+		evaluatePermissionRule,
 	};
 };
 

@@ -8,16 +8,20 @@ jest.mock('axios-hooks', () => ({
   configure: jest.fn()
 }))
 
-const postMock = jest.fn()
-const putMock = jest.fn()
+const postMock = jest.fn<any>()
+const putMock = jest.fn<any>()
+const getMock = jest.fn<any>()
+const deleteMock = jest.fn<any>()
+const patchMock = jest.fn<any>()
 
 jest.mock('axios', () => {
-  const create = jest.fn(() => ({
-    post: postMock,
-    get: jest.fn(),
-    put: putMock,
-    delete: jest.fn(),
-    defaults: { headers: { common: {} } },
+	const create = jest.fn(() => ({
+		post: postMock,
+		get: getMock,
+		put: putMock,
+		delete: deleteMock,
+		patch: patchMock,
+		defaults: { headers: { common: {} } },
     interceptors: {
       request: { use: jest.fn() },
       response: { use: jest.fn() }
@@ -55,14 +59,28 @@ describe('useApi uploadFile', () => {
         timestamp: new Date().toISOString()
       }
     }))
-    putMock.mockImplementation(async () => ({
-      data: {
-        success: true,
+		putMock.mockImplementation(async () => ({
+			data: {
+				success: true,
         data: { id: '/files/demo.txt' },
         timestamp: new Date().toISOString()
       }
-    }))
-  })
+		}))
+		getMock.mockImplementation(async () => ({
+			data: {
+				success: true,
+				data: { items: [] },
+				timestamp: new Date().toISOString()
+			}
+		}))
+		patchMock.mockImplementation(async () => ({
+			data: {
+				success: true,
+				data: { id: 'rule-1' },
+				timestamp: new Date().toISOString()
+			}
+		}))
+	})
 
   it('posts binary uploads to the data API with FormData', async () => {
     let uploadPromise: Promise<unknown> | null = null
@@ -118,6 +136,35 @@ describe('useApi uploadFile', () => {
     expect((body as FormData).get('file')).toBeInstanceOf(File)
 
     await replacePromise
-  })
+	})
+
+	it('calls permission rule endpoints', async () => {
+		let listPromise: Promise<unknown> | null = null
+		let togglePromise: Promise<unknown> | null = null
+
+		const TestComponent = () => {
+			const { useApi } = require('../../hooks/useApi') as typeof import('../../hooks/useApi')
+			const api = useApi()
+
+			React.useEffect(() => {
+				listPromise = api.listPermissionRules(true, '/public')
+				togglePromise = api.setPermissionRuleStatus('rule-1', false)
+			}, [api])
+
+			return null
+		}
+
+		render(<TestComponent />)
+
+		await waitFor(() => expect(getMock).toHaveBeenCalled())
+		await waitFor(() => expect(patchMock).toHaveBeenCalled())
+
+		expect(getMock.mock.calls[0][0]).toBe('/permissions/rules?enabled=true&search=%2Fpublic')
+		expect(patchMock.mock.calls[0][0]).toBe('/permissions/rules/rule-1/status')
+		expect(patchMock.mock.calls[0][1]).toEqual({ enabled: false })
+
+		await listPromise
+		await togglePromise
+	})
 
 })

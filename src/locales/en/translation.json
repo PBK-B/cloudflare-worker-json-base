@@ -192,6 +192,84 @@
 		},
 		"title": "Data Management"
 	},
+	"permissions": {
+		"title": "Permission Rules",
+		"description": "Control public read/write access by path rules with * and ** wildcard matching.",
+		"create": "New Rule",
+		"createTitle": "Create Permission Rule",
+		"editTitle": "Edit Permission Rule",
+		"deleteTitle": "Delete Permission Rule",
+		"delete": "Delete",
+		"deleteConfirm": "Delete rule {{pattern}}?",
+		"cancel": "Cancel",
+		"save": "Save",
+		"search": "Search",
+		"searchPlaceholder": "Search path rules or description...",
+		"actions": {
+			"read": "Read",
+			"write": "Write"
+		},
+		"operations": {
+			"enable": "Enable",
+			"disable": "Disable"
+		},
+		"filters": {
+			"all": "All",
+			"enabled": "Enabled",
+			"disabled": "Disabled"
+		},
+		"status": {
+			"enabled": "Enabled",
+			"disabled": "Disabled"
+		},
+		"modes": {
+			"private_rw": "Private read/write",
+			"public_rw": "Public read/write",
+			"private_read_public_write": "Private read, public write",
+			"public_read_private_write": "Public read, private write"
+		},
+		"table": {
+			"pattern": "Pattern",
+			"mode": "Mode",
+			"priority": "Priority",
+			"status": "Status",
+			"description": "Description",
+			"actions": "Actions"
+		},
+		"form": {
+			"pattern": "Pattern",
+			"patternHint": "Supports rules like /foo/*, /foo/**, and /**/*.png.",
+			"mode": "Permission mode",
+			"priority": "Priority",
+			"priorityHint": "Higher numbers win when multiple rules match the same path.",
+			"description": "Description",
+			"enabled": "Enabled"
+		},
+		"tester": {
+			"title": "Path Tester",
+			"description": "Enter a path and action to see the final access result under currently enabled rules.",
+			"placeholder": "Run a test to view the matched rule and final permission result here.",
+			"run": "Run Test",
+			"publicAccess": "This action is publicly accessible",
+			"privateAccess": "This action requires private access",
+			"matchedRule": "Matched rule:",
+			"defaultRule": "No rule matched, using default private_rw"
+		},
+		"messages": {
+			"loadFailed": "Failed to load permission rules",
+			"createFailed": "Failed to create permission rule",
+			"createSuccess": "Permission rule created",
+			"updateFailed": "Failed to update permission rule",
+			"updateSuccess": "Permission rule updated",
+			"saveFailed": "Failed to save permission rule",
+			"deleteFailed": "Failed to delete permission rule",
+			"deleteSuccess": "Permission rule deleted",
+			"statusFailed": "Failed to change rule status",
+			"enabled": "Rule enabled",
+			"disabled": "Rule disabled",
+			"evaluateFailed": "Failed to evaluate permission rule"
+		}
+	},
 	"layout": {
 		"consoleTitle": "JSON Base",
 		"createData": "Create Data",
@@ -206,6 +284,7 @@
 		"logout": "Sign Out",
 		"navConsole": "Console",
 		"navData": "Data",
+		"navPermissions": "Permissions",
 		"openMenu": "Open menu",
 		"refresh": "Refresh",
 		"updateFailed": "Update failed",

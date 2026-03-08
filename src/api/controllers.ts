@@ -5,9 +5,11 @@ import { StorageAdapter } from '../storage/storageAdapter'
 import { MAX_FILE_SIZE } from '../storage/interfaces'
 import { WorkerEnv } from '../types'
 import { Config } from '../utils/config'
+import { PermissionService } from '../permissions/permissionService'
 
 export class DataController {
   private storageAdapter: StorageAdapter
+  private permissionService: PermissionService
 
   private static readonly API_PATH_PREFIX = '/._jsondb_/api/data'
 
@@ -15,6 +17,7 @@ export class DataController {
     (globalThis as any).ENV = env;
     Config.getInstance(env);
     this.storageAdapter = new StorageAdapter({ env })
+    this.permissionService = new PermissionService(env)
     AuthMiddleware.initialize(env)
     RateLimiter.initialize(env)
   }
@@ -39,12 +42,11 @@ export class DataController {
       }
 
       ValidationMiddleware.validatePathname(pathname)
-      
-      const auth = await AuthMiddleware.requireAuth(request)
+      const auth = await this.authorize(pathname, 'read', request)
 
       const data = await this.storageAdapter.get(pathname)
 
-      Logger.info('Data retrieved', { pathname, auth: auth.apiKey.substring(0, 8), type: data.type })
+      Logger.info('Data retrieved', { pathname, auth: auth?.apiKey.substring(0, 8) || 'public', type: data.type })
 
       return ResponseBuilder.success(this.formatDataResponse(data, pathname), 'Data retrieved successfully')
     } catch (error) {
@@ -59,8 +61,7 @@ export class DataController {
       const pathname = this.getResourcePath(url.pathname)
 
       ValidationMiddleware.validatePathname(pathname)
-      
-      const auth = await AuthMiddleware.requireAuth(request)
+      const auth = await this.authorize(pathname, 'write', request)
       await RateLimiter.checkLimit(request, 100, 3600)
 
       const contentType = request.headers.get('Content-Type') || ''
@@ -68,7 +69,7 @@ export class DataController {
       if (contentType.includes('multipart/form-data')) {
         const data = await this.createOrUpdateFileResource(request, pathname, 'create')
 
-        Logger.info('Data created from file', { pathname, size: data.size, auth: auth.apiKey.substring(0, 8) })
+        Logger.info('Data created from file', { pathname, size: data.size, auth: auth?.apiKey.substring(0, 8) || 'public' })
         return ResponseBuilder.created(this.formatDataResponse(data, pathname), 'Data created successfully')
       }
 
@@ -82,7 +83,7 @@ export class DataController {
         value,
         type: type as 'json' | 'text' | 'binary'
       })
-      Logger.info('Data created', { pathname, auth: auth.apiKey.substring(0, 8) })
+      Logger.info('Data created', { pathname, auth: auth?.apiKey.substring(0, 8) || 'public' })
 
       return ResponseBuilder.created(this.formatDataResponse(data, pathname), 'Data created successfully')
     } catch (error) {
@@ -97,22 +98,21 @@ export class DataController {
       const pathname = this.getResourcePath(url.pathname)
 
       ValidationMiddleware.validatePathname(pathname)
-      
-      const auth = await AuthMiddleware.requireAuth(request)
+      const auth = await this.authorize(pathname, 'write', request)
       await RateLimiter.checkLimit(request, 100, 3600)
 
       const contentType = request.headers.get('Content-Type') || ''
 
       if (contentType.includes('multipart/form-data')) {
         const data = await this.createOrUpdateFileResource(request, pathname, 'update')
-        Logger.info('Data updated from file', { pathname, size: data.size, auth: auth.apiKey.substring(0, 8) })
+        Logger.info('Data updated from file', { pathname, size: data.size, auth: auth?.apiKey.substring(0, 8) || 'public' })
         return ResponseBuilder.success(this.formatDataResponse(data, pathname), 'Data updated successfully')
       }
 
       const requestData = await this.parseRequestBody(request)
 
       const data = await this.storageAdapter.update(pathname, requestData)
-      Logger.info('Data updated', { pathname, auth: auth.apiKey.substring(0, 8) })
+      Logger.info('Data updated', { pathname, auth: auth?.apiKey.substring(0, 8) || 'public' })
 
       return ResponseBuilder.success(this.formatDataResponse(data, pathname), 'Data updated successfully')
     } catch (error) {
@@ -127,12 +127,11 @@ export class DataController {
       const pathname = this.getResourcePath(url.pathname)
 
       ValidationMiddleware.validatePathname(pathname)
-      
-      const auth = await AuthMiddleware.requireAuth(request)
+      const auth = await this.authorize(pathname, 'write', request)
       await RateLimiter.checkLimit(request, 50, 3600)
 
       await this.storageAdapter.delete(pathname)
-      Logger.info('Data deleted', { pathname, auth: auth.apiKey.substring(0, 8) })
+      Logger.info('Data deleted', { pathname, auth: auth?.apiKey.substring(0, 8) || 'public' })
 
       return ResponseBuilder.noContent()
     } catch (error) {
@@ -288,6 +287,15 @@ export class DataController {
 
     Logger.error('Unexpected error', error)
     return ApiError.internal('Internal server error').toResponse()
+  }
+
+  private async authorize(pathname: string, action: 'read' | 'write', request: Request) {
+    const decision = await this.permissionService.evaluate({ path: pathname, action })
+    if (decision.allowed) {
+      return null
+    }
+
+    return await AuthMiddleware.requireAuth(request)
   }
 }
 

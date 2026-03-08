@@ -4,16 +4,27 @@ import { ResourceController } from '../../api/resourceController'
 import { createMockEnv, VALID_API_KEY } from './mocks/env'
 import { ApiError } from '../../utils/response'
 import { StorageAdapter } from '../../storage/storageAdapter'
+import { PermissionService } from '../../permissions/permissionService'
+
+jest.mock('../../permissions/permissionService', () => ({
+  PermissionService: jest.fn().mockImplementation(() => ({
+    evaluate: jest.fn(async () => ({ allowed: true }))
+  }))
+}))
 
 describe('资源控制器', () => {
   let mockEnv: ReturnType<typeof createMockEnv>
   let store: Map<string, StoredEntry>
   let controller: ResourceController
+  let evaluateMock: ReturnType<typeof jest.fn>
 
   beforeEach(() => {
     mockEnv = createMockEnv()
     store = new Map<string, StoredEntry>()
     controller = new ResourceController(mockEnv, createInMemoryStorageAdapter(store))
+    const permissionServiceResults = (PermissionService as unknown as jest.Mock).mock.results
+    const latestPermissionService = permissionServiceResults[permissionServiceResults.length - 1]?.value as { evaluate?: ReturnType<typeof jest.fn> } | undefined
+    evaluateMock = latestPermissionService?.evaluate || jest.fn()
   })
 
   describe('路径过滤', () => {
@@ -41,7 +52,82 @@ describe('资源控制器', () => {
       expect(response).not.toBeNull()
       expect(response!.status).toBe(405)
     })
+
+		it('应该对 OPTIONS 请求返回预检响应', async () => {
+			const request = new Request('https://example.com/demo_bucket/test', {
+				method: 'OPTIONS',
+				headers: { Origin: 'https://client.example.com' },
+			})
+			const response = await controller.handle(request)
+			expect(response).not.toBeNull()
+			expect(response!.status).toBe(204)
+			expect(response!.headers.get('Access-Control-Allow-Origin')).toBe('https://client.example.com')
+		})
   })
+
+	describe('权限控制', () => {
+		it('公开读路径在未鉴权时允许 GET 和 HEAD', async () => {
+			evaluateMock.mockResolvedValue({ allowed: true, mode: 'public_rw', matchedRule: null })
+
+			store.set('/public/readme.txt', { value: 'hello', type: 'text', content_type: 'text/plain' })
+
+			const getResponse = await controller.handle(new Request('https://example.com/public/readme.txt'))
+			const headResponse = await controller.handle(new Request('https://example.com/public/readme.txt', { method: 'HEAD' }))
+
+			expect(getResponse!.status).toBe(200)
+			expect(await getResponse!.text()).toBe('hello')
+			expect(headResponse!.status).toBe(200)
+		})
+
+		it('私有读路径在未鉴权时拒绝 GET', async () => {
+			evaluateMock.mockResolvedValue({ allowed: false, mode: 'private_rw', matchedRule: null })
+
+			store.set('/private/readme.txt', { value: 'secret', type: 'text', content_type: 'text/plain' })
+
+			const response = await controller.handle(new Request('https://example.com/private/readme.txt'))
+
+			expect(response!.status).toBe(401)
+		})
+
+		it('公有写路径在未鉴权时允许 POST 和 PUT', async () => {
+			evaluateMock.mockResolvedValue({ allowed: true, mode: 'private_read_public_write', matchedRule: null })
+
+			const postResponse = await controller.handle(
+				new Request('https://example.com/uploads/demo.txt', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: 'hello' })
+			)
+			const putResponse = await controller.handle(
+				new Request('https://example.com/uploads/demo.txt', { method: 'PUT', headers: { 'Content-Type': 'text/plain' }, body: 'updated' })
+			)
+
+			expect(postResponse!.status).toBe(201)
+			expect(putResponse!.status).toBe(200)
+		})
+
+		it('私有写路径在未鉴权时拒绝 POST 和 DELETE', async () => {
+			evaluateMock.mockResolvedValue({ allowed: false, mode: 'public_read_private_write', matchedRule: null })
+
+			const postResponse = await controller.handle(
+				new Request('https://example.com/private-write/demo.txt', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: 'hello' })
+			)
+			const deleteResponse = await controller.handle(
+				new Request('https://example.com/private-write/demo.txt', { method: 'DELETE' })
+			)
+
+			expect(postResponse!.status).toBe(401)
+			expect(deleteResponse!.status).toBe(401)
+		})
+
+		it('私有路径在鉴权后允许访问', async () => {
+			evaluateMock.mockResolvedValue({ allowed: false, mode: 'private_rw', matchedRule: null })
+			store.set('/private/data.json', { value: { ok: true }, type: 'json', content_type: 'application/json' })
+
+			const request = new Request(`https://example.com/private/data.json?key=${VALID_API_KEY}`)
+			const response = await controller.handle(request)
+
+			expect(response!.status).toBe(200)
+			expect(await response!.json()).toEqual({ ok: true })
+		})
+	})
 
   describe('JSON 资源 CRUD', () => {
     it('应该完成 JSON 资源的增删改查', async () => {

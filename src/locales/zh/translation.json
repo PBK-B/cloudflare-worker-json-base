@@ -192,6 +192,84 @@
     },
     "title": "数据管理"
   },
+  "permissions": {
+    "title": "权限管理",
+    "description": "按路径规则控制资源的公开读写权限，支持 * 与 ** 通配匹配。",
+    "create": "新增规则",
+    "createTitle": "新增权限规则",
+    "editTitle": "编辑权限规则",
+    "deleteTitle": "删除权限规则",
+    "delete": "删除",
+    "deleteConfirm": "确定要删除规则 {{pattern}} 吗？",
+    "cancel": "取消",
+    "save": "保存",
+    "search": "查询",
+    "searchPlaceholder": "搜索路径规则或说明...",
+    "actions": {
+      "read": "读",
+      "write": "写"
+    },
+    "operations": {
+      "enable": "启用",
+      "disable": "禁用"
+    },
+    "filters": {
+      "all": "全部",
+      "enabled": "仅启用",
+      "disabled": "仅禁用"
+    },
+    "status": {
+      "enabled": "已启用",
+      "disabled": "已禁用"
+    },
+    "modes": {
+      "private_rw": "私有读写",
+      "public_rw": "公有读写",
+      "private_read_public_write": "私有读公有写",
+      "public_read_private_write": "公有读私有写"
+    },
+    "table": {
+      "pattern": "匹配规则",
+      "mode": "权限模式",
+      "priority": "优先级",
+      "status": "状态",
+      "description": "说明",
+      "actions": "操作"
+    },
+    "form": {
+      "pattern": "匹配规则",
+      "patternHint": "支持 /foo/*、/foo/**、/**/*.png 这类路径匹配规则。",
+      "mode": "权限模式",
+      "priority": "优先级",
+      "priorityHint": "数值越大优先级越高，多条规则命中时先应用高优先级规则。",
+      "description": "说明",
+      "enabled": "启用状态"
+    },
+    "tester": {
+      "title": "路径测试器",
+      "description": "输入路径和操作类型，查看当前启用规则下的最终权限结果。",
+      "placeholder": "输入路径并开始测试后，在这里查看命中规则与最终权限结果。",
+      "run": "开始测试",
+      "publicAccess": "当前操作为公开访问",
+      "privateAccess": "当前操作需要私有访问",
+      "matchedRule": "命中规则：",
+      "defaultRule": "未命中规则，使用默认 private_rw"
+    },
+    "messages": {
+      "loadFailed": "获取权限规则失败",
+      "createFailed": "创建权限规则失败",
+      "createSuccess": "权限规则创建成功",
+      "updateFailed": "更新权限规则失败",
+      "updateSuccess": "权限规则更新成功",
+      "saveFailed": "保存权限规则失败",
+      "deleteFailed": "删除权限规则失败",
+      "deleteSuccess": "权限规则已删除",
+      "statusFailed": "切换规则状态失败",
+      "enabled": "规则已启用",
+      "disabled": "规则已禁用",
+      "evaluateFailed": "权限规则测试失败"
+    }
+  },
   "layout": {
     "consoleTitle": "JSON Base 管理控制台",
     "createData": "创建数据",
@@ -206,6 +284,7 @@
     "logout": "退出",
     "navConsole": "控制台",
     "navData": "数据管理",
+    "navPermissions": "权限管理",
     "openMenu": "打开菜单",
     "refresh": "刷新",
     "updateFailed": "更新失败",

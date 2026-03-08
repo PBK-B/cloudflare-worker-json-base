@@ -1,0 +1,333 @@
+@use '../../styles/grid' as *;
+
+.adminPermissionsPage {
+	width: 100%;
+}
+
+.permissionsControls {
+	@include container-responsive;
+	padding: 0;
+	padding-top: $space-xl;
+	width: 100%;
+}
+
+.permissionsHeader {
+	@include flex-between;
+	align-items: flex-start;
+	width: 100%;
+	padding: 0;
+	margin-bottom: $space-lg;
+}
+
+.sectionTitle {
+	display: inline-flex;
+	align-items: center;
+	gap: $space-sm;
+	margin: 0;
+}
+
+.sectionDescription {
+	margin: $space-sm 0 0;
+	color: #666;
+	max-width: 720px;
+}
+
+.controlsRow {
+	@include flex-between;
+	width: 100%;
+	padding: 0;
+	margin: 0 0 $space-lg;
+	max-width: none;
+	align-items: center;
+	gap: $space-sm;
+}
+
+.controlsRow :global(.rs-input),
+.controlsRow :global(.rs-picker-toggle.rs-btn),
+.controlsRow :global(.rs-btn),
+.testerControls :global(.rs-input),
+.testerControls :global(.rs-picker-toggle.rs-btn),
+.testerControls :global(.rs-btn) {
+	min-height: 36px;
+}
+
+.searchInput {
+	flex: 1;
+	margin-right: $space-sm;
+}
+
+.filterPicker {
+	min-width: 140px;
+}
+
+.searchButton {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: $space-xs;
+	flex-shrink: 0;
+	white-space: nowrap;
+}
+
+.sortRow {
+	@include flex-start;
+	gap: $space-sm;
+	width: 100%;
+	padding: 0;
+	margin: 0 0 $space-lg;
+	max-width: none;
+	flex-wrap: wrap;
+	align-items: center;
+}
+
+.createButton {
+	gap: $space-xs;
+}
+
+.testerPanel,
+.tableContainer {
+	@include container-responsive;
+	background: #fff;
+	border: $card-border;
+	border-radius: $card-radius;
+	width: 100%;
+	max-width: none;
+	margin: 0 auto;
+}
+
+.testerPanel {
+	padding-top: $space-lg;
+	padding-bottom: $space-lg;
+	margin-top: $space-lg;
+}
+
+.testerHeader {
+	@include flex-between;
+	align-items: flex-start;
+	gap: $space-md;
+	margin-bottom: $space-lg;
+}
+
+.testerControls {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) 160px auto;
+	gap: $space-sm;
+	align-items: center;
+}
+
+.evaluationCard {
+  margin-top: $space-lg;
+  padding: $space-md $space-lg;
+  border-radius: $card-radius;
+  border: 1px solid transparent;
+  min-height: 88px;
+}
+
+.evaluationAllowed {
+  background: rgba(82, 196, 26, 0.08);
+  border-color: rgba(82, 196, 26, 0.18);
+}
+
+.evaluationPrivate {
+  background: rgba(255, 77, 79, 0.08);
+  border-color: rgba(255, 77, 79, 0.18);
+}
+
+.evaluationIdle {
+  background: #fafafa;
+  border-color: #f0f0f0;
+}
+
+.evaluationHeadline {
+  @include flex-between;
+  align-items: center;
+  gap: $space-sm;
+  margin-bottom: $space-xs;
+}
+
+.evaluationPlaceholder {
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+
+  p {
+    margin: 0;
+    color: #999;
+  }
+}
+
+.tableContainer {
+	overflow: hidden;
+	padding: 0;
+}
+
+.patternText {
+	font-family: Menlo, Consolas, Monaco, monospace;
+}
+
+.statusEnabled,
+.statusDisabled {
+	display: inline-flex;
+	align-items: center;
+	padding: 2px $space-md;
+	border-radius: $card-radius;
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.statusEnabled {
+	background: rgba(82, 196, 26, 0.1);
+	color: #389e0d;
+}
+
+.statusDisabled {
+	background: rgba(140, 140, 140, 0.12);
+	color: #595959;
+}
+
+.actionRow {
+  display: flex;
+  align-items: center;
+  gap: $space-xs;
+  min-height: 24px;
+
+	:global(.rs-btn) {
+		min-width: 0;
+		min-height: auto;
+		padding-top: 0;
+		padding-bottom: 0;
+	}
+
+	:global(.rs-btn-link) {
+		gap: 0.25em;
+		min-height: auto;
+		padding-left: 0;
+		padding-right: 0;
+		padding-top: 0;
+		padding-bottom: 0;
+		text-decoration: none !important;
+
+		&:hover,
+		&:focus,
+		&:active {
+			text-decoration: none !important;
+		}
+  }
+}
+
+.primaryAction {
+  margin-right: $space-md;
+}
+
+.enableAction {
+  color: #389e0d !important;
+}
+
+.disableAction {
+	color: inherit !important;
+}
+
+.formHint {
+	margin-top: 6px;
+	color: #999;
+	font-size: 12px;
+}
+
+.formGridRow {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+	gap: $space-xxl * 2;
+	align-items: start;
+}
+
+.formGridField {
+  margin-bottom: $space-lg;
+  display: flex;
+  flex-direction: column;
+	justify-content: flex-start;
+
+	:global(.rs-picker),
+	:global(.rs-input-number) {
+		width: 100%;
+	}
+
+	:global(.rs-form-control-label) {
+		min-height: 22px;
+		display: inline-flex;
+		align-items: center;
+  }
+}
+
+.formGridFieldEnabled {
+  padding-right: 1rem;
+}
+
+.toggleFieldWrap {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  padding-top: 1px;
+}
+
+@include media-md-down {
+	.testerControls {
+		grid-template-columns: 1fr;
+	}
+
+	.formGridRow {
+		grid-template-columns: 1fr;
+		gap: $space-md;
+	}
+}
+
+@include media-sm-down {
+	.controlsRow,
+	.testerHeader,
+	.evaluationHeadline {
+		gap: $space-sm;
+		align-items: stretch;
+		flex-direction: column;
+	}
+
+	.searchInput {
+		margin-right: 0;
+	}
+}
+
+:global(.rs-theme-dark) .sectionTitle {
+	color: var(--rs-text-primary);
+}
+
+:global(.rs-theme-dark) .sectionDescription,
+:global(.rs-theme-dark) .formHint {
+	color: var(--rs-text-secondary);
+}
+
+:global(.rs-theme-dark) .testerPanel,
+:global(.rs-theme-dark) .tableContainer {
+  background: var(--rs-bg-card);
+  border-color: var(--rs-table-border-color);
+}
+
+:global(.rs-theme-dark) .evaluationIdle {
+  background: var(--rs-input-bg);
+  border-color: var(--rs-border-primary);
+}
+
+:global(.rs-theme-dark) .tableContainer :global(.rs-table) {
+	background: var(--rs-bg-card);
+	border-color: var(--rs-table-border-color);
+}
+
+:global(.rs-theme-dark) .tableContainer :global(.rs-table-row) {
+	background: var(--rs-bg-card);
+}
+
+:global(.rs-theme-dark) .tableContainer :global(.rs-table-row:hover) {
+	background: var(--rs-state-hover-bg);
+}
+
+:global(.rs-theme-dark) .tableContainer :global(.rs-table-cell) {
+	background: var(--rs-bg-card);
+	color: var(--rs-text-primary);
+}

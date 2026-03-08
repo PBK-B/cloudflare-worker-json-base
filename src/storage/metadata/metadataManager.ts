@@ -55,6 +55,29 @@ export class D1MetadataManager implements MetadataStorage {
     await this.db.prepare(`
       CREATE INDEX IF NOT EXISTS idx_file_metadata_storage_backend ON file_metadata(storage_backend)
     `).run();
+
+    await this.db.prepare(`
+      CREATE TABLE IF NOT EXISTS path_permission_rules (
+        id TEXT PRIMARY KEY,
+        pattern TEXT NOT NULL,
+        mode TEXT NOT NULL,
+        priority INTEGER NOT NULL DEFAULT 0,
+        enabled INTEGER NOT NULL DEFAULT 1,
+        description TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    `).run();
+
+    await this.db.prepare(`
+      CREATE INDEX IF NOT EXISTS idx_path_permission_rules_priority
+      ON path_permission_rules(priority DESC, updated_at DESC)
+    `).run();
+
+    await this.db.prepare(`
+      CREATE INDEX IF NOT EXISTS idx_path_permission_rules_enabled
+      ON path_permission_rules(enabled)
+    `).run();
   }
 
   async save(metadata: FileMetadata): Promise<void> {

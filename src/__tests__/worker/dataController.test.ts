@@ -3,6 +3,12 @@ import { DataController } from '../../api/controllers'
 import { MAX_FILE_SIZE } from '../../storage/interfaces'
 import { createMockEnv, VALID_API_KEY } from './mocks/env'
 
+jest.mock('../../permissions/permissionService', () => ({
+  PermissionService: jest.fn().mockImplementation(() => ({
+    evaluate: jest.fn(async () => ({ allowed: true }))
+  }))
+}))
+
 describe('DataController file upload flow', () => {
   let createMock: ReturnType<typeof jest.fn>
   let updateMock: ReturnType<typeof jest.fn>
@@ -41,6 +47,9 @@ describe('DataController file upload flow', () => {
       delete: jest.fn(),
       list: jest.fn(),
       getStats: jest.fn()
+    }
+    ;(controller as any).permissionService = {
+      evaluate: jest.fn(async () => ({ allowed: true }))
     }
   })
 

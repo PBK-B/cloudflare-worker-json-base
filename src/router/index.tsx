@@ -9,6 +9,7 @@ const LoginPage = lazy(() => import('../pages/LoginPage'));
 const AdminLayout = lazy(() => import('../pages/admin/AdminLayout'));
 const AdminConsolePage = lazy(() => import('../pages/admin/AdminConsolePage'));
 const AdminDataPage = lazy(() => import('../pages/admin/AdminDataPage'));
+const AdminPermissionsPage = lazy(() => import('../pages/admin/AdminPermissionsPage'));
 
 const AppShell: React.FC = () => {
 	const { t } = useTranslation();
@@ -43,6 +44,7 @@ const LoginRoute: React.FC = () => <LoginPage />;
 const AdminLayoutRoute: React.FC = () => <AdminLayout />;
 const AdminConsoleRoute: React.FC = () => <AdminConsolePage />;
 const AdminDataRoute: React.FC = () => <AdminDataPage />;
+const AdminPermissionsRoute: React.FC = () => <AdminPermissionsPage />;
 
 export const appRouter = createHashRouter([
 	{
@@ -66,6 +68,10 @@ export const appRouter = createHashRouter([
 							{
 								path: 'data',
 								element: <AdminDataRoute />,
+							},
+							{
+								path: 'permissions',
+								element: <AdminPermissionsRoute />,
 							},
 						],
 					},

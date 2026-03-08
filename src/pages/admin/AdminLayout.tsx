@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { Container, Header, Content, Button, Dropdown } from 'rsuite';
-import { Settings, Database, RefreshCw, LogOut, LayoutDashboard, Menu, Languages } from 'lucide-react';
+import { Settings, Database, RefreshCw, LogOut, LayoutDashboard, Menu, Languages, ShieldCheck } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
@@ -200,6 +200,13 @@ const AdminLayout: React.FC = () => {
 							<Database size={16} />
 							{t('layout.navData', { defaultValue: "数据管理" })}
 						</NavLink>
+						<NavLink
+							to={appRoutes.adminPermissions}
+							className={({ isActive }) => `${styles.adminNavLink} ${isActive ? styles.navLinkActive : ''}`}
+						>
+							<ShieldCheck size={16} />
+							{t('layout.navPermissions', { defaultValue: "权限管理" })}
+						</NavLink>
 					</div>
 					<div className={styles.adminActions}>
 						<Button
@@ -283,6 +290,13 @@ const AdminLayout: React.FC = () => {
 								>
 									<Database size={16} />
 									{t('layout.navData', { defaultValue: "数据管理" })}
+								</NavLink>
+								<NavLink
+									to={appRoutes.adminPermissions}
+									className={({ isActive }) => `${styles.adminNavLink} ${styles.adminNavLinkMobile} ${isActive ? styles.navLinkActive : ''}`}
+								>
+									<ShieldCheck size={16} />
+									{t('layout.navPermissions', { defaultValue: "权限管理" })}
 								</NavLink>
 							</div>
 						</div>

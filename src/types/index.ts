@@ -19,6 +19,47 @@ export interface StorageData {
   storage_location?: 'd1' | 'kv'
 }
 
+export type PermissionMode =
+  | 'private_rw'
+  | 'public_rw'
+  | 'private_read_public_write'
+  | 'public_read_private_write'
+
+export type PermissionAction = 'read' | 'write'
+
+export interface PermissionRule {
+  id: string
+  pattern: string
+  mode: PermissionMode
+  priority: number
+  enabled: boolean
+  description?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface PermissionDecision {
+  path: string
+  action: PermissionAction
+  allowed: boolean
+  access: 'public' | 'private'
+  mode: PermissionMode
+  matchedRule: PermissionRule | null
+}
+
+export interface PermissionRuleInput {
+  pattern: string
+  mode: PermissionMode
+  priority: number
+  enabled?: boolean
+  description?: string
+}
+
+export interface PermissionEvaluationRequest {
+  path: string
+  action: PermissionAction
+}
+
 export interface CreateDataRequest {
   value: any
   type?: 'json' | 'binary' | 'text'

@@ -3,6 +3,7 @@ import { StorageAdapter } from '../storage/storageAdapter'
 import { Config } from '../utils/config'
 import { AuthMiddleware, Logger } from '../utils/middleware'
 import { ApiError } from '../utils/response'
+import { PermissionService } from '../permissions/permissionService'
 
 interface ResourceResult {
   status: number
@@ -14,11 +15,13 @@ interface ResourceResult {
 
 export class ResourceController {
   private storageAdapter: StorageAdapter
+  private permissionService: PermissionService
 
   constructor(env: WorkerEnv, mockStorageAdapter?: StorageAdapter) {
     ;(globalThis as any).ENV = env
     Config.getInstance(env)
     this.storageAdapter = mockStorageAdapter || new StorageAdapter({ env })
+    this.permissionService = new PermissionService(env)
     AuthMiddleware.initialize(env)
   }
 
@@ -50,19 +53,17 @@ export class ResourceController {
         })
       }
 
-      await AuthMiddleware.authenticate(request)
-
       switch (method) {
         case 'GET':
-          return await this.get(pathname)
+          return await this.get(pathname, request)
         case 'HEAD':
-          return await this.head(pathname)
+          return await this.head(pathname, request)
         case 'POST':
           return await this.post(pathname, request)
         case 'PUT':
           return await this.put(pathname, request)
         case 'DELETE':
-          return await this.delete(pathname)
+          return await this.delete(pathname, request)
         default:
           return new Response('Method Not Allowed', {
             status: 405,
@@ -85,8 +86,9 @@ export class ResourceController {
     }
   }
 
-  private async get(pathname: string): Promise<Response> {
+  private async get(pathname: string, request: Request): Promise<Response> {
     try {
+      await this.authorize(pathname, 'read', request)
       const data = await this.storageAdapter.get(pathname)
 
       const contentType = data.content_type || 'application/octet-stream'
@@ -142,8 +144,9 @@ export class ResourceController {
     }
   }
 
-  private async head(pathname: string): Promise<Response> {
+  private async head(pathname: string, request: Request): Promise<Response> {
     try {
+      await this.authorize(pathname, 'read', request)
       const data = await this.storageAdapter.get(pathname)
 
       const contentType = data.content_type || 'application/octet-stream'
@@ -174,6 +177,7 @@ export class ResourceController {
   }
 
   private async post(pathname: string, request: Request): Promise<Response> {
+    await this.authorize(pathname, 'write', request)
     const contentType = request.headers.get('Content-Type') || ''
     let result: ResourceResult
 
@@ -219,6 +223,7 @@ export class ResourceController {
   }
 
   private async put(pathname: string, request: Request): Promise<Response> {
+    await this.authorize(pathname, 'write', request)
     const contentType = request.headers.get('Content-Type') || ''
 
     if (contentType.includes('multipart/form-data')) {
@@ -262,7 +267,8 @@ export class ResourceController {
     })
   }
 
-  private async delete(pathname: string): Promise<Response> {
+  private async delete(pathname: string, request: Request): Promise<Response> {
+    await this.authorize(pathname, 'write', request)
     await this.storageAdapter.delete(pathname)
 
     const result: ResourceResult = {
@@ -274,6 +280,24 @@ export class ResourceController {
     return new Response(JSON.stringify(result), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
+    })
+  }
+
+  private async authorize(pathname: string, action: 'read' | 'write', request?: Request): Promise<void> {
+    const decision = await this.permissionService.evaluate({ path: pathname, action })
+    if (decision.allowed) {
+      return
+    }
+
+    if (!request) {
+      throw ApiError.forbidden(`Path ${pathname} requires private ${action} access`)
+    }
+
+    const auth = await AuthMiddleware.authenticate(request)
+    Logger.debug('Resource access requires private auth', {
+      path: pathname,
+      action,
+      auth: auth.apiKey.substring(0, 8)
     })
   }
 

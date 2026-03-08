@@ -1,5 +1,6 @@
 import { DataController, HealthController } from './controllers';
 import { ConsoleController } from './consoleController';
+import { PermissionController } from './permissionController';
 import { ResourceController } from './resourceController';
 import { CorsHandler } from '../utils/response';
 import { Logger } from '../utils/middleware';
@@ -11,6 +12,7 @@ export class Router {
 	private dataController!: DataController;
 	private healthController!: HealthController;
 	private consoleController!: ConsoleController;
+	private permissionController!: PermissionController;
 	private resourceController!: ResourceController;
 	private initError: Error | null = null;
 
@@ -19,6 +21,7 @@ export class Router {
 			this.dataController = new DataController(env);
 			this.healthController = new HealthController(env);
 			this.consoleController = new ConsoleController(env);
+			this.permissionController = new PermissionController(env);
 			this.resourceController = new ResourceController(env);
 		} catch (error) {
 			this.initError = error instanceof Error ? error : new Error('Unknown initialization error');
@@ -62,6 +65,8 @@ export class Router {
 					response = await this.handleDataRoutes(request, pathname, method);
 				} else if (path.startsWith('/console')) {
 					response = await this.handleConsoleRoutes(request, pathname, method);
+				} else if (path.startsWith('/permissions')) {
+					response = await this.handlePermissionRoutes(request, pathname, method);
 				} else if (path === '/' || path === '') {
 					response = await this.handleApiRoot();
 				} else {
@@ -143,6 +148,58 @@ export class Router {
 				return new Response('Method Not Allowed', {
 					status: 405,
 					headers: { Allow: 'GET' },
+				});
+		}
+	}
+
+	private async handlePermissionRoutes(request: Request, pathname: string, method: string): Promise<Response> {
+		const basePath = '/._jsondb_/api/permissions';
+		const relativePath = pathname.replace(basePath, '') || '/';
+
+		switch (method) {
+			case 'GET':
+				if (relativePath === '/rules' || relativePath === '/rules/') {
+					return await this.permissionController.list(request);
+				}
+				return new Response('Permission Endpoint Not Found', { status: 404 });
+
+			case 'POST':
+				if (relativePath === '/rules' || relativePath === '/rules/') {
+					return await this.permissionController.create(request);
+				}
+				if (relativePath === '/evaluate') {
+					return await this.permissionController.evaluate(request);
+				}
+				return new Response('Permission Endpoint Not Found', { status: 404 });
+
+			case 'PUT': {
+				const match = relativePath.match(/^\/rules\/([^/]+)$/);
+				if (match) {
+					return await this.permissionController.update(request, match[1]);
+				}
+				return new Response('Permission Endpoint Not Found', { status: 404 });
+			}
+
+			case 'PATCH': {
+				const match = relativePath.match(/^\/rules\/([^/]+)\/status$/);
+				if (match) {
+					return await this.permissionController.setStatus(request, match[1]);
+				}
+				return new Response('Permission Endpoint Not Found', { status: 404 });
+			}
+
+			case 'DELETE': {
+				const match = relativePath.match(/^\/rules\/([^/]+)$/);
+				if (match) {
+					return await this.permissionController.delete(request, match[1]);
+				}
+				return new Response('Permission Endpoint Not Found', { status: 404 });
+			}
+
+			default:
+				return new Response('Method Not Allowed', {
+					status: 405,
+					headers: { Allow: 'GET, POST, PUT, PATCH, DELETE, OPTIONS' },
 				});
 		}
 	}
