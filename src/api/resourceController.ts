@@ -4,6 +4,7 @@ import { Config } from '../utils/config'
 import { AuthMiddleware, Logger } from '../utils/middleware'
 import { ApiError } from '../utils/response'
 import { PermissionService } from '../permissions/permissionService'
+import { isSystemPath } from '../system/systemPaths'
 
 interface ResourceResult {
   status: number
@@ -33,6 +34,7 @@ export class ResourceController {
       const method = request.method.toUpperCase()
 
       const isApiPath = pathname.startsWith('/._jsondb_/') ||
+                        isSystemPath(pathname) ||
                         pathname === '/' ||
                         pathname.startsWith('/assets/') ||
                         pathname === '/vite.svg'

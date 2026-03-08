@@ -9,6 +9,18 @@ jest.mock('../../permissions/permissionService', () => ({
   }))
 }))
 
+jest.mock('../../permissions/permissionRepository', () => ({
+  PermissionRuleRepository: jest.fn().mockImplementation(() => ({
+    initialize: jest.fn(async () => undefined),
+    list: jest.fn(async () => []),
+    create: jest.fn(),
+    update: jest.fn(),
+    setEnabled: jest.fn(),
+    delete: jest.fn(),
+    getById: jest.fn(),
+  })),
+}))
+
 describe('DataController permission enforcement', () => {
   let controller: DataController
   let evaluateMock: ReturnType<typeof jest.fn>
@@ -152,5 +164,11 @@ describe('DataController permission enforcement', () => {
 
     expect(response.status).toBe(401)
     expect(storageAdapter.list).not.toHaveBeenCalled()
+  })
+
+  it('rejects direct access to system paths', async () => {
+    const response = await controller.get(new Request(`https://example.com/._jsondb_/api/data/._system/permissions/index.json?key=${VALID_API_KEY}`))
+    expect(response.status).toBe(404)
+    expect(storageAdapter.get).not.toHaveBeenCalled()
   })
 })

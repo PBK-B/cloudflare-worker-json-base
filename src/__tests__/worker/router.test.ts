@@ -23,6 +23,18 @@ jest.mock('../../permissions/permissionService', () => ({
   })),
 }))
 
+jest.mock('../../permissions/permissionRepository', () => ({
+  PermissionRuleRepository: jest.fn().mockImplementation(() => ({
+    initialize: jest.fn(async () => undefined),
+    list: jest.fn(async () => []),
+    create: jest.fn(),
+    update: jest.fn(),
+    setEnabled: jest.fn(),
+    delete: jest.fn(),
+    getById: jest.fn(),
+  })),
+}))
+
 describe('Router', () => {
   it('does not expose deprecated storage endpoint in API root', async () => {
     const router = new Router(createMockEnv())

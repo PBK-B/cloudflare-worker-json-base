@@ -10,6 +10,7 @@ import { KVStorageProvider } from './providers/kvStorageProvider';
 import { D1StorageProvider } from './providers/d1StorageProvider';
 import { D1MetadataManager } from './metadata/metadataManager';
 import { Config } from '../utils/config';
+import { isSystemPath } from '../system/systemPaths';
 
 export interface StorageAdapterConfig {
   env: WorkerEnv;
@@ -363,6 +364,10 @@ export class StorageAdapter {
           type = 'binary';
         }
 
+        if (isSystemPath(mapping.path)) {
+          continue;
+        }
+
         if (prefix && !mapping.path.startsWith(prefix)) {
           continue;
         }
@@ -448,6 +453,10 @@ export class StorageAdapter {
     for (const mapping of allPaths) {
       try {
         const metadata = await this.storageService.getMetadata(mapping.file_id);
+        if (isSystemPath(mapping.path)) {
+          continue;
+        }
+
         if (metadata) {
           total++;
           totalSize += metadata.size;

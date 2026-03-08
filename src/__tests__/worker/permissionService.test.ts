@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
+import { D1Database } from '@cloudflare/workers-types'
 import { ApiError } from '../../utils/response'
 import { PermissionRule, PermissionRuleInput } from '../../types'
 import {
@@ -152,6 +153,54 @@ describe('PermissionService', () => {
     expect(repository.list).toHaveBeenNthCalledWith(1, { search: 'demo' })
     expect(repository.setEnabled).toHaveBeenCalledWith('rule-1', false)
     expect(repository.delete).toHaveBeenCalledWith('rule-1')
+  })
+
+  it('migrates legacy D1 permission rules into system storage', async () => {
+    const adapter = {
+      getJson: jest.fn(async () => null),
+      setJson: jest.fn(async () => undefined),
+      delete: jest.fn(async () => undefined),
+      exists: jest.fn(async () => false),
+    }
+
+    const legacyRows = [
+      {
+        id: 'legacy-rule',
+        pattern: '/legacy/**',
+        mode: 'public_rw',
+        priority: 100,
+        enabled: 1,
+        description: 'legacy',
+        created_at: '2024-01-01T00:00:00.000Z',
+        updated_at: '2024-01-02T00:00:00.000Z',
+      },
+    ]
+
+    const db = {
+      prepare: jest.fn(() => ({
+        all: jest.fn(async () => ({ results: legacyRows })),
+      })),
+    } as unknown as D1Database
+
+    const { PermissionRuleRepository } = jest.requireActual('../../permissions/permissionRepository') as typeof import('../../permissions/permissionRepository')
+    const repository = new PermissionRuleRepository(createMockEnv({ JSONBASE_DB: db } as any), adapter as any)
+
+    await repository.initialize()
+
+    expect(adapter.setJson).toHaveBeenCalledTimes(3)
+    const setJsonCalls = adapter.setJson.mock.calls as unknown as Array<[string, unknown]>
+    expect(setJsonCalls[0][0]).toBe('/._system/permissions/rules/legacy-rule.json')
+    expect(setJsonCalls[0][1]).toEqual({
+      id: 'legacy-rule',
+      pattern: '/legacy/**',
+      mode: 'public_rw',
+      priority: 100,
+      enabled: true,
+      description: 'legacy',
+      created_at: '2024-01-01T00:00:00.000Z',
+      updated_at: '2024-01-02T00:00:00.000Z',
+    })
+    expect(setJsonCalls[1][0]).toBe('/._system/permissions/index.json')
   })
 })
 

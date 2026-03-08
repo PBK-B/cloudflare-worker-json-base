@@ -1,8 +1,18 @@
-import { D1Database } from '@cloudflare/workers-types'
 import { WorkerEnv, PermissionRule, PermissionRuleInput } from '../types'
 import { ApiError } from '../utils/response'
+import { SystemDataAdapter } from '../system/systemDataAdapter'
+import {
+  getPermissionRuleRecordPath,
+  PERMISSION_RULES_INDEX_PATH,
+} from '../system/systemPaths'
 
-interface PermissionRuleRow {
+interface PermissionRuleIndex {
+  version: number
+  updatedAt: string
+  items: PermissionRule[]
+}
+
+interface LegacyPermissionRuleRow {
   id: string
   pattern: string
   mode: PermissionRule['mode']
@@ -14,159 +24,225 @@ interface PermissionRuleRow {
 }
 
 export class PermissionRuleRepository {
-  private db: D1Database
+  private adapter: SystemDataAdapter
+  private env: WorkerEnv
+  private initialized = false
 
-  constructor(env: WorkerEnv) {
-    this.db = env.JSONBASE_DB
-
-    if (!this.db) {
-      throw ApiError.serviceUnavailable('D1 database not available')
-    }
+  constructor(env: WorkerEnv, adapter?: SystemDataAdapter) {
+    this.env = env
+    this.adapter = adapter || new SystemDataAdapter(env)
   }
 
   async initialize(): Promise<void> {
-    await this.db.prepare(`
-      CREATE TABLE IF NOT EXISTS path_permission_rules (
-        id TEXT PRIMARY KEY,
-        pattern TEXT NOT NULL,
-        mode TEXT NOT NULL,
-        priority INTEGER NOT NULL DEFAULT 0,
-        enabled INTEGER NOT NULL DEFAULT 1,
-        description TEXT,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
-      )
-    `).run()
+    if (this.initialized) {
+      return
+    }
 
-    await this.db.prepare(`
-      CREATE INDEX IF NOT EXISTS idx_path_permission_rules_priority
-      ON path_permission_rules(priority DESC, updated_at DESC)
-    `).run()
+    const existingIndex = await this.adapter.getJson<PermissionRuleIndex>(PERMISSION_RULES_INDEX_PATH)
+    if (!existingIndex) {
+      await this.migrateLegacyRulesIfNeeded()
+      const reloadedIndex = await this.adapter.getJson<PermissionRuleIndex>(PERMISSION_RULES_INDEX_PATH)
+      if (!reloadedIndex) {
+        await this.writeIndex(this.createEmptyIndex())
+      }
+    }
 
-    await this.db.prepare(`
-      CREATE INDEX IF NOT EXISTS idx_path_permission_rules_enabled
-      ON path_permission_rules(enabled)
-    `).run()
+    this.initialized = true
   }
 
   async list(filters: { enabled?: boolean; search?: string } = {}): Promise<PermissionRule[]> {
-    const conditions: string[] = []
-    const values: Array<string | number> = []
+    await this.initialize()
+    const index = await this.loadIndex()
+
+    let items = [...index.items]
 
     if (typeof filters.enabled === 'boolean') {
-      conditions.push('enabled = ?')
-      values.push(filters.enabled ? 1 : 0)
+      items = items.filter((rule) => rule.enabled === filters.enabled)
     }
 
     if (filters.search) {
-      conditions.push('(pattern LIKE ? OR COALESCE(description, \"\") LIKE ?)')
-      values.push(`%${filters.search}%`, `%${filters.search}%`)
+      const keyword = filters.search.toLowerCase()
+      items = items.filter((rule) =>
+        rule.pattern.toLowerCase().includes(keyword) ||
+        (rule.description || '').toLowerCase().includes(keyword)
+      )
     }
 
-    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
-    const result = await this.db.prepare(`
-      SELECT * FROM path_permission_rules
-      ${whereClause}
-      ORDER BY priority DESC, updated_at DESC, created_at DESC
-    `).bind(...values).all() as { results?: PermissionRuleRow[] }
-
-    return (result.results || []).map((row) => this.rowToRule(row))
+    return this.sortRules(items)
   }
 
   async getById(id: string): Promise<PermissionRule | null> {
-    const row = await this.db.prepare(`
-      SELECT * FROM path_permission_rules WHERE id = ?
-    `).bind(id).first() as PermissionRuleRow | null
+    await this.initialize()
 
-    return row ? this.rowToRule(row) : null
+    const index = await this.loadIndex()
+    const indexedRule = index.items.find((rule) => rule.id === id)
+    if (indexedRule) {
+      return indexedRule
+    }
+
+    return await this.adapter.getJson<PermissionRule>(getPermissionRuleRecordPath(id))
   }
 
   async create(input: PermissionRuleInput): Promise<PermissionRule> {
+    await this.initialize()
+
     const now = new Date().toISOString()
-    const id = crypto.randomUUID()
-
-    await this.db.prepare(`
-      INSERT INTO path_permission_rules (id, pattern, mode, priority, enabled, description, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).bind(
-      id,
-      input.pattern,
-      input.mode,
-      input.priority,
-      input.enabled === false ? 0 : 1,
-      input.description || null,
-      now,
-      now
-    ).run()
-
-    const created = await this.getById(id)
-    if (!created) {
-      throw ApiError.internal('Failed to create permission rule')
+    const rule: PermissionRule = {
+      id: crypto.randomUUID(),
+      pattern: input.pattern,
+      mode: input.mode,
+      priority: input.priority,
+      enabled: input.enabled !== false,
+      description: input.description || undefined,
+      created_at: now,
+      updated_at: now,
     }
 
-    return created
+    await this.adapter.setJson(getPermissionRuleRecordPath(rule.id), rule)
+
+    const index = await this.loadIndex()
+    index.items = this.sortRules([rule, ...index.items])
+    index.updatedAt = now
+    await this.writeIndex(index)
+
+    return rule
   }
 
   async update(id: string, input: PermissionRuleInput): Promise<PermissionRule> {
-    const now = new Date().toISOString()
+    await this.initialize()
+
     const existing = await this.getById(id)
     if (!existing) {
       throw ApiError.notFound('Permission rule not found')
     }
 
-    await this.db.prepare(`
-      UPDATE path_permission_rules
-      SET pattern = ?, mode = ?, priority = ?, enabled = ?, description = ?, updated_at = ?
-      WHERE id = ?
-    `).bind(
-      input.pattern,
-      input.mode,
-      input.priority,
-      input.enabled === false ? 0 : 1,
-      input.description || null,
-      now,
-      id
-    ).run()
-
-    const updated = await this.getById(id)
-    if (!updated) {
-      throw ApiError.internal('Failed to update permission rule')
+    const updated: PermissionRule = {
+      ...existing,
+      pattern: input.pattern,
+      mode: input.mode,
+      priority: input.priority,
+      enabled: input.enabled !== false,
+      description: input.description || undefined,
+      updated_at: new Date().toISOString(),
     }
+
+    await this.adapter.setJson(getPermissionRuleRecordPath(id), updated)
+
+    const index = await this.loadIndex()
+    index.items = this.sortRules(index.items.map((rule) => (rule.id === id ? updated : rule)))
+    index.updatedAt = updated.updated_at
+    await this.writeIndex(index)
 
     return updated
   }
 
   async setEnabled(id: string, enabled: boolean): Promise<PermissionRule> {
+    await this.initialize()
+
     const existing = await this.getById(id)
     if (!existing) {
       throw ApiError.notFound('Permission rule not found')
     }
 
-    await this.db.prepare(`
-      UPDATE path_permission_rules
-      SET enabled = ?, updated_at = ?
-      WHERE id = ?
-    `).bind(enabled ? 1 : 0, new Date().toISOString(), id).run()
-
-    const updated = await this.getById(id)
-    if (!updated) {
-      throw ApiError.internal('Failed to update permission rule status')
+    const updated: PermissionRule = {
+      ...existing,
+      enabled,
+      updated_at: new Date().toISOString(),
     }
+
+    await this.adapter.setJson(getPermissionRuleRecordPath(id), updated)
+
+    const index = await this.loadIndex()
+    index.items = this.sortRules(index.items.map((rule) => (rule.id === id ? updated : rule)))
+    index.updatedAt = updated.updated_at
+    await this.writeIndex(index)
 
     return updated
   }
 
   async delete(id: string): Promise<void> {
-    const result = await this.db.prepare(`
-      DELETE FROM path_permission_rules WHERE id = ?
-    `).bind(id).run()
+    await this.initialize()
 
-    if ((result as { changes?: number }).changes === 0) {
+    const existing = await this.getById(id)
+    if (!existing) {
       throw ApiError.notFound('Permission rule not found')
+    }
+
+    await this.adapter.delete(getPermissionRuleRecordPath(id))
+
+    const index = await this.loadIndex()
+    index.items = index.items.filter((rule) => rule.id !== id)
+    index.updatedAt = new Date().toISOString()
+    await this.writeIndex(index)
+  }
+
+  private async loadIndex(): Promise<PermissionRuleIndex> {
+    const index = await this.adapter.getJson<PermissionRuleIndex>(PERMISSION_RULES_INDEX_PATH)
+    return index || this.createEmptyIndex()
+  }
+
+  private async writeIndex(index: PermissionRuleIndex): Promise<void> {
+    await this.adapter.setJson(PERMISSION_RULES_INDEX_PATH, {
+      ...index,
+      items: this.sortRules(index.items),
+    })
+  }
+
+  private createEmptyIndex(): PermissionRuleIndex {
+    return {
+      version: 1,
+      updatedAt: new Date().toISOString(),
+      items: [],
     }
   }
 
-  private rowToRule(row: PermissionRuleRow): PermissionRule {
+  private sortRules(rules: PermissionRule[]): PermissionRule[] {
+    return [...rules].sort((left, right) => {
+      if (right.priority !== left.priority) {
+        return right.priority - left.priority
+      }
+
+      const updatedDiff = new Date(right.updated_at).getTime() - new Date(left.updated_at).getTime()
+      if (updatedDiff !== 0) {
+        return updatedDiff
+      }
+
+      return new Date(right.created_at).getTime() - new Date(left.created_at).getTime()
+    })
+  }
+
+  private async migrateLegacyRulesIfNeeded(): Promise<void> {
+    const db = this.env.JSONBASE_DB
+    if (!db) {
+      return
+    }
+
+    try {
+      const result = await db.prepare(`
+        SELECT * FROM path_permission_rules
+        ORDER BY priority DESC, updated_at DESC, created_at DESC
+      `).all() as { results?: LegacyPermissionRuleRow[] }
+
+      const legacyRules = (result.results || []).map((row) => this.legacyRowToRule(row))
+      if (legacyRules.length === 0) {
+        return
+      }
+
+      for (const rule of legacyRules) {
+        await this.adapter.setJson(getPermissionRuleRecordPath(rule.id), rule)
+      }
+
+      await this.writeIndex({
+        version: 1,
+        updatedAt: new Date().toISOString(),
+        items: legacyRules,
+      })
+    } catch {
+      return
+    }
+  }
+
+  private legacyRowToRule(row: LegacyPermissionRuleRow): PermissionRule {
     return {
       id: row.id,
       pattern: row.pattern,
@@ -175,7 +251,7 @@ export class PermissionRuleRepository {
       enabled: row.enabled === 1,
       description: row.description || undefined,
       created_at: row.created_at,
-      updated_at: row.updated_at
+      updated_at: row.updated_at,
     }
   }
 }

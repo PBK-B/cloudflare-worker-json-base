@@ -6,6 +6,7 @@ import { MAX_FILE_SIZE } from '../storage/interfaces'
 import { WorkerEnv } from '../types'
 import { Config } from '../utils/config'
 import { PermissionService } from '../permissions/permissionService'
+import { isSystemPath } from '../system/systemPaths'
 
 export class DataController {
   private storageAdapter: StorageAdapter
@@ -42,6 +43,7 @@ export class DataController {
       }
 
       ValidationMiddleware.validatePathname(pathname)
+      this.assertNotSystemPath(pathname)
       const auth = await this.authorize(pathname, 'read', request)
 
       const data = await this.storageAdapter.get(pathname)
@@ -61,6 +63,7 @@ export class DataController {
       const pathname = this.getResourcePath(url.pathname)
 
       ValidationMiddleware.validatePathname(pathname)
+      this.assertNotSystemPath(pathname)
       const auth = await this.authorize(pathname, 'write', request)
       await RateLimiter.checkLimit(request, 100, 3600)
 
@@ -98,6 +101,7 @@ export class DataController {
       const pathname = this.getResourcePath(url.pathname)
 
       ValidationMiddleware.validatePathname(pathname)
+      this.assertNotSystemPath(pathname)
       const auth = await this.authorize(pathname, 'write', request)
       await RateLimiter.checkLimit(request, 100, 3600)
 
@@ -127,6 +131,7 @@ export class DataController {
       const pathname = this.getResourcePath(url.pathname)
 
       ValidationMiddleware.validatePathname(pathname)
+      this.assertNotSystemPath(pathname)
       const auth = await this.authorize(pathname, 'write', request)
       await RateLimiter.checkLimit(request, 50, 3600)
 
@@ -296,6 +301,12 @@ export class DataController {
     }
 
     return await AuthMiddleware.requireAuth(request)
+  }
+
+  private assertNotSystemPath(pathname: string): void {
+    if (isSystemPath(pathname)) {
+      throw ApiError.notFound('Resource not found')
+    }
   }
 }
 

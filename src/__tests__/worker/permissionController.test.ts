@@ -14,6 +14,18 @@ jest.mock('../../permissions/permissionService', () => ({
   }))
 }))
 
+jest.mock('../../permissions/permissionRepository', () => ({
+  PermissionRuleRepository: jest.fn().mockImplementation(() => ({
+    initialize: jest.fn(async () => undefined),
+    list: jest.fn(async () => []),
+    create: jest.fn(),
+    update: jest.fn(),
+    setEnabled: jest.fn(),
+    delete: jest.fn(),
+    getById: jest.fn(),
+  })),
+}))
+
 describe('PermissionController', () => {
   let controller: PermissionController
   let serviceMock: {

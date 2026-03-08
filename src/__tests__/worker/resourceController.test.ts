@@ -46,6 +46,12 @@ describe('资源控制器', () => {
       expect(response).toBeNull()
     })
 
+    it('应该对系统路径返回 null', async () => {
+      const request = createRequest('GET', '/._system/permissions/index.json')
+      const response = await controller.handle(request)
+      expect(response).toBeNull()
+    })
+
     it('应该对不支持的方法返回 405', async () => {
       const request = createRequest('PATCH', '/demo_bucket/test')
       const response = await controller.handle(request)
