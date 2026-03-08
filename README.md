@@ -41,12 +41,32 @@ npm run auto-deploy
 
 ```bash
 npm install -g wrangler
-wrangler login
-npx wrangler d1 create jsonbase
-# edit d1_databases.database_id and vars.API_KEY
-vim wrangler.toml
 npm run deploy
 ```
+
+`npm run deploy` now uses the interactive `deploy-cli.ts` flow:
+
+- prompts for environment, storage backend, and backend resource selection/creation
+- auto-runs `wrangler login` in interactive mode when Cloudflare auth is missing
+- writes `API_KEY` as a Worker secret instead of expecting it in `wrangler.toml`
+
+Useful variants:
+
+```bash
+# validate the final generated config without deploying
+npm run deploy -- --dry-run
+
+# print the resolved config without interaction
+npm run deploy:print -- --env development --storage d1 --d1 jsonbase
+
+# update an existing deployment without changing API_KEY secret
+npm run deploy -- --skip-secret
+```
+
+Useful force-override inputs:
+
+- CLI args: `--env`, `--storage`, `--d1`, `--kv`, `--api-key`, `--skip-secret`
+- env vars: `DEPLOY_ENV`, `DEPLOY_STORAGE_BACKEND`, `DEPLOY_D1_DATABASE`, `DEPLOY_KV_NAMESPACE`, `DEPLOY_API_KEY`
 
 ## Usage
 
@@ -128,7 +148,7 @@ Visit `https://your-worker.workers.dev/dash/` for web management.
 
 ## Configuration
 
-Configure in `wrangler.toml`:
+Configure defaults in `wrangler.toml`:
 
 ```toml
 name = "your-worker"
@@ -148,7 +168,7 @@ database_id = "xxx"
 ## FAQ
 
 **Lost API Key?**
-Redeploy with new API_KEY env var to get a new one.
+Redeploy with `--api-key` or `DEPLOY_API_KEY` to write a new secret. Use `--skip-secret` when updating without changing the existing secret.
 
 **Data persistence?**
 Data stored in D1, won't be lost.

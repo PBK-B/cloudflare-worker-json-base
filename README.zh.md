@@ -41,12 +41,32 @@ npm run auto-deploy
 
 ```bash
 npm install -g wrangler
-wrangler login
-npx wrangler d1 create jsonbase
-# 修改 d1_databases.database_id 和 vars.API_KEY
-vim wrangler.toml
 npm run deploy
 ```
+
+现在 `npm run deploy` 会走交互式 `deploy-cli.ts` 流程：
+
+- 询问部署环境、存储后端以及后端资源的选择/创建
+- 交互模式下如果 Cloudflare 未登录，会自动执行 `wrangler login`
+- `API_KEY` 会写入 Worker Secret，而不是要求手动写进 `wrangler.toml`
+
+常用变体：
+
+```bash
+# 校验最终生成配置，但不执行部署
+npm run deploy -- --dry-run
+
+# 不交互地打印最终配置
+npm run deploy:print -- --env development --storage d1 --d1 jsonbase
+
+# 更新已有部署，但不改动 API_KEY secret
+npm run deploy -- --skip-secret
+```
+
+常用强制覆盖输入：
+
+- CLI 参数：`--env`、`--storage`、`--d1`、`--kv`、`--api-key`、`--skip-secret`
+- 环境变量：`DEPLOY_ENV`、`DEPLOY_STORAGE_BACKEND`、`DEPLOY_D1_DATABASE`、`DEPLOY_KV_NAMESPACE`、`DEPLOY_API_KEY`
 
 ## 使用方法
 
@@ -128,7 +148,7 @@ curl -X DELETE https://your-worker.workers.dev/myapp/config \
 
 ## 配置
 
-在 `wrangler.toml` 中配置：
+在 `wrangler.toml` 中配置默认值：
 
 ```toml
 name = "your-worker"
@@ -148,7 +168,7 @@ database_id = "xxx"
 ## 常见问题
 
 **API Key 忘记怎么办？**
-修改 API_KEY 环境变量重新部署会使用新的 Key。
+使用 `--api-key` 或 `DEPLOY_API_KEY` 重新部署即可写入新的 secret；如果只是更新部署且不想改动现有 secret，可使用 `--skip-secret`。
 
 **数据会丢失吗？**
 数据存储在 D1 数据库中，不会丢失。

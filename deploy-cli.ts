@@ -754,7 +754,7 @@ function ensureWranglerLogin(options?: DeployOptions): void {
 			timeout: 300000,
 		});
 		if (loginResult.status !== 0) {
-			fail('Cloudflare 登录失败或已取消');
+			fail('Cloudflare 登录失败或已取消，尝试执行: npx wrangler login');
 		}
 		const verifyResult = run(getNpxBin(), ['wrangler', 'whoami'], { timeout: 30000 });
 		if (!isWranglerAuthenticated(verifyResult)) {
@@ -1759,48 +1759,131 @@ async function printConfig(options: DeployOptions): Promise<void> {
 	console.log(toJsonc(finalConfig));
 }
 
-const program = new Command();
+function createProgram(): Command {
+	const program = new Command();
 
-program.name('deploy-cli').description('Cloudflare Worker 动态部署 CLI').version('5.0.0');
+	program.name('deploy-cli').description('Cloudflare Worker 动态部署 CLI').version('5.0.0');
 
-program
-	.command('deploy')
-	.description('生成动态 wrangler 配置并部署')
-	.option('--env <environment>', '部署环境')
-	.option('--storage <backend>', '存储后端: d1|kv')
-	.option('--d1 <database>', '指定 D1 数据库 (ID 或名称)')
-	.option('--kv <namespace>', '指定 KV 命名空间 (ID 或名称)')
-	.option('--missing-resource <policy>', '缺失资源策略: ask|auto|manual|fail')
-	.option('--plan', '只输出执行计划，不执行部署')
-	.option('--dry-run', '执行 wrangler deploy --dry-run')
-	.option('--conf-file <path>', '覆盖生成配置的 wrangler.[jsonc/json/toml] 文件')
-	.option('--var <keyValue>', '追加变量，格式 KEY:VALUE', (value: string, previous: string[] = []) => [...previous, value], [])
-	.option('--env-file <path>', '加载环境变量文件，格式 KEY=VALUE', (value: string, previous: string[] = []) => [...previous, value], [])
-	.option('--keep-vars', '部署时启用 --keep-vars')
-	.option('--non-interactive', '禁用交互模式')
-	.option('--yes', '使用推荐默认值')
-	.option('--skip-migrate', '跳过数据库迁移')
-	.option('--skip-healthcheck', '跳过健康检查')
-	.option('--skip-build', '跳过构建')
-	.option('--skip-secret', '跳过 API_KEY secret 设置')
-	.option('--api-key <key>', '写入 API_KEY secret')
-	.action(async (options: DeployOptions) => {
-		await deploy(options);
-	});
+	program
+		.command('deploy')
+		.description('生成动态 wrangler 配置并部署')
+		.option('--env <environment>', '部署环境')
+		.option('--storage <backend>', '存储后端: d1|kv')
+		.option('--d1 <database>', '指定 D1 数据库 (ID 或名称)')
+		.option('--kv <namespace>', '指定 KV 命名空间 (ID 或名称)')
+		.option('--missing-resource <policy>', '缺失资源策略: ask|auto|manual|fail')
+		.option('--plan', '只输出执行计划，不执行部署')
+		.option('--dry-run', '执行 wrangler deploy --dry-run')
+		.option('--conf-file <path>', '覆盖生成配置的 wrangler.[jsonc/json/toml] 文件')
+		.option('--var <keyValue>', '追加变量，格式 KEY:VALUE', (value: string, previous: string[] = []) => [...previous, value], [])
+		.option('--env-file <path>', '加载环境变量文件，格式 KEY=VALUE', (value: string, previous: string[] = []) => [...previous, value], [])
+		.option('--keep-vars', '部署时启用 --keep-vars')
+		.option('--non-interactive', '禁用交互模式')
+		.option('--yes', '使用推荐默认值')
+		.option('--skip-migrate', '跳过数据库迁移')
+		.option('--skip-healthcheck', '跳过健康检查')
+		.option('--skip-build', '跳过构建')
+		.option('--skip-secret', '跳过 API_KEY secret 设置')
+		.option('--api-key <key>', '写入 API_KEY secret')
+		.action(async (options: DeployOptions) => {
+			await deploy(options);
+		});
 
-program.command('doctor').description('检查部署基础状态').action(doctor);
+	program.command('doctor').description('检查部署基础状态').action(doctor);
 
-program
-	.command('print-config')
-	.description('打印最终生成的部署配置')
-	.option('--env <environment>', '部署环境')
-	.option('--storage <backend>', '存储后端: d1|kv')
-	.option('--d1 <database>', '指定 D1 数据库 (ID 或名称)')
-	.option('--kv <namespace>', '指定 KV 命名空间 (ID 或名称)')
-	.option('--conf-file <path>', '覆盖生成配置的 wrangler.[jsonc/json/toml] 文件')
-	.option('--non-interactive', '禁用交互模式')
-	.action(async (options: DeployOptions) => {
-		await printConfig(options);
-	});
+	program
+		.command('print-config')
+		.description('打印最终生成的部署配置')
+		.option('--env <environment>', '部署环境')
+		.option('--storage <backend>', '存储后端: d1|kv')
+		.option('--d1 <database>', '指定 D1 数据库 (ID 或名称)')
+		.option('--kv <namespace>', '指定 KV 命名空间 (ID 或名称)')
+		.option('--conf-file <path>', '覆盖生成配置的 wrangler.[jsonc/json/toml] 文件')
+		.option('--non-interactive', '禁用交互模式')
+		.action(async (options: DeployOptions) => {
+			await printConfig(options);
+		});
 
-program.parse();
+	return program;
+}
+
+export const __testing = {
+	parseTomlLite,
+	stripJsonComments,
+	deepMerge,
+	getSchemaAllowList,
+	sanitizeConfigBySchema,
+	parseVarPair,
+	parseEnvFile,
+	parseConfigFile,
+	generateSecureApiKey,
+	getDefaultEnvironment,
+	normalizeStorageBackend,
+	normalizeMissingResourcePolicy,
+	resolveEnvConfig,
+	assertRequiredFields,
+	checkSensitiveVars,
+	validateGeneratedConfig,
+	toJsonc,
+	toGeneratedRelativePath,
+	rewriteConfigPathsForGeneratedFile,
+	isWranglerAuthenticated,
+	parseBooleanFlag,
+	isCiEnvironment,
+	isNonInteractiveMode,
+	looksLikeUuid,
+	getNpxBin,
+	getCommandOutput,
+	ensureWranglerLogin,
+	ensureDeployFiles,
+	runBuild,
+	upsertApiKeySecret,
+	listD1Databases,
+	listKVNamespaces,
+	listR2Buckets,
+	selectD1Database,
+	selectKVNamespace,
+	selectR2Bucket,
+	ensureD1Database,
+	createD1DatabaseWithPrompt,
+	createD1DatabaseByName,
+	getCreateOptionLabel,
+	getSelectMessage,
+	createKVNamespaceWithPrompt,
+	createKVNamespaceByName,
+	createR2BucketWithPrompt,
+	ensureKVNamespace,
+	ensureR2Bucket,
+	resolveEnvironment,
+	resolveApiKey,
+	resolveStorageBackend,
+	resolveMissingResourcePolicy,
+	promptMissingResourceAction,
+	resolveEffectiveMissingPolicy,
+	resolveSkipMigrate,
+	resolveSkipHealthcheck,
+	getForcedD1Value,
+	getForcedKVValue,
+	validateForcedResourceOptions,
+	getD1Bindings,
+	getKVBindings,
+	getR2Bindings,
+	resolveForcedResources,
+	promptResourceBindings,
+	ensureResources,
+	applyResolvedResources,
+	runMigrations,
+	runHealthcheck,
+	buildDeployArgs,
+	getWorkerName,
+	createProgram,
+	deploy,
+	printConfig,
+	doctor,
+};
+
+export { createProgram, deploy, printConfig, doctor };
+
+if (require.main === module) {
+	createProgram().parse();
+}

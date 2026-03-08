@@ -29,6 +29,7 @@
 - 基于 Commander.js 的命令行工具
 - 交互式配置向导
 - 自动化部署流程
+- 支持 `--plan`、`--dry-run`、`print-config`、强制资源指定与 Secret 跳过
 
 #### 4. Shell 脚本 (deploy.sh)
 - 传统 Shell 脚本部署
@@ -50,6 +51,23 @@ npm install
 npm run auto-deploy
 ```
 
+也可以直接使用部署 CLI：
+
+```bash
+# 正常交互部署
+npm run deploy
+
+# 仅预览最终配置与部署计划
+npm run deploy -- --dry-run
+npm run deploy -- --plan
+
+# 打印最终配置（不交互）
+npm run deploy:print -- --env development --storage d1 --d1 jsonbase
+
+# 更新已有部署，但跳过 API_KEY Secret 写入
+npm run deploy -- --skip-secret
+```
+
 ### 方法三：Shell 脚本部署
 ```bash
 chmod +x deploy.sh
@@ -69,13 +87,19 @@ chmod +x deploy.sh
 - 环境选择
 
 ### 3. Cloudflare 认证
-- 自动登录 Cloudflare 账户
+- 交互模式下未登录会自动执行 `wrangler login`
 - 验证权限
 
 ### 4. KV 命名空间创建
 - 自动创建生产环境 KV
 - 自动创建预览环境 KV
 - 绑定到 Worker
+
+### 4.1 资源强制指定
+- 支持强制指定部署环境、存储后端和资源
+- D1 支持通过数据库 ID 或名称指定
+- KV 支持通过命名空间 ID 或名称指定
+- 指定资源不存在时会自动创建，创建失败则终止部署
 
 ### 5. 项目部署
 - 构建 WebUI 界面
@@ -134,8 +158,8 @@ interface CloudflareConfig {
 
 ### API Key 管理
 - 支持环境变量注入
-- 本地加密存储
-- 前端显示保护
+- 通过 Worker Secret 写入
+- 支持 `--skip-secret` 跳过 Secret 更新
 
 ### 配置安全
 - 敏感信息隐藏
@@ -201,6 +225,25 @@ const environments = {
 DEBUG=1 npm run auto-deploy
 
 # 或在 WebUI 中查看实时日志
+```
+
+### 常用 CLI 覆盖项
+
+```bash
+# CLI 参数
+--env
+--storage
+--d1
+--kv
+--api-key
+--skip-secret
+
+# 环境变量
+DEPLOY_ENV
+DEPLOY_STORAGE_BACKEND
+DEPLOY_D1_DATABASE
+DEPLOY_KV_NAMESPACE
+DEPLOY_API_KEY
 ```
 
 ## 总结

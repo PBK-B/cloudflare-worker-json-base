@@ -3,7 +3,9 @@
 	"version": "0.0.0",
 	"private": true,
 	"scripts": {
-		"deploy": "tsc --esModuleInterop --outDir .deploy-temp deploy-cli.ts && node .deploy-temp/deploy-cli.js deploy && rm -rf .deploy-temp",
+		"deploy": "tsc --esModuleInterop --outDir .deploy-temp deploy-cli.ts && node .deploy-temp/deploy-cli.js deploy",
+		"deploy:doctor": "tsc --esModuleInterop --outDir .deploy-temp deploy-cli.ts && node .deploy-temp/deploy-cli.js doctor",
+		"deploy:print": "tsc --esModuleInterop --outDir .deploy-temp deploy-cli.ts && node .deploy-temp/deploy-cli.js print-config",
 		"auto-deploy": "npm run deploy",
 		"dev": "wrangler dev --port 8788",
 		"dev:worker": "wrangler dev --port 8788",
