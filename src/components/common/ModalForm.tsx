@@ -1,6 +1,6 @@
 import React from 'react';
 import { Modal, Form, Input, InputPicker, Button, Uploader } from 'rsuite';
-import { Plus, Edit, Upload, File, X } from 'lucide-react';
+import { Plus, Edit, Upload, File, X, Eye, Pencil, Minimize2, AlignLeft } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { notify } from '../../utils/notification';
 import styles from './ModalForm.module.scss';
@@ -49,6 +49,33 @@ export const ModalForm: React.FC<ModalFormProps> = ({
 	const [uploadedFile, setUploadedFile] = React.useState<File | null>(null);
 	const [isUploading, setIsUploading] = React.useState(false);
 	const [autoFilledPath, setAutoFilledPath] = React.useState(false);
+	const [jsonPreviewMode, setJsonPreviewMode] = React.useState(false);
+	const [jsonPreviewValue, setJsonPreviewValue] = React.useState('');
+	const [jsonEditScrollTop, setJsonEditScrollTop] = React.useState(0);
+	const [jsonPreviewScrollTop, setJsonPreviewScrollTop] = React.useState(0);
+	const [jsonEditorHeight, setJsonEditorHeight] = React.useState(276);
+	const jsonPreviewRef = React.useRef<HTMLPreElement | null>(null);
+	const jsonTextareaRef = React.useRef<HTMLTextAreaElement | null>(null);
+
+	const formatJsonString = React.useCallback((value: string) => {
+		const trimmedValue = value.trim();
+
+		if (!trimmedValue) {
+			return '';
+		}
+
+		return JSON.stringify(JSON.parse(trimmedValue), null, 2);
+	}, []);
+
+	const compactJsonString = React.useCallback((value: string) => {
+		const trimmedValue = value.trim();
+
+		if (!trimmedValue) {
+			return '';
+		}
+
+		return JSON.stringify(JSON.parse(trimmedValue));
+	}, []);
 
 	const derivePathFromFile = React.useCallback((file: File) => {
 		const rawName = (file.webkitRelativePath || file.name || '').trim();
@@ -63,9 +90,17 @@ export const ModalForm: React.FC<ModalFormProps> = ({
 
 	React.useEffect(() => {
 		if (initialData) {
-			setFormData(initialData);
+			setFormData({
+				...initialData,
+				value: initialData.type === 'json' ? formatJsonString(initialData.value) : initialData.value,
+			});
 			setUploadedFile(null);
 			setAutoFilledPath(false);
+			setJsonPreviewMode(false);
+			setJsonPreviewValue('');
+			setJsonEditScrollTop(0);
+			setJsonPreviewScrollTop(0);
+			setJsonEditorHeight(276);
 		} else if (show) {
 			setFormData({
 				path: '',
@@ -74,8 +109,65 @@ export const ModalForm: React.FC<ModalFormProps> = ({
 			});
 			setUploadedFile(null);
 			setAutoFilledPath(false);
+			setJsonPreviewMode(false);
+			setJsonPreviewValue('');
+			setJsonEditScrollTop(0);
+			setJsonPreviewScrollTop(0);
+			setJsonEditorHeight(276);
 		}
-	}, [initialData, show, initialType]);
+	}, [formatJsonString, initialData, show, initialType]);
+
+	React.useLayoutEffect(() => {
+		const textarea = jsonTextareaRef.current;
+
+		if (!textarea) {
+			return;
+		}
+
+		const syncHeight = () => {
+			setJsonEditorHeight(textarea.offsetHeight || 276);
+		};
+
+		syncHeight();
+
+		const resizeObserver = new ResizeObserver(() => {
+			syncHeight();
+		});
+
+		resizeObserver.observe(textarea);
+
+		return () => {
+			resizeObserver.disconnect();
+		};
+	}, [jsonPreviewMode, show]);
+
+	React.useLayoutEffect(() => {
+		if (jsonPreviewMode) {
+			return;
+		}
+
+		const target = jsonTextareaRef.current;
+
+		if (!target) {
+			return;
+		}
+
+		target.scrollTop = jsonEditScrollTop;
+	}, [jsonEditScrollTop, jsonPreviewMode]);
+
+	React.useLayoutEffect(() => {
+		if (!jsonPreviewMode) {
+			return;
+		}
+
+		const target = jsonPreviewRef.current;
+
+		if (!target) {
+			return;
+		}
+
+		target.scrollTop = jsonPreviewScrollTop;
+	}, [jsonPreviewMode, jsonPreviewScrollTop, jsonPreviewValue]);
 
 	const handleSubmit = async () => {
 		if (!formData.path.trim()) {
@@ -116,7 +208,57 @@ export const ModalForm: React.FC<ModalFormProps> = ({
 		setFormData((prev) => ({ ...prev, type: value as 'json' | 'text' | 'binary', value: '' }));
 		setUploadedFile(null);
 		setAutoFilledPath(false);
+		setJsonPreviewMode(false);
+		setJsonPreviewValue('');
+		setJsonEditScrollTop(0);
+		setJsonPreviewScrollTop(0);
+		setJsonEditorHeight(276);
 	};
+
+	const updateJsonValue = React.useCallback((transform: (value: string) => string) => {
+		try {
+			if (jsonPreviewMode) {
+				const nextPreviewValue = transform(jsonPreviewValue || formData.value);
+				setJsonPreviewValue(nextPreviewValue);
+				return;
+			}
+
+			const nextValue = transform(formData.value);
+			setFormData((prev) => ({ ...prev, value: nextValue }));
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : t('modal.unknownError', { defaultValue: '未知错误' });
+			notify.warning(`${t('modal.jsonInvalid', { defaultValue: "JSON 格式错误，请检查数据格式" })}: ${errorMessage}`);
+		}
+	}, [formData.value, jsonPreviewMode, jsonPreviewValue, t]);
+
+	const handleToggleJsonPreview = React.useCallback(() => {
+		if (jsonPreviewMode) {
+			setJsonPreviewScrollTop(jsonPreviewRef.current?.scrollTop ?? jsonPreviewScrollTop);
+			setJsonPreviewMode(false);
+			setJsonPreviewValue('');
+			return;
+		}
+
+		try {
+			JSON.parse(formData.value);
+			const currentEditScrollTop = jsonTextareaRef.current?.scrollTop ?? jsonEditScrollTop;
+			setJsonEditScrollTop(currentEditScrollTop);
+			setJsonPreviewScrollTop(currentEditScrollTop);
+			setJsonPreviewValue(formData.value);
+			setJsonPreviewMode(true);
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : t('modal.unknownError', { defaultValue: '未知错误' });
+			notify.warning(`${t('modal.jsonInvalid', { defaultValue: "JSON 格式错误，请检查数据格式" })}: ${errorMessage}`);
+		}
+	}, [formData.value, jsonEditScrollTop, jsonPreviewMode, jsonPreviewScrollTop, t]);
+
+	const handleCompactJson = React.useCallback(() => {
+		updateJsonValue(compactJsonString);
+	}, [compactJsonString, updateJsonValue]);
+
+	const handleFormatJson = React.useCallback(() => {
+		updateJsonValue(formatJsonString);
+	}, [formatJsonString, updateJsonValue]);
 
 	const handleFileUpload = (fileList: any[]) => {
 		if (!fileList || fileList.length === 0) {
@@ -264,13 +406,72 @@ export const ModalForm: React.FC<ModalFormProps> = ({
 			);
 		}
 
+		if (formData.type === 'json') {
+			return (
+				<div className={styles.jsonEditorShell}>
+					<div className={styles.jsonToolbar}>
+						<button
+							type="button"
+							className={styles.jsonToolbarButton}
+							onClick={handleToggleJsonPreview}
+							title={jsonPreviewMode
+								? t('modal.jsonSwitchToEdit', { defaultValue: '切换到编辑' })
+								: t('modal.jsonSwitchToPreview', { defaultValue: '切换到预览' })}
+						>
+							{jsonPreviewMode ? <Pencil size={14} /> : <Eye size={14} />}
+						</button>
+						<button
+							type="button"
+							className={styles.jsonToolbarButton}
+							onClick={handleCompactJson}
+							title={t('modal.jsonCompact', { defaultValue: '压缩 JSON' })}
+						>
+							<Minimize2 size={14} />
+						</button>
+						<button
+							type="button"
+							className={styles.jsonToolbarButton}
+							onClick={handleFormatJson}
+							title={t('modal.jsonFormat', { defaultValue: '格式化 JSON' })}
+						>
+							<AlignLeft size={14} />
+						</button>
+					</div>
+
+					<div className={styles.jsonSurface} style={{ ['--json-editor-height' as string]: `${jsonEditorHeight}px` }}>
+						<Input
+							as="textarea"
+							className={`${styles.jsonTextarea} ${jsonPreviewMode ? styles.jsonPaneHidden : ''}`}
+							rows={10}
+							value={formData.value}
+							onChange={(value) => setFormData((prev) => ({ ...prev, value }))}
+							onScroll={(event) => {
+								const scrollTop = (event.target as HTMLTextAreaElement).scrollTop;
+								setJsonEditScrollTop(scrollTop);
+							}}
+							placeholder={t('modal.jsonPlaceholder', { defaultValue: "输入 JSON 数据，例如: {\"key\": \"value\"}" })}
+							size="lg"
+							inputRef={jsonTextareaRef}
+						/>
+						<pre
+							ref={jsonPreviewRef}
+							className={`${styles.jsonPreview} ${jsonPreviewMode ? '' : styles.jsonPaneHidden}`}
+							onScroll={(event) => setJsonPreviewScrollTop((event.target as HTMLPreElement).scrollTop)}
+						>
+							{jsonPreviewValue}
+						</pre>
+					</div>
+				</div>
+			);
+		}
+
 		return (
 			<Input
 				as="textarea"
 				rows={10}
 				value={formData.value}
 				onChange={(value) => setFormData((prev) => ({ ...prev, value }))}
-				placeholder={formData.type === 'json' ? t('modal.jsonPlaceholder', { defaultValue: "输入 JSON 数据，例如: {\"key\": \"value\"}" }) : t('modal.textPlaceholder', { defaultValue: "输入文本内容" })}
+				placeholder={t('modal.textPlaceholder', { defaultValue: "输入文本内容" })}
 				size="lg"
 			/>
 		);
@@ -328,7 +529,7 @@ export const ModalForm: React.FC<ModalFormProps> = ({
 				<Button onClick={onClose} appearance="subtle">
 					{t('modal.cancel', { defaultValue: "取消" })}
 				</Button>
-				<Button onClick={handleSubmit} appearance="primary" loading={loading}>
+				<Button onClick={handleSubmit} appearance="primary" loading={loading} disabled={formData.type === 'json' && jsonPreviewMode}>
 					{mode === 'create' ? t('modal.create', { defaultValue: "创建" }) : t('modal.update', { defaultValue: "更新" })}
 				</Button>
 			</Modal.Footer>
