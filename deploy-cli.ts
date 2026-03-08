@@ -100,6 +100,18 @@ function logError(message: string): void {
 	console.log(chalk.red('[ERROR]'), message);
 }
 
+function logStep(label: string, detail?: string): void {
+	logInfo(detail ? `${label}: ${detail}` : label);
+}
+
+function logDone(label: string, detail?: string): void {
+	logSuccess(detail ? `${label}: ${detail}` : label);
+}
+
+function logSkip(label: string, detail?: string): void {
+	logWarn(detail ? `${label}: ${detail}` : label);
+}
+
 function fail(message: string): never {
 	logError(message);
 	process.exit(1);
@@ -681,13 +693,13 @@ function getCommandOutput(args: string[], timeout = 30000): string {
 }
 
 function ensureWranglerLogin(): void {
-	logInfo('检查 Cloudflare 登录状态...');
+	logStep('Cloudflare 登录检查');
 	const result = run(getNpxBin(), ['wrangler', 'whoami'], { timeout: 30000 });
 	if (!result.ok) {
 		console.log(result.stderr || result.stdout);
 		fail('未登录 Cloudflare，请先执行: npx wrangler login');
 	}
-	logSuccess('Cloudflare 登录状态正常');
+	logDone('Cloudflare 登录检查', '通过');
 }
 
 function toJsonc(value: JsonObject): string {
@@ -711,23 +723,23 @@ function ensureDeployFiles(envName: string, config: JsonObject): { generatedPath
 
 function runBuild(skipBuild = false): void {
 	if (skipBuild) {
-		logWarn('跳过构建阶段 (--skip-build)');
+		logSkip('项目构建', '已跳过 (--skip-build)');
 		return;
 	}
-	logInfo('执行项目构建...');
+	logStep('项目构建');
 	const result = run('npm', ['run', 'build'], { timeout: 300000 });
 	if (!result.ok) {
 		console.log(result.stdout);
 		console.log(result.stderr);
 		fail('构建失败，已终止部署');
 	}
-	logSuccess('构建完成');
+	logDone('项目构建', '完成');
 }
 
-function upsertApiKeySecret(apiKey: string | undefined): void {
+function upsertApiKeySecret(apiKey: string | undefined, workerName: string, generatedConfigPath: string): void {
 	if (!apiKey) return;
-	logInfo('写入 API_KEY secret...');
-	const result = run(getNpxBin(), ['wrangler', 'secret', 'put', 'API_KEY', '--name', path.basename(WORKDIR)], {
+	logStep('API_KEY Secret', `写入到 ${workerName}`);
+	const result = run(getNpxBin(), ['wrangler', 'secret', 'put', 'API_KEY', '--name', workerName, '--config', generatedConfigPath], {
 		input: `${apiKey}\n`,
 		timeout: 120000,
 	});
@@ -736,7 +748,7 @@ function upsertApiKeySecret(apiKey: string | undefined): void {
 		console.log(result.stderr);
 		fail('写入 API_KEY secret 失败');
 	}
-	logSuccess('API_KEY secret 写入成功');
+	logDone('API_KEY Secret', '写入成功');
 }
 
 function listD1Databases(): Array<{ uuid: string; name: string }> {
@@ -752,7 +764,7 @@ function listR2Buckets(): Array<{ name: string }> {
 }
 
 async function selectD1Database(binding: D1BindingConfig, nonInteractive: boolean): Promise<ResourceInfo | null> {
-	logInfo('获取 D1 数据库列表...');
+	logStep('D1 资源', '获取数据库列表');
 	try {
 		const dbs = listD1Databases();
 		if (dbs.length === 0) {
@@ -779,7 +791,7 @@ async function selectD1Database(binding: D1BindingConfig, nonInteractive: boolea
 }
 
 async function selectKVNamespace(binding: string, nonInteractive: boolean): Promise<ResourceInfo | null> {
-	logInfo('获取 KV 命名空间列表...');
+	logStep('KV 资源', '获取命名空间列表');
 	try {
 		const namespaces = listKVNamespaces();
 		if (namespaces.length === 0) {
@@ -806,7 +818,7 @@ async function selectKVNamespace(binding: string, nonInteractive: boolean): Prom
 }
 
 async function selectR2Bucket(binding: R2BindingConfig, nonInteractive: boolean): Promise<ResourceInfo | null> {
-	logInfo('获取 R2 存储桶列表...');
+	logStep('R2 资源', '获取存储桶列表');
 	try {
 		const buckets = listR2Buckets();
 		if (buckets.length === 0) {
@@ -832,16 +844,16 @@ async function selectR2Bucket(binding: R2BindingConfig, nonInteractive: boolean)
 }
 
 async function ensureD1Database(binding: D1BindingConfig, missingResourcePolicy: MissingResourcePolicy, yes: boolean, nonInteractive: boolean): Promise<ResourceInfo> {
-	logInfo(`检查 D1: ${binding.binding} (${binding.database_name})`);
+	logStep('D1 资源检查', `${binding.binding} -> ${binding.database_name}`);
 	try {
 		const dbs = listD1Databases();
 		const existing = dbs.find((db) => db.name === binding.database_name || db.uuid === binding.database_id);
 		if (existing) {
-			logSuccess(`D1 ${binding.binding}: 已存在 (${existing.uuid})`);
+			logDone('D1 资源检查', `${binding.binding} -> ${existing.name} (${existing.uuid})`);
 			return { type: 'd1', binding: binding.binding, id: existing.uuid, name: existing.name, status: 'existing' };
 		}
 	} catch {
-		logInfo('未找到现有数据库');
+		logStep('D1 资源检查', '未找到现有数据库');
 	}
 	const policy = resolveEffectiveMissingPolicy(missingResourcePolicy, yes);
 	const action = policy === 'ask' ? await promptMissingResourceAction(`D1 ${binding.binding}`) : policy;
@@ -857,7 +869,7 @@ async function ensureD1Database(binding: D1BindingConfig, missingResourcePolicy:
 			const output = getCommandOutput(['d1', 'create', binding.database_name], 60000);
 			const idMatch = output.match(/([a-f0-9-]{36})/i);
 			if (idMatch) {
-				logSuccess(`D1 创建成功 (${idMatch[1]})`);
+				logDone('D1 资源创建', `${binding.database_name} (${idMatch[1]})`);
 				return { type: 'd1', binding: binding.binding, id: idMatch[1], name: binding.database_name, status: 'created' };
 			}
 			const refreshed = listD1Databases().find((db) => db.name === binding.database_name);
@@ -875,10 +887,10 @@ async function ensureD1Database(binding: D1BindingConfig, missingResourcePolicy:
 				}
 			}
 			if (retries > 0) {
-				logWarn(`创建失败，${retries} 次重试...`);
+				logSkip('D1 资源创建', `失败，剩余重试 ${retries} 次`);
 				await new Promise((resolve) => setTimeout(resolve, 3000));
 			} else {
-				logWarn(`创建失败: ${message}`);
+				logSkip('D1 资源创建', `失败 - ${message}`);
 			}
 		}
 	}
@@ -900,18 +912,18 @@ async function createD1DatabaseWithPrompt(defaultName: string): Promise<Resource
 		const output = getCommandOutput(['d1', 'create', databaseName], 60000);
 		const idMatch = output.match(/([a-f0-9-]{36})/i);
 		if (idMatch) {
-			logSuccess(`D1 创建成功 (${idMatch[1]})`);
+			logDone('D1 资源创建', `${databaseName} (${idMatch[1]})`);
 			return { type: 'd1', binding: databaseName, id: idMatch[1], name: databaseName, status: 'created' };
 		}
 		const refreshed = listD1Databases().find((db) => db.name === databaseName);
 		if (refreshed) {
-			logSuccess(`D1 创建成功 (${refreshed.uuid})`);
+			logDone('D1 资源创建', `${refreshed.name} (${refreshed.uuid})`);
 			return { type: 'd1', binding: databaseName, id: refreshed.uuid, name: refreshed.name, status: 'created' };
 		}
-		logWarn('创建成功但未解析到数据库 ID');
+		logSkip('D1 资源创建', '创建成功但未解析到数据库 ID');
 		return null;
 	} catch (error) {
-		logWarn(`创建 D1 失败: ${error instanceof Error ? error.message : String(error)}`);
+		logSkip('D1 资源创建', `失败 - ${error instanceof Error ? error.message : String(error)}`);
 		return null;
 	}
 }
@@ -953,18 +965,18 @@ async function createKVNamespaceWithPrompt(defaultName: string): Promise<Resourc
 		const output = getCommandOutput(['kv', 'namespace', 'create', namespaceTitle], 60000);
 		const idMatch = output.match(/([a-f0-9-]{32,36})/i);
 		if (idMatch) {
-			logSuccess(`KV 创建成功 (${idMatch[1]})`);
+			logDone('KV 资源创建', `${namespaceTitle} (${idMatch[1]})`);
 			return { type: 'kv', binding: namespaceTitle, id: idMatch[1], status: 'created' };
 		}
 		const refreshed = listKVNamespaces().find((ns) => ns.title === namespaceTitle);
 		if (refreshed) {
-			logSuccess(`KV 创建成功 (${refreshed.id})`);
+			logDone('KV 资源创建', `${refreshed.title} (${refreshed.id})`);
 			return { type: 'kv', binding: namespaceTitle, id: refreshed.id, status: 'created' };
 		}
-		logWarn('创建成功但未解析到 KV ID');
+		logSkip('KV 资源创建', '创建成功但未解析到 KV ID');
 		return null;
 	} catch (error) {
-		logWarn(`创建 KV 失败: ${error instanceof Error ? error.message : String(error)}`);
+		logSkip('KV 资源创建', `失败 - ${error instanceof Error ? error.message : String(error)}`);
 		return null;
 	}
 }
@@ -982,25 +994,25 @@ async function createR2BucketWithPrompt(defaultName: string): Promise<ResourceIn
 	const bucketName = (answer.bucketName as string).trim();
 	try {
 		getCommandOutput(['r2', 'bucket', 'create', bucketName], 60000);
-		logSuccess(`R2 创建成功 (${bucketName})`);
+		logDone('R2 资源创建', bucketName);
 		return { type: 'r2', binding: bucketName, id: bucketName, status: 'created' };
 	} catch (error) {
-		logWarn(`创建 R2 失败: ${error instanceof Error ? error.message : String(error)}`);
+		logSkip('R2 资源创建', `失败 - ${error instanceof Error ? error.message : String(error)}`);
 		return null;
 	}
 }
 
 async function ensureKVNamespace(binding: KVBindingConfig, missingResourcePolicy: MissingResourcePolicy, yes: boolean, nonInteractive: boolean): Promise<ResourceInfo> {
-	logInfo(`检查 KV: ${binding.binding}`);
+	logStep('KV 资源检查', binding.binding);
 	try {
 		const namespaces = listKVNamespaces();
 		const existing = namespaces.find((ns) => ns.title === binding.binding || ns.id === binding.id);
 		if (existing) {
-			logSuccess(`KV ${binding.binding}: ${existing.id}`);
+			logDone('KV 资源检查', `${binding.binding} -> ${existing.title} (${existing.id})`);
 			return { type: 'kv', binding: binding.binding, id: existing.id, status: 'existing' };
 		}
 	} catch {
-		logInfo('未找到现有 KV');
+		logStep('KV 资源检查', '未找到现有命名空间');
 	}
 	const policy = resolveEffectiveMissingPolicy(missingResourcePolicy, yes);
 	const action = policy === 'ask' ? await promptMissingResourceAction(`KV ${binding.binding}`) : policy;
@@ -1016,7 +1028,7 @@ async function ensureKVNamespace(binding: KVBindingConfig, missingResourcePolicy
 			const output = getCommandOutput(['kv', 'namespace', 'create', binding.binding], 60000);
 			const idMatch = output.match(/([a-f0-9-]{32,36})/i);
 			if (idMatch) {
-				logSuccess(`KV 创建成功 (${idMatch[1]})`);
+				logDone('KV 资源创建', `${binding.binding} (${idMatch[1]})`);
 				return { type: 'kv', binding: binding.binding, id: idMatch[1], status: 'created' };
 			}
 			const refreshed = listKVNamespaces().find((ns) => ns.title === binding.binding);
@@ -1028,10 +1040,10 @@ async function ensureKVNamespace(binding: KVBindingConfig, missingResourcePolicy
 			retries -= 1;
 			const message = error instanceof Error ? error.message : String(error);
 			if (retries > 0) {
-				logWarn(`创建失败，${retries} 次重试...`);
+				logSkip('KV 资源创建', `失败，剩余重试 ${retries} 次`);
 				await new Promise((resolve) => setTimeout(resolve, 3000));
 			} else {
-				logWarn(`创建失败: ${message}`);
+				logSkip('KV 资源创建', `失败 - ${message}`);
 			}
 		}
 	}
@@ -1039,16 +1051,16 @@ async function ensureKVNamespace(binding: KVBindingConfig, missingResourcePolicy
 }
 
 async function ensureR2Bucket(binding: R2BindingConfig, missingResourcePolicy: MissingResourcePolicy, yes: boolean, nonInteractive: boolean): Promise<ResourceInfo> {
-	logInfo(`检查 R2: ${binding.binding} (${binding.bucket_name})`);
+	logStep('R2 资源检查', `${binding.binding} -> ${binding.bucket_name}`);
 	try {
 		const buckets = listR2Buckets();
 		const existing = buckets.find((bucket) => bucket.name === binding.bucket_name);
 		if (existing) {
-			logSuccess(`R2 ${binding.binding}: 已存在`);
+			logDone('R2 资源检查', `${binding.binding} -> ${existing.name}`);
 			return { type: 'r2', binding: binding.binding, id: existing.name, status: 'existing' };
 		}
 	} catch {
-		logInfo('未找到现有 R2');
+		logStep('R2 资源检查', '未找到现有存储桶');
 	}
 	const policy = resolveEffectiveMissingPolicy(missingResourcePolicy, yes);
 	const action = policy === 'ask' ? await promptMissingResourceAction(`R2 ${binding.binding}`) : policy;
@@ -1060,10 +1072,10 @@ async function ensureR2Bucket(binding: R2BindingConfig, missingResourcePolicy: M
 	}
 	try {
 		getCommandOutput(['r2', 'bucket', 'create', binding.bucket_name], 60000);
-		logSuccess(`R2 创建成功 (${binding.bucket_name})`);
+		logDone('R2 资源创建', binding.bucket_name);
 		return { type: 'r2', binding: binding.binding, id: binding.bucket_name, status: 'created' };
 	} catch (error) {
-		logWarn(`创建失败: ${error instanceof Error ? error.message : String(error)}`);
+		logSkip('R2 资源创建', `失败 - ${error instanceof Error ? error.message : String(error)}`);
 	}
 	return (await selectR2Bucket(binding, nonInteractive)) || { type: 'r2', binding: binding.binding, id: '', status: 'pending' };
 }
@@ -1308,29 +1320,31 @@ function applyResolvedResources(config: JsonObject, resources: ResourceInfo[]): 
 	return nextConfig;
 }
 
-function runMigrations(config: JsonObject, envName: string): void {
+function runMigrations(config: JsonObject, generatedConfigPath: string): void {
 	const schemaPath = path.join(WORKDIR, 'src', 'database', 'schema.sql');
 	if (!fs.existsSync(schemaPath)) {
-		logWarn(`迁移文件不存在，跳过: ${path.relative(WORKDIR, schemaPath)}`);
+		logSkip('数据库迁移', `迁移文件不存在 - ${path.relative(WORKDIR, schemaPath)}`);
 		return;
 	}
 	const d1Databases = config.d1_databases;
 	if (!Array.isArray(d1Databases) || d1Databases.length === 0) {
-		logWarn('当前配置没有 D1 绑定，跳过迁移');
+		logSkip('数据库迁移', '当前配置没有 D1 绑定');
 		return;
 	}
 	const firstDb = d1Databases[0];
 	if (!firstDb || typeof firstDb !== 'object' || Array.isArray(firstDb)) {
-		logWarn('D1 绑定配置异常，跳过迁移');
+		logSkip('数据库迁移', 'D1 绑定配置异常');
 		return;
 	}
+	const binding = (firstDb as JsonObject).binding;
 	const databaseName = (firstDb as JsonObject).database_name;
-	if (typeof databaseName !== 'string' || !databaseName.trim()) {
-		logWarn('未找到 D1 database_name，跳过迁移');
+	const databaseRef = typeof binding === 'string' && binding.trim() ? binding : databaseName;
+	if (typeof databaseRef !== 'string' || !databaseRef.trim()) {
+		logSkip('数据库迁移', '未找到可用的 D1 binding/database_name');
 		return;
 	}
-	logInfo(`执行数据库迁移: ${databaseName}`);
-	const result = run(getNpxBin(), ['wrangler', 'd1', 'execute', databaseName, '--remote', `--file=${schemaPath}`, '--env', envName], {
+	logStep('数据库迁移', databaseRef);
+	const result = run(getNpxBin(), ['wrangler', 'd1', 'execute', databaseRef, '--remote', `--file=${schemaPath}`, '--config', generatedConfigPath], {
 		timeout: 120000,
 	});
 	if (!result.ok) {
@@ -1338,27 +1352,27 @@ function runMigrations(config: JsonObject, envName: string): void {
 		console.log(result.stderr);
 		fail('数据库迁移失败');
 	}
-	logSuccess('数据库迁移完成');
+	logDone('数据库迁移', '完成');
 }
 
 async function runHealthcheck(config: JsonObject): Promise<void> {
 	const workerUrl = `https://${getWorkerName(config)}.workers.dev/._jsondb_/api/health`;
-	logInfo(`执行健康检查: ${workerUrl}`);
+	logStep('健康检查', workerUrl);
 	try {
 		const response = await fetch(workerUrl, { signal: AbortSignal.timeout(15000) });
 		if (!response.ok) {
-			logWarn(`健康检查返回异常状态: ${response.status}`);
+			logSkip('健康检查', `返回状态 ${response.status}`);
 			return;
 		}
 		const payload = (await response.json()) as { status?: string };
-		logSuccess(`健康检查通过${payload.status ? `: ${payload.status}` : ''}`);
+		logDone('健康检查', payload.status || '通过');
 	} catch (error) {
-		logWarn(`健康检查失败: ${error instanceof Error ? error.message : String(error)}`);
+		logSkip('健康检查', `失败 - ${error instanceof Error ? error.message : String(error)}`);
 	}
 }
 
-function buildDeployArgs(options: DeployOptions): string[] {
-	const args = ['wrangler', 'deploy', '--config', path.join(DEPLOY_DIR, 'config.json')];
+function buildDeployArgs(options: DeployOptions, generatedConfigPath: string): string[] {
+	const args = ['wrangler', 'deploy', '--config', generatedConfigPath];
 	if (options.dryRun) {
 		args.push('--dry-run');
 	}
@@ -1434,7 +1448,7 @@ async function deploy(options: DeployOptions): Promise<void> {
 	const generatedPathRelative = path.relative(WORKDIR, generatedPath);
 	finalConfig = rewriteConfigPathsForGeneratedFile(finalConfig, generatedDir);
 
-	const deployArgs = buildDeployArgs(options);
+	const deployArgs = buildDeployArgs(options, generatedPath);
 	const previewCommand = `${getNpxBin()} ${deployArgs.join(' ')}`;
 
 	if (options.dryRun) {
@@ -1469,23 +1483,23 @@ async function deploy(options: DeployOptions): Promise<void> {
 	}
 
 	const writtenFiles = ensureDeployFiles(envName, finalConfig);
-	logSuccess(`已生成部署配置: ${path.relative(WORKDIR, writtenFiles.generatedPath)}`);
-	logSuccess(`已生成配置重定向: ${path.relative(WORKDIR, writtenFiles.redirectPath)}`);
+	logDone('部署配置生成', path.relative(WORKDIR, writtenFiles.generatedPath));
+	logDone('配置重定向生成', path.relative(WORKDIR, writtenFiles.redirectPath));
 
 	const apiKey = await resolveApiKey(options);
 
 	if (!apiKey) {
-		logWarn('未检测到 API_KEY，本次将跳过 API_KEY secret 写入');
+		logSkip('API_KEY Secret', '未检测到 API_KEY，跳过写入');
 	}
 
 	if (!skipMigrate) {
-		runMigrations(finalConfig, envName);
+		runMigrations(finalConfig, writtenFiles.generatedPath);
 	}
 
 	runBuild(Boolean(options.skipBuild));
-	upsertApiKeySecret(apiKey);
+	upsertApiKeySecret(apiKey, getWorkerName(finalConfig), writtenFiles.generatedPath);
 
-	logInfo(`执行部署命令: ${previewCommand}`);
+	logStep('Worker 部署', previewCommand);
 	const deployResult = run(getNpxBin(), deployArgs, { timeout: 300000 });
 	if (!deployResult.ok) {
 		console.log(deployResult.stdout);
@@ -1497,7 +1511,7 @@ async function deploy(options: DeployOptions): Promise<void> {
 	if (!skipHealthcheck) {
 		await runHealthcheck(finalConfig);
 	}
-	logSuccess(options.dryRun ? 'dry-run 执行成功' : '部署成功');
+	logDone('Worker 部署', options.dryRun ? 'dry-run 执行成功' : '部署成功');
 }
 
 function doctor(): void {
