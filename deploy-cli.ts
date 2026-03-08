@@ -28,6 +28,7 @@ interface DeployOptions {
 	skipMigrate?: boolean;
 	skipHealthcheck?: boolean;
 	skipBuild?: boolean;
+	skipSecret?: boolean;
 	apiKey?: string;
 }
 
@@ -445,6 +446,9 @@ async function resolveEnvironment(baseConfig: JsonObject, options: DeployOptions
 }
 
 async function resolveApiKey(options: DeployOptions): Promise<string | undefined> {
+	if (options.skipSecret) {
+		return undefined;
+	}
 	const explicit = options.apiKey?.trim() || process.env.DEPLOY_API_KEY?.trim() || process.env.API_KEY?.trim();
 	if (explicit) {
 		if (explicit.length < 16) {
@@ -1680,7 +1684,9 @@ async function deploy(options: DeployOptions): Promise<void> {
 
 	const apiKey = await resolveApiKey(options);
 
-	if (!apiKey) {
+	if (options.skipSecret) {
+		logSkip('API_KEY Secret', '已跳过 (--skip-secret)');
+	} else if (!apiKey) {
 		logSkip('API_KEY Secret', '未检测到 API_KEY，跳过写入');
 	}
 
@@ -1776,6 +1782,7 @@ program
 	.option('--skip-migrate', '跳过数据库迁移')
 	.option('--skip-healthcheck', '跳过健康检查')
 	.option('--skip-build', '跳过构建')
+	.option('--skip-secret', '跳过 API_KEY secret 设置')
 	.option('--api-key <key>', '写入 API_KEY secret')
 	.action(async (options: DeployOptions) => {
 		await deploy(options);
