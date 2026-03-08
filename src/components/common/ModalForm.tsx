@@ -48,11 +48,24 @@ export const ModalForm: React.FC<ModalFormProps> = ({
 	);
 	const [uploadedFile, setUploadedFile] = React.useState<File | null>(null);
 	const [isUploading, setIsUploading] = React.useState(false);
+	const [autoFilledPath, setAutoFilledPath] = React.useState(false);
+
+	const derivePathFromFile = React.useCallback((file: File) => {
+		const rawName = (file.webkitRelativePath || file.name || '').trim();
+		const normalizedName = rawName.replace(/\\/g, '/').replace(/^\/+/, '');
+
+		if (!normalizedName) {
+			return '';
+		}
+
+		return `/${normalizedName}`;
+	}, []);
 
 	React.useEffect(() => {
 		if (initialData) {
 			setFormData(initialData);
 			setUploadedFile(null);
+			setAutoFilledPath(false);
 		} else if (show) {
 			setFormData({
 				path: '',
@@ -60,6 +73,7 @@ export const ModalForm: React.FC<ModalFormProps> = ({
 				type: initialType,
 			});
 			setUploadedFile(null);
+			setAutoFilledPath(false);
 		}
 	}, [initialData, show, initialType]);
 
@@ -101,6 +115,7 @@ export const ModalForm: React.FC<ModalFormProps> = ({
 	const handleTypeChange = (value: unknown) => {
 		setFormData((prev) => ({ ...prev, type: value as 'json' | 'text' | 'binary', value: '' }));
 		setUploadedFile(null);
+		setAutoFilledPath(false);
 	};
 
 	const handleFileUpload = (fileList: any[]) => {
@@ -113,14 +128,34 @@ export const ModalForm: React.FC<ModalFormProps> = ({
 		if (fileObj?.blobFile) {
 			const blobFile = fileObj.blobFile as File;
 			if (blobFile.size > 0) {
+				const derivedPath = derivePathFromFile(blobFile);
 				setUploadedFile(blobFile);
-				setFormData((prev) => ({ ...prev, value: blobFile.name }));
+				setFormData((prev) => {
+					const shouldAutoFillPath = !prev.path.trim();
+					setAutoFilledPath(Boolean(shouldAutoFillPath && derivedPath));
+
+					return {
+						...prev,
+						path: shouldAutoFillPath ? derivedPath : prev.path,
+						value: blobFile.name,
+					};
+				});
 			}
 		} else if (fileObj.file) {
 			const file = fileObj.file as File;
 			if (file.size > 0) {
+				const derivedPath = derivePathFromFile(file);
 				setUploadedFile(file);
-				setFormData((prev) => ({ ...prev, value: file.name }));
+				setFormData((prev) => {
+					const shouldAutoFillPath = !prev.path.trim();
+					setAutoFilledPath(Boolean(shouldAutoFillPath && derivedPath));
+
+					return {
+						...prev,
+						path: shouldAutoFillPath ? derivedPath : prev.path,
+						value: file.name,
+					};
+				});
 			}
 		}
 
@@ -128,8 +163,14 @@ export const ModalForm: React.FC<ModalFormProps> = ({
 	};
 
 	const handleRemoveFile = () => {
+		const derivedPath = uploadedFile ? derivePathFromFile(uploadedFile) : '';
 		setUploadedFile(null);
-		setFormData((prev) => ({ ...prev, value: '' }));
+		setFormData((prev) => ({
+			...prev,
+			path: autoFilledPath && derivedPath && prev.path === derivedPath ? '' : prev.path,
+			value: '',
+		}));
+		setAutoFilledPath(false);
 		const fileInput = document.querySelector('.rs-uploader input[type="file"]') as HTMLInputElement;
 		if (fileInput) {
 			fileInput.value = '';
@@ -249,7 +290,12 @@ export const ModalForm: React.FC<ModalFormProps> = ({
 						<Form.ControlLabel>{t('modal.path', { defaultValue: "路径" })}</Form.ControlLabel>
 						<Input
 							value={formData.path}
-							onChange={(value) => setFormData((prev) => ({ ...prev, path: value }))}
+							onChange={(value) => {
+								if (autoFilledPath && value !== formData.path) {
+									setAutoFilledPath(false);
+								}
+								setFormData((prev) => ({ ...prev, path: value }));
+							}}
 							placeholder={t('modal.pathPlaceholder', { defaultValue: "/example/data" })}
 							size="lg"
 							disabled={mode === 'edit'}
