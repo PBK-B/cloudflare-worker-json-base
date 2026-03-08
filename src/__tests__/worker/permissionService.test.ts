@@ -11,6 +11,18 @@ import {
 import { PermissionService } from '../../permissions/permissionService'
 import { createMockEnv } from './mocks/env'
 
+jest.mock('../../storage/pathMapper', () => ({
+  PathMapper: jest.fn().mockImplementation(() => ({
+    initialize: jest.fn(async () => undefined),
+    getFileId: jest.fn(async () => null),
+    setMapping: jest.fn(async () => undefined),
+    deleteMapping: jest.fn(async () => undefined),
+    getPath: jest.fn(async () => null),
+    listPaths: jest.fn(async () => []),
+    getTotalPaths: jest.fn(async () => 0),
+  })),
+}))
+
 describe('permissionMatcher', () => {
   it('normalizes leading and trailing slashes', () => {
     expect(normalizePermissionPath('public/demo/')).toBe('/public/demo')

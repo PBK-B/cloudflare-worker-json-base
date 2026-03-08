@@ -12,6 +12,18 @@ jest.mock('../../permissions/permissionService', () => ({
   }))
 }))
 
+jest.mock('../../storage/pathMapper', () => ({
+  PathMapper: jest.fn().mockImplementation(() => ({
+    initialize: jest.fn(async () => undefined),
+    getFileId: jest.fn(async () => null),
+    setMapping: jest.fn(async () => undefined),
+    deleteMapping: jest.fn(async () => undefined),
+    getPath: jest.fn(async () => null),
+    listPaths: jest.fn(async () => []),
+    getTotalPaths: jest.fn(async () => 0),
+  })),
+}))
+
 describe('资源控制器', () => {
   let mockEnv: ReturnType<typeof createMockEnv>
   let store: Map<string, StoredEntry>

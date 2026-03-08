@@ -7,6 +7,7 @@ import { PathMapper } from '../storage/pathMapper';
 import { Config } from '../utils/config';
 import { ApiError } from '../utils/response';
 import { AuthMiddleware, Logger } from '../utils/middleware';
+import { isSystemPath } from '../system/systemPaths';
 
 export class DataAccessController {
   private storageService: FileStorageService;
@@ -38,6 +39,7 @@ export class DataAccessController {
       const pathname = url.pathname;
 
       const isApiPath = pathname.startsWith('/._jsondb_/') || 
+                        isSystemPath(pathname) ||
                         pathname === '/' ||
                         pathname.startsWith('/assets/') ||
                         pathname.startsWith('/vite.svg');

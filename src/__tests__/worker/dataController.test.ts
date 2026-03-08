@@ -9,6 +9,18 @@ jest.mock('../../permissions/permissionService', () => ({
   }))
 }))
 
+jest.mock('../../storage/pathMapper', () => ({
+  PathMapper: jest.fn().mockImplementation(() => ({
+    initialize: jest.fn(async () => undefined),
+    getFileId: jest.fn(async () => null),
+    setMapping: jest.fn(async () => undefined),
+    deleteMapping: jest.fn(async () => undefined),
+    getPath: jest.fn(async () => null),
+    listPaths: jest.fn(async () => []),
+    getTotalPaths: jest.fn(async () => 0),
+  })),
+}))
+
 describe('DataController file upload flow', () => {
   let createMock: ReturnType<typeof jest.fn>
   let updateMock: ReturnType<typeof jest.fn>
