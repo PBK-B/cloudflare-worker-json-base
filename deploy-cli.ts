@@ -140,6 +140,14 @@ function run(
 	};
 }
 
+function isWranglerAuthenticated(result: { ok: boolean; stdout: string; stderr: string; status: number | null }): boolean {
+	const output = `${result.stdout}\n${result.stderr}`.toLowerCase();
+	if (output.includes('you are not authenticated') || output.includes('please run `wrangler login`')) {
+		return false;
+	}
+	return result.ok;
+}
+
 function readText(filePath: string): string {
 	return fs.readFileSync(filePath, 'utf8');
 }
@@ -726,12 +734,29 @@ function getCommandOutput(args: string[], timeout = 30000): string {
 	return result.stdout;
 }
 
-function ensureWranglerLogin(): void {
+function ensureWranglerLogin(options?: DeployOptions): void {
 	logStep('Cloudflare 登录检查');
 	const result = run(getNpxBin(), ['wrangler', 'whoami'], { timeout: 30000 });
-	if (!result.ok) {
-		console.log(result.stderr || result.stdout);
-		fail('未登录 Cloudflare，请先执行: npx wrangler login');
+	if (!isWranglerAuthenticated(result)) {
+		if (isNonInteractiveMode(options || {})) {
+			console.log(result.stderr || result.stdout);
+			fail('未登录 Cloudflare，请先执行: npx wrangler login');
+		}
+		logStep('Cloudflare 登录', '启动 wrangler login');
+		const loginResult = spawnSync(getNpxBin(), ['wrangler', 'login'], {
+			cwd: WORKDIR,
+			encoding: 'utf8',
+			stdio: 'inherit',
+			timeout: 300000,
+		});
+		if (loginResult.status !== 0) {
+			fail('Cloudflare 登录失败或已取消');
+		}
+		const verifyResult = run(getNpxBin(), ['wrangler', 'whoami'], { timeout: 30000 });
+		if (!isWranglerAuthenticated(verifyResult)) {
+			console.log(verifyResult.stderr || verifyResult.stdout);
+			fail('Cloudflare 登录未完成，请重新执行部署');
+		}
 	}
 	logDone('Cloudflare 登录检查', '通过');
 }
@@ -1543,7 +1568,7 @@ async function deploy(options: DeployOptions): Promise<void> {
 		fail('未找到 wrangler.toml');
 	}
 
-	ensureWranglerLogin();
+	ensureWranglerLogin(options);
 
 	const baseConfig = parseTomlLite(readText(WRANGLER_TOML_PATH));
 	const envName = await resolveEnvironment(baseConfig, options);
@@ -1696,7 +1721,7 @@ function doctor(): void {
 	}
 
 	const login = run(getNpxBin(), ['wrangler', 'whoami'], { timeout: 20000 });
-	if (login.ok) {
+	if (isWranglerAuthenticated(login)) {
 		logSuccess('Cloudflare 已登录');
 	} else {
 		logWarn('Cloudflare 未登录 (执行 npx wrangler login)');
