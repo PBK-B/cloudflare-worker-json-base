@@ -38,6 +38,10 @@ export class D1MetadataManager implements MetadataStorage {
       )
     `).run();
 
+    await this.db.prepare(`
+      ALTER TABLE file_metadata ADD COLUMN handle TEXT
+    `).run().catch(() => undefined);
+
     // Create indexes
     await this.db.prepare(`
       CREATE INDEX IF NOT EXISTS idx_file_metadata_created_at ON file_metadata(created_at DESC)
@@ -65,7 +69,7 @@ export class D1MetadataManager implements MetadataStorage {
       metadata.chunkCount,
       metadata.chunkSize,
       metadata.storageBackend,
-      metadata.id
+      metadata.handle || metadata.id
     ).run();
 
     Logger.debug('Metadata saved', { id: metadata.id, size: metadata.size });
@@ -143,6 +147,7 @@ export class D1MetadataManager implements MetadataStorage {
       checksum: row.checksum,
       chunkCount: row.chunk_count,
       chunkSize: row.chunk_size,
+      handle: row.handle || row.id,
       storageBackend: row.storage_backend
     };
   }

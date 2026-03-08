@@ -332,6 +332,7 @@ function createInMemoryStorageAdapter(store: Map<string, StoredEntry>): StorageA
 
     return {
       id: pathname,
+      handle: pathname,
       path: pathname,
       value: item.value,
       type: item.type,

@@ -54,6 +54,7 @@ describe('DataController permission enforcement', () => {
     storageAdapter = {
       get: jest.fn(async (pathname: string) => ({
         id: pathname,
+        handle: pathname,
         path: pathname,
         value: { ok: true },
         type: 'json',
@@ -65,6 +66,7 @@ describe('DataController permission enforcement', () => {
       })),
       create: jest.fn(async (pathname: string, request: any) => ({
         id: pathname,
+        handle: pathname,
         path: pathname,
         value: request.value,
         type: request.type || 'json',
@@ -76,6 +78,7 @@ describe('DataController permission enforcement', () => {
       })),
       update: jest.fn(async (pathname: string, request: any) => ({
         id: pathname,
+        handle: pathname,
         path: pathname,
         value: request.value,
         type: request.type || 'json',

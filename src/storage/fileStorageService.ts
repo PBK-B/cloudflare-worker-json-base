@@ -80,6 +80,7 @@ export class FileStorageService {
 
       const metadata: FileMetadata = {
         id,
+        handle: id,
         name: options.name || null,
         contentType: options.contentType || 'application/octet-stream',
         size: data.length,
@@ -91,7 +92,8 @@ export class FileStorageService {
         storageBackend: provider.getBackendName()
       };
 
-      await provider.write(data, metadata);
+      const handle = await provider.write(data, metadata);
+      metadata.handle = handle;
 
       await this.metadataStore.save(metadata);
 
@@ -131,7 +133,7 @@ export class FileStorageService {
         throw ApiError.serviceUnavailable(`${metadata.storageBackend.toUpperCase()} storage provider not available`);
       }
 
-      const data = await provider.read(metadata.id);
+      const data = await provider.read(metadata.handle || metadata.id);
 
       const calculatedChecksum = await calculateChecksum(data);
       if (calculatedChecksum !== metadata.checksum) {
@@ -168,7 +170,7 @@ export class FileStorageService {
         return null;
       }
 
-      const data = await provider.read(metadata.id);
+      const data = await provider.read(metadata.handle || metadata.id);
       return data;
     } catch (error) {
       Logger.error('Failed to read file data', error);
@@ -190,7 +192,7 @@ export class FileStorageService {
         throw ApiError.serviceUnavailable(`${metadata.storageBackend.toUpperCase()} storage provider not available`);
       }
 
-      await provider.delete(metadata.id);
+      await provider.delete(metadata.handle || metadata.id);
 
       await this.metadataStore.delete(id);
 
@@ -248,7 +250,7 @@ export class FileStorageService {
         return { valid: false, error: `${metadata.storageBackend.toUpperCase()} storage provider not available` };
       }
 
-      const data = await provider.read(metadata.id);
+      const data = await provider.read(metadata.handle || metadata.id);
 
       if (data.length !== metadata.size) {
         return { valid: false, error: 'File size mismatch' };

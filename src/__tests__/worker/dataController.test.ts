@@ -29,6 +29,7 @@ describe('DataController file upload flow', () => {
   beforeEach(() => {
     createMock = jest.fn(async (_pathname: string, request: any) => ({
       id: '/files/demo.bin',
+      handle: '/files/demo.bin',
       path: '/files/demo.bin',
       value: request.value,
       type: request.type,
@@ -41,6 +42,7 @@ describe('DataController file upload flow', () => {
 
     updateMock = jest.fn(async (_pathname: string, request: any) => ({
       id: '/files/demo.bin',
+      handle: '/files/demo.bin',
       path: '/files/demo.bin',
       value: request.value,
       type: request.type,
