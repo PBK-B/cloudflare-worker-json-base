@@ -122,7 +122,7 @@ function fail(message: string): never {
 
 function quoteWindowsArg(value: string): string {
 	if (!value) return '""';
-	if (!/[\s"]/u.test(value)) return value;
+	if (!/[\s"]/.test(value)) return value;
 	return `"${value.replace(/(\\*)"/g, '$1$1\\"')}"`;
 }
 
@@ -164,7 +164,11 @@ function run(
 	return {
 		ok: result.status === 0,
 		stdout: result.stdout || '',
-		stderr: result.stderr || '',
+		stderr:
+			(result.stderr || '') +
+			(result.error
+				? `\n[spawn error] ${result.error instanceof Error ? result.error.message : String(result.error)}`
+				: ''),
 		status: result.status,
 	};
 }
@@ -758,8 +762,59 @@ function getNpxBin(): string {
 	return isWindowsPlatform() ? 'npx.cmd' : 'npx';
 }
 
+function getNpmBin(): string {
+	return isWindowsPlatform() ? 'npm.cmd' : 'npm';
+}
+
+function resolveWranglerCommand(args: string[]): { command: string; args: string[] } {
+	const localWranglerJsBin = path.join(WORKDIR, 'node_modules', 'wrangler', 'bin', 'wrangler.js');
+	if (fs.existsSync(localWranglerJsBin)) {
+		return { command: process.execPath, args: [localWranglerJsBin, ...args] };
+	}
+	return { command: getNpxBin(), args: ['wrangler', ...args] };
+}
+
+function runWrangler(args: string[], options: { input?: string; timeout?: number } = {}): {
+	ok: boolean;
+	stdout: string;
+	stderr: string;
+	status: number | null;
+} {
+	const invocation = resolveWranglerCommand(args);
+	return run(invocation.command, invocation.args, options);
+}
+
+function formatWranglerCommand(args: string[]): string {
+	const invocation = resolveWranglerCommand(args);
+	return `${invocation.command} ${invocation.args.join(' ')}`;
+}
+
+function resolveNpmCommand(args: string[]): { command: string; args: string[] } {
+	const npmExecPath = process.env.npm_execpath;
+	if (npmExecPath && fs.existsSync(npmExecPath)) {
+		return { command: process.execPath, args: [npmExecPath, ...args] };
+	}
+
+	const bundledNpmCliPath = path.join(path.dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js');
+	if (fs.existsSync(bundledNpmCliPath)) {
+		return { command: process.execPath, args: [bundledNpmCliPath, ...args] };
+	}
+
+	return { command: getNpmBin(), args };
+}
+
+function runNpm(args: string[], options: { input?: string; timeout?: number } = {}): {
+	ok: boolean;
+	stdout: string;
+	stderr: string;
+	status: number | null;
+} {
+	const invocation = resolveNpmCommand(args);
+	return run(invocation.command, invocation.args, options);
+}
+
 function getCommandOutput(args: string[], timeout = 30000): string {
-	const result = run(getNpxBin(), ['wrangler', ...args], { timeout });
+	const result = runWrangler(args, { timeout });
 	if (!result.ok) {
 		throw new Error(result.stderr || result.stdout || `命令执行失败: wrangler ${args.join(' ')}`);
 	}
@@ -768,7 +823,7 @@ function getCommandOutput(args: string[], timeout = 30000): string {
 
 function ensureWranglerLogin(options?: DeployOptions): void {
 	logStep('Cloudflare 登录检查');
-	const result = run(getNpxBin(), ['wrangler', 'whoami'], { timeout: 30000 });
+	const result = runWrangler(['whoami'], { timeout: 30000 });
 	if (!isWranglerAuthenticated(result)) {
 		if (isNonInteractiveMode(options || {})) {
 			console.log(result.stderr || result.stdout);
@@ -785,7 +840,7 @@ function ensureWranglerLogin(options?: DeployOptions): void {
 		if (loginResult.status !== 0) {
 			fail('Cloudflare 登录失败或已取消，尝试执行: npx wrangler login');
 		}
-		const verifyResult = run(getNpxBin(), ['wrangler', 'whoami'], { timeout: 30000 });
+		const verifyResult = runWrangler(['whoami'], { timeout: 30000 });
 		if (!isWranglerAuthenticated(verifyResult)) {
 			console.log(verifyResult.stderr || verifyResult.stdout);
 			fail('Cloudflare 登录未完成，请重新执行部署');
@@ -819,7 +874,7 @@ function runBuild(skipBuild = false): void {
 		return;
 	}
 	logStep('项目构建');
-	const result = run('npm', ['run', 'build'], { timeout: 300000 });
+	const result = runNpm(['run', 'build'], { timeout: 300000 });
 	if (!result.ok) {
 		console.log(result.stdout);
 		console.log(result.stderr);
@@ -831,7 +886,7 @@ function runBuild(skipBuild = false): void {
 function upsertApiKeySecret(apiKey: string | undefined, workerName: string, generatedConfigPath: string): void {
 	if (!apiKey) return;
 	logStep('API_KEY Secret', `写入到 ${workerName}`);
-	const result = run(getNpxBin(), ['wrangler', 'secret', 'put', 'API_KEY', '--name', workerName, '--config', generatedConfigPath], {
+	const result = runWrangler(['secret', 'put', 'API_KEY', '--name', workerName, '--config', generatedConfigPath], {
 		input: `${apiKey}\n`,
 		timeout: 120000,
 	});
@@ -1554,13 +1609,9 @@ function runMigrations(config: JsonObject, generatedConfigPath: string): void {
 		return;
 	}
 	logStep('数据库迁移', databaseRef);
-	const result = run(
-		getNpxBin(),
-		['wrangler', 'd1', 'execute', databaseRef, '--remote', `--file=${schemaPath}`, '--config', generatedConfigPath],
-		{
-			timeout: 120000,
-		},
-	);
+	const result = runWrangler(['d1', 'execute', databaseRef, '--remote', `--file=${schemaPath}`, '--config', generatedConfigPath], {
+		timeout: 120000,
+	});
 	if (!result.ok) {
 		console.log(result.stdout);
 		console.log(result.stderr);
@@ -1586,7 +1637,7 @@ async function runHealthcheck(config: JsonObject): Promise<void> {
 }
 
 function buildDeployArgs(options: DeployOptions, generatedConfigPath: string): string[] {
-	const args = ['wrangler', 'deploy', '--config', generatedConfigPath];
+	const args = ['deploy', '--config', generatedConfigPath];
 	if (options.dryRun) {
 		args.push('--dry-run');
 	}
@@ -1659,22 +1710,15 @@ async function deploy(options: DeployOptions): Promise<void> {
 
 	assertRequiredFields(finalConfig);
 	checkSensitiveVars(finalConfig);
-	const validationErrors = validateGeneratedConfig(finalConfig);
-	if (validationErrors.length > 0) {
-		for (const message of validationErrors) {
-			logError(message);
-		}
-		fail('生成配置校验失败');
-	}
 
 	const generatedPath = path.join(DEPLOY_DIR, 'generated', envName, 'wrangler.jsonc');
 	const generatedDir = path.dirname(generatedPath);
 	const redirectPath = path.join(DEPLOY_DIR, 'config.json');
 	const generatedPathRelative = path.relative(WORKDIR, generatedPath);
-	finalConfig = rewriteConfigPathsForGeneratedFile(finalConfig, generatedDir);
+	const deployConfig = rewriteConfigPathsForGeneratedFile(finalConfig, generatedDir);
 
 	const deployArgs = buildDeployArgs(options, generatedPath);
-	const previewCommand = `${getNpxBin()} ${deployArgs.join(' ')}`;
+	const previewCommand = formatWranglerCommand(deployArgs);
 
 	if (options.dryRun) {
 		console.log(chalk.cyan('\n[DRY-RUN] 配置预览 (不会写入文件，不会部署)'));
@@ -1685,7 +1729,7 @@ async function deploy(options: DeployOptions): Promise<void> {
 		console.log(`健康检查: ${skipHealthcheck ? '跳过' : '执行'}`);
 		console.log(`计划生成: ${generatedPathRelative}`);
 		console.log('\n--- wrangler.jsonc ---');
-		console.log(toJsonc(finalConfig).trim());
+		console.log(toJsonc(deployConfig).trim());
 		console.log('--- end ---\n');
 		logSuccess('配置校验通过');
 		return;
@@ -1707,7 +1751,16 @@ async function deploy(options: DeployOptions): Promise<void> {
 		return;
 	}
 
-	const writtenFiles = ensureDeployFiles(envName, finalConfig);
+	runBuild(Boolean(options.skipBuild));
+	const validationErrors = validateGeneratedConfig(finalConfig);
+	if (validationErrors.length > 0) {
+		for (const message of validationErrors) {
+			logError(message);
+		}
+		fail('生成配置校验失败');
+	}
+
+	const writtenFiles = ensureDeployFiles(envName, deployConfig);
 	logDone('部署配置生成', path.relative(WORKDIR, writtenFiles.generatedPath));
 	logDone('配置重定向生成', path.relative(WORKDIR, writtenFiles.redirectPath));
 
@@ -1723,11 +1776,10 @@ async function deploy(options: DeployOptions): Promise<void> {
 		runMigrations(finalConfig, writtenFiles.generatedPath);
 	}
 
-	runBuild(Boolean(options.skipBuild));
 	upsertApiKeySecret(apiKey, getWorkerName(finalConfig), writtenFiles.generatedPath);
 
 	logStep('Worker 部署', previewCommand);
-	const deployResult = run(getNpxBin(), deployArgs, { timeout: 300000 });
+	const deployResult = runWrangler(deployArgs, { timeout: 300000 });
 	if (!deployResult.ok) {
 		console.log(deployResult.stdout);
 		console.log(deployResult.stderr);
@@ -1755,7 +1807,7 @@ function doctor(): void {
 		}
 	}
 
-	const login = run(getNpxBin(), ['wrangler', 'whoami'], { timeout: 20000 });
+	const login = runWrangler(['whoami'], { timeout: 20000 });
 	if (isWranglerAuthenticated(login)) {
 		logSuccess('Cloudflare 已登录');
 	} else {
@@ -1865,6 +1917,7 @@ export const __testing = {
 	isNonInteractiveMode,
 	looksLikeUuid,
 	getNpxBin,
+	formatWranglerCommand,
 	getCommandOutput,
 	ensureWranglerLogin,
 	ensureDeployFiles,

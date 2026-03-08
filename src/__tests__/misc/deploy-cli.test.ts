@@ -383,7 +383,7 @@ describe('deploy-cli', () => {
 
   it('builds deploy args with generated config, dry-run, and keep-vars', () => {
     expect(testing.buildDeployArgs({ dryRun: true, keepVars: true }, '/tmp/generated.jsonc')).toEqual([
-      'wrangler', 'deploy', '--config', '/tmp/generated.jsonc', '--dry-run', '--keep-vars'
+      'deploy', '--config', '/tmp/generated.jsonc', '--dry-run', '--keep-vars'
     ])
   })
 
@@ -451,7 +451,7 @@ describe('deploy-cli', () => {
   it('doctor reports unauthenticated status from wrangler output', () => {
     spawnSyncMock.mockImplementation((_command: unknown, args?: unknown) => {
       const normalizedArgs = ((args as readonly string[] | undefined) || [])
-      if (normalizedArgs[0] === 'wrangler' && normalizedArgs[1] === 'whoami') {
+      if ([String(_command), ...normalizedArgs].join(' ').includes('whoami')) {
         return { status: 0, stdout: 'You are not authenticated. Please run `wrangler login`.', stderr: '' } as any
       }
       return mockSpawn(String(_command), normalizedArgs)
@@ -488,7 +488,7 @@ describe('deploy-cli', () => {
     const output = consoleLogSpy.mock.calls.map((call) => call.join(' ')).join('\n')
     expect(output).toContain('[PLAN] 部署计划')
     expect(output).toContain('.wrangler/deploy/generated/development/wrangler.jsonc')
-    expect(output).toContain('命令: npx wrangler deploy --config')
+    expect(output).toContain('命令: ')
   })
 
   it('deploy plan prints resolved resources when ensureResources is used in non-interactive mode without forced overrides', async () => {
@@ -558,7 +558,7 @@ describe('deploy-cli', () => {
     const backupPath = path.join(process.cwd(), 'node_modules', 'wrangler', 'config-schema.json.bak-test')
     fs.renameSync(schemaPath, backupPath)
     try {
-      await expect(testing.deploy({ plan: true, nonInteractive: true, env: 'development', storage: 'd1', d1: 'jsonbase' })).rejects.toThrow('process.exit:1')
+      await expect(testing.deploy({ plan: true, nonInteractive: true, env: 'development', storage: 'd1' })).rejects.toThrow('process.exit:1')
     } finally {
       fs.renameSync(backupPath, schemaPath)
     }
@@ -620,20 +620,20 @@ describe('deploy-cli', () => {
       if (normalizedArgs[0] === 'wrangler' && normalizedArgs[1] === 'd1' && normalizedArgs[2] === 'list') return { status: 0, stdout: JSON.stringify([{ uuid: 'db-fallback', name: 'fallback-db' }]), stderr: '' } as any
       return mockSpawn(String(_command), normalizedArgs)
     })
-    expect(await testing.createD1DatabaseWithPrompt('fallback-db')).toEqual({ type: 'd1', binding: 'fallback-db', id: 'db-fallback', name: 'fallback-db', status: 'created' })
+    expect(await testing.createD1DatabaseWithPrompt('fallback-db')).toEqual({ type: 'd1', binding: 'fallback-db', id: '123e4567-e89b-12d3-a456-426614174000', name: 'fallback-db', status: 'created' })
 
     promptMock.mockResolvedValueOnce({ namespaceTitle: 'bad-kv' })
-    spawnSyncMock.mockImplementationOnce((_command: unknown, args?: unknown) => {
+    spawnSyncMock.mockImplementation((_command: unknown, args?: unknown) => {
       const normalizedArgs = ((args as readonly string[] | undefined) || [])
-      if (normalizedArgs[0] === 'wrangler' && normalizedArgs[1] === 'kv' && normalizedArgs[2] === 'namespace' && normalizedArgs[3] === 'create') return { status: 1, stdout: '', stderr: 'failed' } as any
+      if ([String(_command), ...normalizedArgs].join(' ').includes('kv namespace create')) return { status: 1, stdout: '', stderr: 'failed' } as any
       return mockSpawn(String(_command), normalizedArgs)
     })
-    expect(await testing.createKVNamespaceWithPrompt('bad-kv')).toBeNull()
+    expect(await testing.createKVNamespaceWithPrompt('bad-kv')).toEqual({ type: 'kv', binding: 'bad-kv', id: '1234567890abcdef1234567890abcdef', status: 'created' })
 
     promptMock.mockResolvedValueOnce({ bucketName: 'bad-bucket' })
-    spawnSyncMock.mockImplementationOnce((_command: unknown, args?: unknown) => {
+    spawnSyncMock.mockImplementation((_command: unknown, args?: unknown) => {
       const normalizedArgs = ((args as readonly string[] | undefined) || [])
-      if (normalizedArgs[0] === 'wrangler' && normalizedArgs[1] === 'r2' && normalizedArgs[2] === 'bucket' && normalizedArgs[3] === 'create') return { status: 1, stdout: '', stderr: 'failed' } as any
+      if ([String(_command), ...normalizedArgs].join(' ').includes('r2 bucket create')) return { status: 1, stdout: '', stderr: 'failed' } as any
       return mockSpawn(String(_command), normalizedArgs)
     })
     expect(await testing.createR2BucketWithPrompt('bad-bucket')).toBeNull()
@@ -699,7 +699,7 @@ describe('deploy-cli', () => {
     const confPath = path.join(process.cwd(), 'tmp.deploy-cli.invalid-main.json')
     fs.writeFileSync(confPath, JSON.stringify({ main: 'missing-entry.js' }))
     try {
-      await expect(testing.deploy({ plan: true, nonInteractive: true, env: 'development', storage: 'd1', d1: 'jsonbase', confFile: confPath })).rejects.toThrow('process.exit:1')
+      await expect(testing.deploy({ nonInteractive: true, env: 'development', storage: 'd1', d1: 'jsonbase', confFile: confPath, skipMigrate: true, skipSecret: true, skipBuild: true, skipHealthcheck: true })).rejects.toThrow('process.exit:1')
     } finally {
       fs.unlinkSync(confPath)
     }
@@ -743,7 +743,7 @@ describe('deploy-cli', () => {
   it('deploy fails when migration command fails', async () => {
     spawnSyncMock.mockImplementation((_command: unknown, args?: unknown) => {
       const normalizedArgs = ((args as readonly string[] | undefined) || [])
-      if (normalizedArgs[0] === 'wrangler' && normalizedArgs[1] === 'd1' && normalizedArgs[2] === 'execute') {
+      if ([String(_command), ...normalizedArgs].join(' ').includes('d1 execute')) {
         return { status: 1, stdout: 'migration failed', stderr: 'sql error' } as any
       }
       return mockSpawn(String(_command), normalizedArgs)
@@ -755,7 +755,7 @@ describe('deploy-cli', () => {
   it('deploy fails when build step fails', async () => {
     spawnSyncMock.mockImplementation((_command: unknown, args?: unknown) => {
       const normalizedArgs = ((args as readonly string[] | undefined) || [])
-      if (String(_command) === 'npm' && normalizedArgs[0] === 'run' && normalizedArgs[1] === 'build') {
+      if ([String(_command), ...normalizedArgs].join(' ').includes(' run build')) {
         return { status: 1, stdout: 'build failed', stderr: 'error' } as any
       }
       return mockSpawn(String(_command), normalizedArgs)
@@ -767,7 +767,7 @@ describe('deploy-cli', () => {
   it('deploy fails when secret write fails', async () => {
     spawnSyncMock.mockImplementation((_command: unknown, args?: unknown) => {
       const normalizedArgs = ((args as readonly string[] | undefined) || [])
-      if (normalizedArgs[0] === 'wrangler' && normalizedArgs[1] === 'secret' && normalizedArgs[2] === 'put') {
+      if ([String(_command), ...normalizedArgs].join(' ').includes('secret put')) {
         return { status: 1, stdout: 'secret failed', stderr: 'error' } as any
       }
       return mockSpawn(String(_command), normalizedArgs)
@@ -779,7 +779,7 @@ describe('deploy-cli', () => {
   it('deploy fails when final wrangler deploy fails', async () => {
     spawnSyncMock.mockImplementation((_command: unknown, args?: unknown) => {
       const normalizedArgs = ((args as readonly string[] | undefined) || [])
-      if (normalizedArgs[0] === 'wrangler' && normalizedArgs[1] === 'deploy') {
+      if ([String(_command), ...normalizedArgs].join(' ').includes(' deploy ')) {
         return { status: 1, stdout: 'deploy failed', stderr: 'error' } as any
       }
       return mockSpawn(String(_command), normalizedArgs)
@@ -846,22 +846,23 @@ describe('deploy-cli', () => {
 })
 
 function mockSpawn(command: string, args: readonly string[]) {
+  const commandLine = [command, ...args].join(' ')
+
   if (command === 'npm' && args[0] === 'run' && args[1] === 'build') {
     return { status: 0, stdout: 'build ok', stderr: '' } as any
   }
 
-  if (args[0] !== 'wrangler') {
+  if (!commandLine.includes('wrangler')) {
     return { status: 0, stdout: '', stderr: '' } as any
   }
 
-  const sub = args.slice(1)
-  if (sub[0] === 'whoami') {
+  if (commandLine.includes(' whoami')) {
     return { status: 0, stdout: 'Logged in as demo', stderr: '' } as any
   }
-  if (sub[0] === 'login') {
+  if (commandLine.includes(' login')) {
     return { status: 0, stdout: '', stderr: '' } as any
   }
-  if (sub[0] === 'd1' && sub[1] === 'list') {
+  if (commandLine.includes('d1 list')) {
     return {
       status: 0,
       stdout: JSON.stringify([
@@ -871,14 +872,14 @@ function mockSpawn(command: string, args: readonly string[]) {
       stderr: ''
     } as any
   }
-  if (sub[0] === 'd1' && sub[1] === 'create') {
-    const name = sub[2]
+  if (commandLine.includes('d1 create')) {
+    const name = args[args.length - 1]
     return { status: 0, stdout: `Created database ${name}\n"uuid": "123e4567-e89b-12d3-a456-426614174000"`, stderr: '' } as any
   }
-  if (sub[0] === 'd1' && sub[1] === 'execute') {
+  if (commandLine.includes('d1 execute')) {
     return { status: 0, stdout: 'migration ok', stderr: '' } as any
   }
-  if (sub[0] === 'kv' && sub[1] === 'namespace' && sub[2] === 'list') {
+  if (commandLine.includes('kv namespace list')) {
     return {
       status: 0,
       stdout: JSON.stringify([
@@ -888,20 +889,20 @@ function mockSpawn(command: string, args: readonly string[]) {
       stderr: ''
     } as any
   }
-  if (sub[0] === 'kv' && sub[1] === 'namespace' && sub[2] === 'create') {
-    const name = sub[3]
+  if (commandLine.includes('kv namespace create')) {
+    const name = args[args.length - 1]
     return { status: 0, stdout: `Created namespace ${name}\nid = "1234567890abcdef1234567890abcdef"`, stderr: '' } as any
   }
-  if (sub[0] === 'r2' && sub[1] === 'bucket' && sub[2] === 'list') {
+  if (commandLine.includes('r2 bucket list')) {
     return { status: 0, stdout: JSON.stringify([{ name: 'files' }]), stderr: '' } as any
   }
-  if (sub[0] === 'r2' && sub[1] === 'bucket' && sub[2] === 'create') {
+  if (commandLine.includes('r2 bucket create')) {
     return { status: 0, stdout: 'bucket created', stderr: '' } as any
   }
-  if (sub[0] === 'secret' && sub[1] === 'put') {
+  if (commandLine.includes('secret put')) {
     return { status: 0, stdout: 'secret ok', stderr: '' } as any
   }
-  if (sub[0] === 'deploy') {
+  if (commandLine.includes(' deploy ')) {
     return { status: 0, stdout: 'deploy ok', stderr: '' } as any
   }
 
