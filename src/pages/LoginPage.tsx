@@ -4,6 +4,7 @@ import { Container, Header, Content, Button, Form, Input } from 'rsuite';
 import { Key, Lock, ArrowRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
+import { appRoutes } from '../router/routes';
 import styles from './LoginPage.module.scss';
 
 const LoginPage: React.FC = () => {
@@ -26,7 +27,7 @@ const LoginPage: React.FC = () => {
 	}
 
 	if (isAuthenticated) {
-		return <Navigate to="/admin" replace />;
+		return <Navigate to={appRoutes.admin} replace />;
 	}
 
 	const handleSubmit = async () => {
@@ -41,7 +42,7 @@ const LoginPage: React.FC = () => {
 		const result = await login(apiKey);
 
 		if (result.success) {
-			navigate('/admin');
+			navigate(appRoutes.admin);
 		} else {
 			setError(result.error || t('login.loginFailed', { defaultValue: "登录失败，请检查 API Key 后重试" }));
 		}

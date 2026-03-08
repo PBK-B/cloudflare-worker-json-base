@@ -3,6 +3,7 @@ import { useNavigate, useOutletContext } from 'react-router-dom';
 import { Plus, FileText, Paperclip, Database } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useApi } from '../../hooks/useApi';
+import { appRoutes } from '../../router/routes';
 import styles from './AdminConsolePage.module.scss';
 
 interface AdminContext {
@@ -89,7 +90,7 @@ const AdminConsolePage: React.FC = () => {
 						<div className={styles.actionTitle}>{t('console.actions.upload.title', { defaultValue: "上传文件" })}</div>
 						<div className={styles.actionDescription}>{t('console.actions.upload.description', { defaultValue: "存储二进制文件数据" })}</div>
 					</div>
-					<div className={styles.actionCard} onClick={() => navigate('/admin/data')}>
+					<div className={styles.actionCard} onClick={() => navigate(appRoutes.adminData)}>
 						<span className={styles.actionIcon}>
 							<Database size={24} />
 						</span>

@@ -9,6 +9,7 @@ import { useApi } from '../../hooks/useApi';
 import { ModalForm } from '../../components/common/ModalForm';
 import { StorageData } from '../../types';
 import { notify } from '../../utils/notification';
+import { appRoutes } from '../../router/routes';
 import styles from './AdminLayout.module.scss';
 
 interface FormData {
@@ -45,7 +46,7 @@ const AdminLayout: React.FC = () => {
 	const handleLogout = () => {
 		setMobileNavOpen(false);
 		logout();
-		navigate('/login');
+		navigate(appRoutes.login);
 	};
 
 	useEffect(() => {
@@ -185,7 +186,7 @@ const AdminLayout: React.FC = () => {
 					</div>
 					<div className={`${styles.adminNav} ${styles.adminNavDesktop}`}>
 						<NavLink
-							to="/admin"
+							to={appRoutes.admin}
 							end
 							className={({ isActive }) => `${styles.adminNavLink} ${isActive ? styles.navLinkActive : ''}`}
 						>
@@ -193,7 +194,7 @@ const AdminLayout: React.FC = () => {
 							{t('layout.navConsole', { defaultValue: "控制台" })}
 						</NavLink>
 						<NavLink
-							to="/admin/data"
+							to={appRoutes.adminData}
 							className={({ isActive }) => `${styles.adminNavLink} ${isActive ? styles.navLinkActive : ''}`}
 						>
 							<Database size={16} />
@@ -269,7 +270,7 @@ const AdminLayout: React.FC = () => {
 						<div className={styles.adminMobileNavPanel}>
 							<div className={`${styles.adminNav} ${styles.adminNavMobile}`}>
 								<NavLink
-									to="/admin"
+									to={appRoutes.admin}
 									end
 									className={({ isActive }) => `${styles.adminNavLink} ${styles.adminNavLinkMobile} ${isActive ? styles.navLinkActive : ''}`}
 								>
@@ -277,7 +278,7 @@ const AdminLayout: React.FC = () => {
 									{t('layout.navConsole', { defaultValue: "控制台" })}
 								</NavLink>
 								<NavLink
-									to="/admin/data"
+									to={appRoutes.adminData}
 									className={({ isActive }) => `${styles.adminNavLink} ${styles.adminNavLinkMobile} ${isActive ? styles.navLinkActive : ''}`}
 								>
 									<Database size={16} />
