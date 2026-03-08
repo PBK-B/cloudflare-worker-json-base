@@ -120,12 +120,40 @@ function fail(message: string): never {
 	process.exit(1);
 }
 
+function quoteWindowsArg(value: string): string {
+	if (!value) return '""';
+	if (!/[\s"]/u.test(value)) return value;
+	return `"${value.replace(/(\\*)"/g, '$1$1\\"')}"`;
+}
+
+function isWindowsPlatform(): boolean {
+	return process.platform === 'win32';
+}
+
+function buildSpawnCommand(command: string, args: string[]): { command: string; args: string[] } {
+	if (!isWindowsPlatform()) {
+		return { command, args };
+	}
+
+	const normalizedCommand = command.toLowerCase();
+	if (normalizedCommand === 'npm' || normalizedCommand === 'npm.cmd' || normalizedCommand === 'npx' || normalizedCommand === 'npx.cmd') {
+		const shellCommand = [command, ...args].map((entry) => quoteWindowsArg(entry)).join(' ');
+		return {
+			command: 'cmd.exe',
+			args: ['/d', '/s', '/c', shellCommand],
+		};
+	}
+
+	return { command, args };
+}
+
 function run(
 	command: string,
 	args: string[],
 	options: { input?: string; timeout?: number } = {},
 ): { ok: boolean; stdout: string; stderr: string; status: number | null } {
-	const result = spawnSync(command, args, {
+	const spawnTarget = buildSpawnCommand(command, args);
+	const result = spawnSync(spawnTarget.command, spawnTarget.args, {
 		cwd: WORKDIR,
 		encoding: 'utf8',
 		stdio: ['pipe', 'pipe', 'pipe'],
@@ -727,7 +755,7 @@ function rewriteConfigPathsForGeneratedFile(config: JsonObject, generatedDir: st
 }
 
 function getNpxBin(): string {
-	return process.platform === 'win32' ? 'npx.cmd' : 'npx';
+	return isWindowsPlatform() ? 'npx.cmd' : 'npx';
 }
 
 function getCommandOutput(args: string[], timeout = 30000): string {
@@ -747,7 +775,8 @@ function ensureWranglerLogin(options?: DeployOptions): void {
 			fail('未登录 Cloudflare，请先执行: npx wrangler login');
 		}
 		logStep('Cloudflare 登录', '启动 wrangler login');
-		const loginResult = spawnSync(getNpxBin(), ['wrangler', 'login'], {
+		const loginTarget = buildSpawnCommand(getNpxBin(), ['wrangler', 'login']);
+		const loginResult = spawnSync(loginTarget.command, loginTarget.args, {
 			cwd: WORKDIR,
 			encoding: 'utf8',
 			stdio: 'inherit',
@@ -1827,6 +1856,9 @@ export const __testing = {
 	toJsonc,
 	toGeneratedRelativePath,
 	rewriteConfigPathsForGeneratedFile,
+	quoteWindowsArg,
+	isWindowsPlatform,
+	buildSpawnCommand,
 	isWranglerAuthenticated,
 	parseBooleanFlag,
 	isCiEnvironment,

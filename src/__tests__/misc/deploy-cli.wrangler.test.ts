@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
+import * as fs from 'fs'
+import * as path from 'path'
 
 const promptMock = jest.fn<any>()
 const spawnSyncMock = jest.fn<any>()
@@ -142,6 +144,47 @@ describe('deploy-cli external tool outputs', () => {
     expect(() => testing.ensureWranglerLogin({ nonInteractive: true })).not.toThrow()
   })
 
+  it('builds cmd.exe wrapper for npm/npx on Windows', () => {
+    const descriptor = Object.getOwnPropertyDescriptor(process, 'platform')
+    Object.defineProperty(process, 'platform', { value: 'win32' })
+    try {
+      expect(testing.quoteWindowsArg('path with spaces')).toBe('"path with spaces"')
+      expect(testing.buildSpawnCommand('npx.cmd', ['wrangler', 'whoami'])).toEqual({
+        command: 'cmd.exe',
+        args: ['/d', '/s', '/c', 'npx.cmd wrangler whoami']
+      })
+      expect(testing.buildSpawnCommand('npm', ['run', 'build'])).toEqual({
+        command: 'cmd.exe',
+        args: ['/d', '/s', '/c', 'npm run build']
+      })
+    } finally {
+      if (descriptor) {
+        Object.defineProperty(process, 'platform', descriptor)
+      }
+    }
+  })
+
+  it('keeps direct spawn for non-windows commands', () => {
+    expect(testing.buildSpawnCommand('node', ['script.js'])).toEqual({ command: 'node', args: ['script.js'] })
+  })
+
+  it('runs wrangler whoami through cmd.exe wrapper on Windows', () => {
+    const descriptor = Object.getOwnPropertyDescriptor(process, 'platform')
+    Object.defineProperty(process, 'platform', { value: 'win32' })
+    try {
+      testing.ensureWranglerLogin({ nonInteractive: true })
+      expect(spawnSyncMock).toHaveBeenCalledWith(
+        'cmd.exe',
+        ['/d', '/s', '/c', 'npx.cmd wrangler whoami'],
+        expect.objectContaining({ cwd: process.cwd() })
+      )
+    } finally {
+      if (descriptor) {
+        Object.defineProperty(process, 'platform', descriptor)
+      }
+    }
+  })
+
   it('fails secret put when wrangler returns an error output', () => {
     spawnSyncMock.mockImplementationOnce((_command: unknown, args?: unknown) => {
       const normalizedArgs = (args as readonly string[] | undefined) || []
@@ -176,6 +219,14 @@ describe('deploy-cli external tool outputs', () => {
     })
 
     expect(() => testing.runMigrations({ d1_databases: [{ binding: 'JSONBASE_DB', database_name: 'jsonbase' }] } as any, '/tmp/generated.jsonc')).toThrow('process.exit:1')
+  })
+
+  it('package scripts keep deploy commands Windows-safe enough for npm/npx usage', () => {
+    const pkg = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'package.json'), 'utf8')) as { scripts: Record<string, string> }
+    expect(pkg.scripts.deploy).toContain('node .deploy-temp/deploy-cli.js deploy')
+    expect(pkg.scripts['deploy:doctor']).toContain('node .deploy-temp/deploy-cli.js doctor')
+    expect(pkg.scripts['deploy:print']).toContain('node .deploy-temp/deploy-cli.js print-config')
+    expect(pkg.scripts['d1:reset']).toContain('&& npm run d1:migrate')
   })
 })
 

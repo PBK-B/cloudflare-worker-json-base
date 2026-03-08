@@ -8,7 +8,7 @@
   "transform": {
     "^.+\\.(ts|tsx|js|jsx)$": ["ts-jest", { "tsconfig": "tsconfig.json" }]
   },
-  "testMatch": ["**/__tests__/worker/**/*.test.(ts|tsx)", "**/__tests__/*.test.(ts|tsx)"],
+  "testMatch": ["**/__tests__/worker/**/*.test.(ts|tsx)", "**/__tests__/misc/**/*.test.(ts|tsx)", "**/__tests__/*.test.(ts|tsx)"],
   "testPathIgnorePatterns": [
     "/node_modules/",
     "/dist/",
