@@ -14,6 +14,8 @@ type MissingResourcePolicy = 'ask' | 'auto' | 'manual' | 'fail';
 interface DeployOptions {
 	env?: string;
 	storage?: string;
+	d1?: string;
+	kv?: string;
 	missingResource?: string;
 	plan?: boolean;
 	dryRun?: boolean;
@@ -117,7 +119,11 @@ function fail(message: string): never {
 	process.exit(1);
 }
 
-function run(command: string, args: string[], options: { input?: string; timeout?: number } = {}): { ok: boolean; stdout: string; stderr: string; status: number | null } {
+function run(
+	command: string,
+	args: string[],
+	options: { input?: string; timeout?: number } = {},
+): { ok: boolean; stdout: string; stderr: string; status: number | null } {
 	const result = spawnSync(command, args, {
 		cwd: WORKDIR,
 		encoding: 'utf8',
@@ -248,7 +254,10 @@ function parseTomlLite(content: string): JsonObject {
 }
 
 function stripJsonComments(input: string): string {
-	return input.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|\s+)\/\/.*$/gm, '').replace(/,\s*([}\]])/g, '$1');
+	return input
+		.replace(/\/\*[\s\S]*?\*\//g, '')
+		.replace(/(^|\s+)\/\/.*$/gm, '')
+		.replace(/,\s*([}\]])/g, '$1');
 }
 
 function parseConfigFile(filePath: string): JsonObject {
@@ -404,8 +413,13 @@ function isNonInteractiveMode(options: DeployOptions): boolean {
 	return parseBooleanFlag(options.nonInteractive) || isCiEnvironment();
 }
 
+function looksLikeUuid(value: string): boolean {
+	return /^[a-f0-9-]{32,36}$/i.test(value.trim());
+}
+
 async function resolveEnvironment(baseConfig: JsonObject, options: DeployOptions): Promise<string> {
 	if (options.env) return options.env;
+	if (process.env.DEPLOY_ENV?.trim()) return process.env.DEPLOY_ENV.trim();
 	const envs = Object.keys((baseConfig.env as JsonObject) || {});
 	if (isNonInteractiveMode(options)) {
 		return getDefaultEnvironment(baseConfig);
@@ -423,7 +437,7 @@ async function resolveEnvironment(baseConfig: JsonObject, options: DeployOptions
 }
 
 async function resolveApiKey(options: DeployOptions): Promise<string | undefined> {
-	const explicit = options.apiKey?.trim() || process.env.API_KEY?.trim();
+	const explicit = options.apiKey?.trim() || process.env.DEPLOY_API_KEY?.trim() || process.env.API_KEY?.trim();
 	if (explicit) {
 		if (explicit.length < 16) {
 			fail('API Key 至少需要 16 字符');
@@ -434,9 +448,7 @@ async function resolveApiKey(options: DeployOptions): Promise<string | undefined
 		return undefined;
 	}
 	while (true) {
-		const inputAnswers = await inquirer.prompt([
-			{ type: 'password', name: 'apiKey', message: '输入 API Key (直接回车可选择自动生成):' },
-		]);
+		const inputAnswers = await inquirer.prompt([{ type: 'password', name: 'apiKey', message: '输入 API Key (直接回车可选择自动生成):' }]);
 		const inputKey = (inputAnswers.apiKey as string | undefined)?.trim();
 		if (inputKey && inputKey.length >= 16) {
 			return inputKey;
@@ -467,13 +479,16 @@ async function resolveApiKey(options: DeployOptions): Promise<string | undefined
 }
 
 async function resolveStorageBackend(baseConfig: JsonObject, options: DeployOptions): Promise<StorageBackend> {
-	const explicit = normalizeStorageBackend(options.storage || process.env.STORAGE_BACKEND);
+	const explicit = normalizeStorageBackend(options.storage || process.env.DEPLOY_STORAGE_BACKEND || process.env.STORAGE_BACKEND);
 	if (explicit) {
 		return explicit;
 	}
 
 	const vars = baseConfig.vars;
-	const configured = vars && typeof vars === 'object' && !Array.isArray(vars) ? normalizeStorageBackend(String((vars as JsonObject).STORAGE_BACKEND || '')) : undefined;
+	const configured =
+		vars && typeof vars === 'object' && !Array.isArray(vars)
+			? normalizeStorageBackend(String((vars as JsonObject).STORAGE_BACKEND || ''))
+			: undefined;
 	const defaultBackend = configured || 'd1';
 
 	if (isNonInteractiveMode(options) || options.yes) {
@@ -494,6 +509,25 @@ async function resolveStorageBackend(baseConfig: JsonObject, options: DeployOpti
 	]);
 
 	return answer.storage as StorageBackend;
+}
+
+function getForcedD1Value(options: DeployOptions): string | undefined {
+	return options.d1?.trim() || process.env.DEPLOY_D1_DATABASE?.trim();
+}
+
+function getForcedKVValue(options: DeployOptions): string | undefined {
+	return options.kv?.trim() || process.env.DEPLOY_KV_NAMESPACE?.trim();
+}
+
+function validateForcedResourceOptions(storageBackend: StorageBackend, options: DeployOptions): void {
+	const forcedD1 = getForcedD1Value(options);
+	const forcedKV = getForcedKVValue(options);
+	if (forcedD1 && storageBackend !== 'd1') {
+		fail('指定了 D1 资源，但当前存储后端不是 d1');
+	}
+	if (forcedKV && storageBackend !== 'kv') {
+		fail('指定了 KV 资源，但当前存储后端不是 kv');
+	}
 }
 
 async function resolveMissingResourcePolicy(options: DeployOptions): Promise<MissingResourcePolicy> {
@@ -843,7 +877,12 @@ async function selectR2Bucket(binding: R2BindingConfig, nonInteractive: boolean)
 	}
 }
 
-async function ensureD1Database(binding: D1BindingConfig, missingResourcePolicy: MissingResourcePolicy, yes: boolean, nonInteractive: boolean): Promise<ResourceInfo> {
+async function ensureD1Database(
+	binding: D1BindingConfig,
+	missingResourcePolicy: MissingResourcePolicy,
+	yes: boolean,
+	nonInteractive: boolean,
+): Promise<ResourceInfo> {
 	logStep('D1 资源检查', `${binding.binding} -> ${binding.database_name}`);
 	try {
 		const dbs = listD1Databases();
@@ -928,6 +967,26 @@ async function createD1DatabaseWithPrompt(defaultName: string): Promise<Resource
 	}
 }
 
+async function createD1DatabaseByName(databaseName: string, binding: string): Promise<ResourceInfo> {
+	logStep('D1 资源创建', databaseName);
+	try {
+		const output = getCommandOutput(['d1', 'create', databaseName], 60000);
+		const idMatch = output.match(/([a-f0-9-]{36})/i);
+		if (idMatch) {
+			logDone('D1 资源创建', `${databaseName} (${idMatch[1]})`);
+			return { type: 'd1', binding, id: idMatch[1], name: databaseName, status: 'created' };
+		}
+		const refreshed = listD1Databases().find((db) => db.name === databaseName);
+		if (refreshed) {
+			logDone('D1 资源创建', `${refreshed.name} (${refreshed.uuid})`);
+			return { type: 'd1', binding, id: refreshed.uuid, name: refreshed.name, status: 'created' };
+		}
+		fail(`D1 资源创建失败: 未解析到数据库 ID (${databaseName})`);
+	} catch (error) {
+		fail(`D1 资源创建失败: ${error instanceof Error ? error.message : String(error)}`);
+	}
+}
+
 function getCreateOptionLabel(resourceType: 'd1' | 'kv' | 'r2'): string {
 	switch (resourceType) {
 		case 'd1':
@@ -981,6 +1040,26 @@ async function createKVNamespaceWithPrompt(defaultName: string): Promise<Resourc
 	}
 }
 
+async function createKVNamespaceByName(namespaceTitle: string, binding: string): Promise<ResourceInfo> {
+	logStep('KV 资源创建', namespaceTitle);
+	try {
+		const output = getCommandOutput(['kv', 'namespace', 'create', namespaceTitle], 60000);
+		const idMatch = output.match(/([a-f0-9-]{32,36})/i);
+		if (idMatch) {
+			logDone('KV 资源创建', `${namespaceTitle} (${idMatch[1]})`);
+			return { type: 'kv', binding, id: idMatch[1], status: 'created' };
+		}
+		const refreshed = listKVNamespaces().find((ns) => ns.title === namespaceTitle);
+		if (refreshed) {
+			logDone('KV 资源创建', `${refreshed.title} (${refreshed.id})`);
+			return { type: 'kv', binding, id: refreshed.id, status: 'created' };
+		}
+		fail(`KV 资源创建失败: 未解析到命名空间 ID (${namespaceTitle})`);
+	} catch (error) {
+		fail(`KV 资源创建失败: ${error instanceof Error ? error.message : String(error)}`);
+	}
+}
+
 async function createR2BucketWithPrompt(defaultName: string): Promise<ResourceInfo | null> {
 	const answer = await inquirer.prompt([
 		{
@@ -1002,7 +1081,12 @@ async function createR2BucketWithPrompt(defaultName: string): Promise<ResourceIn
 	}
 }
 
-async function ensureKVNamespace(binding: KVBindingConfig, missingResourcePolicy: MissingResourcePolicy, yes: boolean, nonInteractive: boolean): Promise<ResourceInfo> {
+async function ensureKVNamespace(
+	binding: KVBindingConfig,
+	missingResourcePolicy: MissingResourcePolicy,
+	yes: boolean,
+	nonInteractive: boolean,
+): Promise<ResourceInfo> {
 	logStep('KV 资源检查', binding.binding);
 	try {
 		const namespaces = listKVNamespaces();
@@ -1020,7 +1104,9 @@ async function ensureKVNamespace(binding: KVBindingConfig, missingResourcePolicy
 		return { type: 'kv', binding: binding.binding, id: '', status: 'pending' };
 	}
 	if (action === 'manual') {
-		return (await selectKVNamespace(binding.binding, nonInteractive)) || { type: 'kv', binding: binding.binding, id: '', status: 'pending' };
+		return (
+			(await selectKVNamespace(binding.binding, nonInteractive)) || { type: 'kv', binding: binding.binding, id: '', status: 'pending' }
+		);
 	}
 	let retries = 3;
 	while (retries > 0) {
@@ -1050,7 +1136,12 @@ async function ensureKVNamespace(binding: KVBindingConfig, missingResourcePolicy
 	return (await selectKVNamespace(binding.binding, nonInteractive)) || { type: 'kv', binding: binding.binding, id: '', status: 'pending' };
 }
 
-async function ensureR2Bucket(binding: R2BindingConfig, missingResourcePolicy: MissingResourcePolicy, yes: boolean, nonInteractive: boolean): Promise<ResourceInfo> {
+async function ensureR2Bucket(
+	binding: R2BindingConfig,
+	missingResourcePolicy: MissingResourcePolicy,
+	yes: boolean,
+	nonInteractive: boolean,
+): Promise<ResourceInfo> {
 	logStep('R2 资源检查', `${binding.binding} -> ${binding.bucket_name}`);
 	try {
 		const buckets = listR2Buckets();
@@ -1113,7 +1204,46 @@ function getKVBindings(config: JsonObject): KVBindingConfig[] {
 
 function getR2Bindings(config: JsonObject): R2BindingConfig[] {
 	if (!Array.isArray(config.r2_buckets)) return [];
-	return (config.r2_buckets as JsonValue[]).filter((entry): entry is JsonObject => Boolean(entry) && typeof entry === 'object' && !Array.isArray(entry)).map((entry) => entry as unknown as R2BindingConfig);
+	return (config.r2_buckets as JsonValue[])
+		.filter((entry): entry is JsonObject => Boolean(entry) && typeof entry === 'object' && !Array.isArray(entry))
+		.map((entry) => entry as unknown as R2BindingConfig);
+}
+
+async function resolveForcedResources(config: JsonObject, storageBackend: StorageBackend, options: DeployOptions): Promise<ResourceInfo[]> {
+	const resources: ResourceInfo[] = [];
+	if (storageBackend === 'd1') {
+		const forced = getForcedD1Value(options);
+		if (forced) {
+			const binding = getD1Bindings(config)[0] || { binding: 'JSONBASE_DB', database_name: forced };
+			const databases = listD1Databases();
+			const existing = databases.find((db) => db.uuid === forced || db.name === forced);
+			if (existing) {
+				logDone('D1 资源指定', `${binding.binding} -> ${existing.name} (${existing.uuid})`);
+				resources.push({ type: 'd1', binding: binding.binding, id: existing.uuid, name: existing.name, status: 'existing' });
+			} else if (looksLikeUuid(forced)) {
+				fail(`未找到指定的 D1 数据库: ${forced}`);
+			} else {
+				resources.push(await createD1DatabaseByName(forced, binding.binding));
+			}
+		}
+	}
+	if (storageBackend === 'kv') {
+		const forced = getForcedKVValue(options);
+		if (forced) {
+			const binding = getKVBindings(config)[0] || { binding: 'JSONBIN' };
+			const namespaces = listKVNamespaces();
+			const existing = namespaces.find((ns) => ns.id === forced || ns.title === forced);
+			if (existing) {
+				logDone('KV 资源指定', `${binding.binding} -> ${existing.title} (${existing.id})`);
+				resources.push({ type: 'kv', binding: binding.binding, id: existing.id, status: 'existing' });
+			} else if (looksLikeUuid(forced)) {
+				fail(`未找到指定的 KV 命名空间: ${forced}`);
+			} else {
+				resources.push(await createKVNamespaceByName(forced, binding.binding));
+			}
+		}
+	}
+	return resources;
 }
 
 async function promptResourceBindings(config: JsonObject, storageBackend: StorageBackend, allowCreate: boolean): Promise<ResourceInfo[]> {
@@ -1140,10 +1270,18 @@ async function promptResourceBindings(config: JsonObject, storageBackend: Storag
 		]);
 		if (answers.databaseId === '__create_new__') {
 			const created = await createD1DatabaseWithPrompt(binding.database_name);
-			resources.push(created ? { ...created, binding: binding.binding } : { type: 'd1', binding: binding.binding, id: '', status: 'pending' });
+			resources.push(
+				created ? { ...created, binding: binding.binding } : { type: 'd1', binding: binding.binding, id: '', status: 'pending' },
+			);
 		} else {
 			const selected = databases.find((db) => db.uuid === answers.databaseId);
-			resources.push({ type: 'd1', binding: binding.binding, id: answers.databaseId as string, name: selected?.name || binding.database_name, status: 'existing' });
+			resources.push({
+				type: 'd1',
+				binding: binding.binding,
+				id: answers.databaseId as string,
+				name: selected?.name || binding.database_name,
+				status: 'existing',
+			});
 		}
 	}
 
@@ -1168,7 +1306,9 @@ async function promptResourceBindings(config: JsonObject, storageBackend: Storag
 		]);
 		if (answers.namespaceId === '__create_new__') {
 			const created = await createKVNamespaceWithPrompt(binding.binding);
-			resources.push(created ? { ...created, binding: binding.binding } : { type: 'kv', binding: binding.binding, id: '', status: 'pending' });
+			resources.push(
+				created ? { ...created, binding: binding.binding } : { type: 'kv', binding: binding.binding, id: '', status: 'pending' },
+			);
 		} else {
 			resources.push({ type: 'kv', binding: binding.binding, id: answers.namespaceId as string, status: 'existing' });
 		}
@@ -1195,7 +1335,9 @@ async function promptResourceBindings(config: JsonObject, storageBackend: Storag
 		]);
 		if (answers.bucketName === '__create_new__') {
 			const created = await createR2BucketWithPrompt(binding.bucket_name);
-			resources.push(created ? { ...created, binding: binding.binding } : { type: 'r2', binding: binding.binding, id: '', status: 'pending' });
+			resources.push(
+				created ? { ...created, binding: binding.binding } : { type: 'r2', binding: binding.binding, id: '', status: 'pending' },
+			);
 		} else {
 			resources.push({ type: 'r2', binding: binding.binding, id: answers.bucketName as string, status: 'existing' });
 		}
@@ -1244,10 +1386,20 @@ async function ensureResources(
 
 function applyResolvedResources(config: JsonObject, resources: ResourceInfo[]): JsonObject {
 	const nextConfig = deepClone(config);
-	const d1Map = new Map(resources.filter((resource) => resource.type === 'd1' && resource.id).map((resource) => [resource.binding, resource.id]));
-	const d1NameMap = new Map(resources.filter((resource) => resource.type === 'd1' && resource.id).map((resource) => [resource.binding, resource.name || 'jsonbase']));
-	const kvMap = new Map(resources.filter((resource) => resource.type === 'kv' && resource.id).map((resource) => [resource.binding, resource.id]));
-	const r2Map = new Map(resources.filter((resource) => resource.type === 'r2' && resource.id).map((resource) => [resource.binding, resource.id]));
+	const d1Map = new Map(
+		resources.filter((resource) => resource.type === 'd1' && resource.id).map((resource) => [resource.binding, resource.id]),
+	);
+	const d1NameMap = new Map(
+		resources
+			.filter((resource) => resource.type === 'd1' && resource.id)
+			.map((resource) => [resource.binding, resource.name || 'jsonbase']),
+	);
+	const kvMap = new Map(
+		resources.filter((resource) => resource.type === 'kv' && resource.id).map((resource) => [resource.binding, resource.id]),
+	);
+	const r2Map = new Map(
+		resources.filter((resource) => resource.type === 'r2' && resource.id).map((resource) => [resource.binding, resource.id]),
+	);
 
 	if (Array.isArray(nextConfig.d1_databases)) {
 		nextConfig.d1_databases = (nextConfig.d1_databases as JsonValue[]).map((entry) => {
@@ -1344,9 +1496,13 @@ function runMigrations(config: JsonObject, generatedConfigPath: string): void {
 		return;
 	}
 	logStep('数据库迁移', databaseRef);
-	const result = run(getNpxBin(), ['wrangler', 'd1', 'execute', databaseRef, '--remote', `--file=${schemaPath}`, '--config', generatedConfigPath], {
-		timeout: 120000,
-	});
+	const result = run(
+		getNpxBin(),
+		['wrangler', 'd1', 'execute', databaseRef, '--remote', `--file=${schemaPath}`, '--config', generatedConfigPath],
+		{
+			timeout: 120000,
+		},
+	);
 	if (!result.ok) {
 		console.log(result.stdout);
 		console.log(result.stderr);
@@ -1392,6 +1548,7 @@ async function deploy(options: DeployOptions): Promise<void> {
 	const baseConfig = parseTomlLite(readText(WRANGLER_TOML_PATH));
 	const envName = await resolveEnvironment(baseConfig, options);
 	const storageBackend = await resolveStorageBackend(baseConfig, options);
+	validateForcedResourceOptions(storageBackend, options);
 	const missingResourcePolicy = await resolveMissingResourcePolicy(options);
 	const skipMigrate = await resolveSkipMigrate(baseConfig, storageBackend, options);
 	const skipHealthcheck = await resolveSkipHealthcheck(options);
@@ -1419,8 +1576,18 @@ async function deploy(options: DeployOptions): Promise<void> {
 		finalConfig = deepMerge(finalConfig, overrides);
 	}
 
-	const preselectedResources = !isNonInteractiveMode(options) ? await promptResourceBindings(finalConfig, storageBackend, true) : [];
-	const resources = !isNonInteractiveMode(options) ? preselectedResources : options.plan || options.dryRun ? [] : await ensureResources(finalConfig, storageBackend, missingResourcePolicy, options, preselectedResources);
+	const forcedResources = await resolveForcedResources(finalConfig, storageBackend, options);
+	const preselectedResources =
+		forcedResources.length > 0
+			? forcedResources
+			: !isNonInteractiveMode(options)
+				? await promptResourceBindings(finalConfig, storageBackend, true)
+				: [];
+	const resources = !isNonInteractiveMode(options)
+		? preselectedResources
+		: options.plan || options.dryRun
+			? []
+			: await ensureResources(finalConfig, storageBackend, missingResourcePolicy, options, preselectedResources);
 	const missingResources = resources.filter((resource) => !resource.id);
 	if (missingResources.length > 0) {
 		fail(`部署失败: 以下资源缺少 ID: ${missingResources.map((resource) => `${resource.type}.${resource.binding}`).join(', ')}`);
@@ -1538,8 +1705,10 @@ function doctor(): void {
 
 async function printConfig(options: DeployOptions): Promise<void> {
 	const baseConfig = parseTomlLite(readText(WRANGLER_TOML_PATH));
+	options = { ...options, nonInteractive: true };
 	const envName = await resolveEnvironment(baseConfig, options);
 	const storageBackend = await resolveStorageBackend(baseConfig, options);
+	validateForcedResourceOptions(storageBackend, options);
 	let finalConfig = resolveEnvConfig(baseConfig, envName);
 	if (!finalConfig.vars || typeof finalConfig.vars !== 'object' || Array.isArray(finalConfig.vars)) {
 		finalConfig.vars = {};
@@ -1547,6 +1716,10 @@ async function printConfig(options: DeployOptions): Promise<void> {
 	(finalConfig.vars as JsonObject).STORAGE_BACKEND = storageBackend;
 	if (options.confFile) {
 		finalConfig = deepMerge(finalConfig, parseConfigFile(options.confFile));
+	}
+	const forcedResources = await resolveForcedResources(finalConfig, storageBackend, options);
+	if (forcedResources.length > 0) {
+		finalConfig = applyResolvedResources(finalConfig, forcedResources);
 	}
 	delete finalConfig.env;
 	const schemaAllowList = getSchemaAllowList(WRANGLER_SCHEMA_PATH);
@@ -1564,10 +1737,12 @@ program
 	.description('生成动态 wrangler 配置并部署')
 	.option('--env <environment>', '部署环境')
 	.option('--storage <backend>', '存储后端: d1|kv')
+	.option('--d1 <database>', '指定 D1 数据库 (ID 或名称)')
+	.option('--kv <namespace>', '指定 KV 命名空间 (ID 或名称)')
 	.option('--missing-resource <policy>', '缺失资源策略: ask|auto|manual|fail')
 	.option('--plan', '只输出执行计划，不执行部署')
 	.option('--dry-run', '执行 wrangler deploy --dry-run')
-	.option('--conf-file <path>', '覆盖生成配置的 wrangler.jsonc/json/toml 文件')
+	.option('--conf-file <path>', '覆盖生成配置的 wrangler.[jsonc/json/toml] 文件')
 	.option('--var <keyValue>', '追加变量，格式 KEY:VALUE', (value: string, previous: string[] = []) => [...previous, value], [])
 	.option('--env-file <path>', '加载环境变量文件，格式 KEY=VALUE', (value: string, previous: string[] = []) => [...previous, value], [])
 	.option('--keep-vars', '部署时启用 --keep-vars')
@@ -1588,7 +1763,9 @@ program
 	.description('打印最终生成的部署配置')
 	.option('--env <environment>', '部署环境')
 	.option('--storage <backend>', '存储后端: d1|kv')
-	.option('--conf-file <path>', '覆盖生成配置的 wrangler.jsonc/json/toml 文件')
+	.option('--d1 <database>', '指定 D1 数据库 (ID 或名称)')
+	.option('--kv <namespace>', '指定 KV 命名空间 (ID 或名称)')
+	.option('--conf-file <path>', '覆盖生成配置的 wrangler.[jsonc/json/toml] 文件')
 	.option('--non-interactive', '禁用交互模式')
 	.action(async (options: DeployOptions) => {
 		await printConfig(options);
