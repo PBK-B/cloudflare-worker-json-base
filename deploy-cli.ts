@@ -8,9 +8,13 @@ import { spawnSync } from 'child_process';
 type JsonValue = string | number | boolean | null | JsonObject | JsonArray;
 type JsonArray = JsonValue[];
 type JsonObject = { [key: string]: JsonValue };
+type StorageBackend = 'd1' | 'kv';
+type MissingResourcePolicy = 'ask' | 'auto' | 'manual' | 'fail';
 
 interface DeployOptions {
 	env?: string;
+	storage?: string;
+	missingResource?: string;
 	plan?: boolean;
 	dryRun?: boolean;
 	confFile?: string;
@@ -19,8 +23,38 @@ interface DeployOptions {
 	keepVars?: boolean;
 	nonInteractive?: boolean;
 	yes?: boolean;
+	skipMigrate?: boolean;
+	skipHealthcheck?: boolean;
 	skipBuild?: boolean;
 	apiKey?: string;
+}
+
+interface ResourceInfo {
+	type: 'd1' | 'kv' | 'r2';
+	binding: string;
+	id: string;
+	status: 'existing' | 'created' | 'pending';
+	name?: string;
+}
+
+interface D1BindingConfig {
+	binding: string;
+	database_name: string;
+	database_id?: string;
+	preview_id?: string;
+	migrations_dir?: string;
+}
+
+interface KVBindingConfig {
+	binding: string;
+	id?: string;
+	preview_id?: string;
+}
+
+interface R2BindingConfig {
+	binding: string;
+	bucket_name: string;
+	jurisdiction?: string;
 }
 
 const WORKDIR = process.cwd();
@@ -30,7 +64,6 @@ const DEPLOY_DIR = path.join(WORKDIR, '.wrangler', 'deploy');
 const SENSITIVE_VAR_KEYS = new Set(['API_KEY']);
 const NON_INHERITABLE_ENV_KEYS = new Set([
 	'define',
-	'vars',
 	'secrets',
 	'durable_objects',
 	'kv_namespaces',
@@ -305,11 +338,65 @@ function checkSensitiveVars(config: JsonObject): void {
 	}
 }
 
+function generateSecureApiKey(): string {
+	const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+	let key = '';
+	const randomValues = new Uint32Array(32);
+	crypto.getRandomValues(randomValues);
+	for (let i = 0; i < 32; i += 1) {
+		key += chars[randomValues[i] % chars.length];
+	}
+	return key;
+}
+
+function getDefaultEnvironment(baseConfig: JsonObject): string {
+	const envs = Object.keys((baseConfig.env as JsonObject) || {});
+	if (envs.includes('development')) {
+		return 'development';
+	}
+	return envs[0] || 'development';
+}
+
+function normalizeStorageBackend(value?: string): StorageBackend | undefined {
+	if (!value) return undefined;
+	if (value === 'd1' || value === 'kv') return value;
+	return undefined;
+}
+
+function normalizeMissingResourcePolicy(value?: string): MissingResourcePolicy | undefined {
+	if (!value) return undefined;
+	if (value === 'ask' || value === 'auto' || value === 'manual' || value === 'fail') return value;
+	return undefined;
+}
+
+function hasD1Binding(config: JsonObject): boolean {
+	return Array.isArray(config.d1_databases) && config.d1_databases.length > 0;
+}
+
+function getWorkerName(config: JsonObject): string {
+	if (typeof config.name === 'string' && config.name.trim()) {
+		return config.name;
+	}
+	return 'worker';
+}
+
+function parseBooleanFlag(value: unknown): boolean {
+	return value === true;
+}
+
+function isCiEnvironment(): boolean {
+	return process.env.CI === 'true' || process.env.CI === '1';
+}
+
+function isNonInteractiveMode(options: DeployOptions): boolean {
+	return parseBooleanFlag(options.nonInteractive) || isCiEnvironment();
+}
+
 async function resolveEnvironment(baseConfig: JsonObject, options: DeployOptions): Promise<string> {
 	if (options.env) return options.env;
 	const envs = Object.keys((baseConfig.env as JsonObject) || {});
-	if (options.nonInteractive) {
-		return envs.includes('development') ? 'development' : envs[0] || 'development';
+	if (isNonInteractiveMode(options)) {
+		return getDefaultEnvironment(baseConfig);
 	}
 	const answer = await inquirer.prompt([
 		{
@@ -321,6 +408,133 @@ async function resolveEnvironment(baseConfig: JsonObject, options: DeployOptions
 		},
 	]);
 	return answer.env as string;
+}
+
+async function resolveApiKey(options: DeployOptions): Promise<string | undefined> {
+	const explicit = options.apiKey?.trim() || process.env.API_KEY?.trim();
+	if (explicit) {
+		if (explicit.length < 16) {
+			fail('API Key 至少需要 16 字符');
+		}
+		return explicit;
+	}
+	if (isNonInteractiveMode(options)) {
+		return undefined;
+	}
+	while (true) {
+		const inputAnswers = await inquirer.prompt([
+			{ type: 'password', name: 'apiKey', message: '输入 API Key (直接回车可选择自动生成):' },
+		]);
+		const inputKey = (inputAnswers.apiKey as string | undefined)?.trim();
+		if (inputKey && inputKey.length >= 16) {
+			return inputKey;
+		}
+		if (!inputKey) {
+			const choiceAnswers = await inquirer.prompt([
+				{
+					type: 'list',
+					name: 'choice',
+					message: 'API Key 为空，请选择操作:',
+					choices: [
+						{ name: '生成随机密钥', value: 'generate' },
+						{ name: '重新输入', value: 'retry' },
+					],
+					default: 'generate',
+				},
+			]);
+			if (choiceAnswers.choice === 'generate') {
+				const newKey = generateSecureApiKey();
+				logSuccess('已生成 API Key，请妥善保存并按需写入环境变量');
+				console.log(newKey);
+				return newKey;
+			}
+		} else {
+			logWarn('API Key 至少需要 16 字符');
+		}
+	}
+}
+
+async function resolveStorageBackend(baseConfig: JsonObject, options: DeployOptions): Promise<StorageBackend> {
+	const explicit = normalizeStorageBackend(options.storage || process.env.STORAGE_BACKEND);
+	if (explicit) {
+		return explicit;
+	}
+
+	const vars = baseConfig.vars;
+	const configured = vars && typeof vars === 'object' && !Array.isArray(vars) ? normalizeStorageBackend(String((vars as JsonObject).STORAGE_BACKEND || '')) : undefined;
+	const defaultBackend = configured || 'd1';
+
+	if (isNonInteractiveMode(options) || options.yes) {
+		return defaultBackend;
+	}
+
+	const answer = await inquirer.prompt([
+		{
+			type: 'list',
+			name: 'storage',
+			message: '选择存储后端',
+			choices: [
+				{ name: 'D1 数据库 (推荐)', value: 'd1' },
+				{ name: 'KV 命名空间', value: 'kv' },
+			],
+			default: defaultBackend,
+		},
+	]);
+
+	return answer.storage as StorageBackend;
+}
+
+async function resolveMissingResourcePolicy(options: DeployOptions): Promise<MissingResourcePolicy> {
+	const explicit = normalizeMissingResourcePolicy(options.missingResource || process.env.DEPLOY_MISSING_RESOURCE_POLICY);
+	if (explicit) {
+		return explicit;
+	}
+	if (options.yes) {
+		return 'auto';
+	}
+	return 'ask';
+}
+
+async function promptMissingResourceAction(resourceLabel: string): Promise<'auto' | 'manual' | 'fail'> {
+	const answer = await inquirer.prompt([
+		{
+			type: 'list',
+			name: 'action',
+			message: `${resourceLabel} 不存在，如何处理？`,
+			choices: [
+				{ name: '自动创建', value: 'auto' },
+				{ name: '手动选择已有资源', value: 'manual' },
+				{ name: '取消部署', value: 'fail' },
+			],
+			default: 'auto',
+		},
+	]);
+	return answer.action as 'auto' | 'manual' | 'fail';
+}
+
+function resolveEffectiveMissingPolicy(basePolicy: MissingResourcePolicy, yes: boolean): MissingResourcePolicy {
+	if (basePolicy === 'ask' && yes) {
+		return 'auto';
+	}
+	return basePolicy;
+}
+
+async function resolveSkipMigrate(baseConfig: JsonObject, storageBackend: StorageBackend, options: DeployOptions): Promise<boolean> {
+	if (options.skipMigrate !== undefined) {
+		return options.skipMigrate;
+	}
+	const migrationApplicable = storageBackend === 'd1' && hasD1Binding(baseConfig);
+	if (!migrationApplicable) {
+		return true;
+	}
+	return false;
+}
+
+async function resolveSkipHealthcheck(options: DeployOptions): Promise<boolean> {
+	if (options.skipHealthcheck !== undefined) {
+		return options.skipHealthcheck;
+	}
+	return false;
 }
 
 function resolveEnvConfig(baseConfig: JsonObject, envName: string): JsonObject {
@@ -458,6 +672,14 @@ function getNpxBin(): string {
 	return process.platform === 'win32' ? 'npx.cmd' : 'npx';
 }
 
+function getCommandOutput(args: string[], timeout = 30000): string {
+	const result = run(getNpxBin(), ['wrangler', ...args], { timeout });
+	if (!result.ok) {
+		throw new Error(result.stderr || result.stdout || `命令执行失败: wrangler ${args.join(' ')}`);
+	}
+	return result.stdout;
+}
+
 function ensureWranglerLogin(): void {
 	logInfo('检查 Cloudflare 登录状态...');
 	const result = run(getNpxBin(), ['wrangler', 'whoami'], { timeout: 30000 });
@@ -505,7 +727,7 @@ function runBuild(skipBuild = false): void {
 function upsertApiKeySecret(apiKey: string | undefined): void {
 	if (!apiKey) return;
 	logInfo('写入 API_KEY secret...');
-	const result = run(getNpxBin(), ['wrangler', 'secret', 'put', 'API_KEY'], {
+	const result = run(getNpxBin(), ['wrangler', 'secret', 'put', 'API_KEY', '--name', path.basename(WORKDIR)], {
 		input: `${apiKey}\n`,
 		timeout: 120000,
 	});
@@ -517,8 +739,626 @@ function upsertApiKeySecret(apiKey: string | undefined): void {
 	logSuccess('API_KEY secret 写入成功');
 }
 
+function listD1Databases(): Array<{ uuid: string; name: string }> {
+	return JSON.parse(getCommandOutput(['d1', 'list', '--json'], 30000)) as Array<{ uuid: string; name: string }>;
+}
+
+function listKVNamespaces(): Array<{ id: string; title: string }> {
+	return JSON.parse(getCommandOutput(['kv', 'namespace', 'list'], 30000)) as Array<{ id: string; title: string }>;
+}
+
+function listR2Buckets(): Array<{ name: string }> {
+	return JSON.parse(getCommandOutput(['r2', 'bucket', 'list'], 30000)) as Array<{ name: string }>;
+}
+
+async function selectD1Database(binding: D1BindingConfig, nonInteractive: boolean): Promise<ResourceInfo | null> {
+	logInfo('获取 D1 数据库列表...');
+	try {
+		const dbs = listD1Databases();
+		if (dbs.length === 0) {
+			logWarn('未找到任何 D1 数据库');
+			return null;
+		}
+		if (nonInteractive) {
+			fail(`D1 ${binding.binding} 缺失，且当前为非交互模式`);
+		}
+		const answers = await inquirer.prompt([
+			{
+				type: 'list',
+				name: 'databaseId',
+				message: `选择要绑定到 ${binding.binding} 的 D1 数据库:`,
+				choices: dbs.map((db) => ({ name: `${db.name} (${db.uuid})`, value: db.uuid })),
+			},
+		]);
+		const selected = dbs.find((db) => db.uuid === answers.databaseId);
+		return selected ? { type: 'd1', binding: binding.binding, id: selected.uuid, name: selected.name, status: 'existing' } : null;
+	} catch (error) {
+		logWarn(`获取 D1 列表失败: ${error instanceof Error ? error.message : String(error)}`);
+		return null;
+	}
+}
+
+async function selectKVNamespace(binding: string, nonInteractive: boolean): Promise<ResourceInfo | null> {
+	logInfo('获取 KV 命名空间列表...');
+	try {
+		const namespaces = listKVNamespaces();
+		if (namespaces.length === 0) {
+			logWarn('未找到任何 KV 命名空间');
+			return null;
+		}
+		if (nonInteractive) {
+			fail(`KV ${binding} 缺失，且当前为非交互模式`);
+		}
+		const answers = await inquirer.prompt([
+			{
+				type: 'list',
+				name: 'namespaceId',
+				message: `选择要绑定到 ${binding} 的 KV 命名空间:`,
+				choices: namespaces.map((ns) => ({ name: `${ns.title} (${ns.id})`, value: ns.id })),
+			},
+		]);
+		const selected = namespaces.find((ns) => ns.id === answers.namespaceId);
+		return selected ? { type: 'kv', binding, id: selected.id, status: 'existing' } : null;
+	} catch (error) {
+		logWarn(`获取 KV 列表失败: ${error instanceof Error ? error.message : String(error)}`);
+		return null;
+	}
+}
+
+async function selectR2Bucket(binding: R2BindingConfig, nonInteractive: boolean): Promise<ResourceInfo | null> {
+	logInfo('获取 R2 存储桶列表...');
+	try {
+		const buckets = listR2Buckets();
+		if (buckets.length === 0) {
+			logWarn('未找到任何 R2 存储桶');
+			return null;
+		}
+		if (nonInteractive) {
+			fail(`R2 ${binding.binding} 缺失，且当前为非交互模式`);
+		}
+		const answers = await inquirer.prompt([
+			{
+				type: 'list',
+				name: 'bucketName',
+				message: `选择要绑定到 ${binding.binding} 的 R2 存储桶:`,
+				choices: buckets.map((bucket) => ({ name: bucket.name, value: bucket.name })),
+			},
+		]);
+		return { type: 'r2', binding: binding.binding, id: answers.bucketName as string, status: 'existing' };
+	} catch (error) {
+		logWarn(`获取 R2 列表失败: ${error instanceof Error ? error.message : String(error)}`);
+		return null;
+	}
+}
+
+async function ensureD1Database(binding: D1BindingConfig, missingResourcePolicy: MissingResourcePolicy, yes: boolean, nonInteractive: boolean): Promise<ResourceInfo> {
+	logInfo(`检查 D1: ${binding.binding} (${binding.database_name})`);
+	try {
+		const dbs = listD1Databases();
+		const existing = dbs.find((db) => db.name === binding.database_name || db.uuid === binding.database_id);
+		if (existing) {
+			logSuccess(`D1 ${binding.binding}: 已存在 (${existing.uuid})`);
+			return { type: 'd1', binding: binding.binding, id: existing.uuid, name: existing.name, status: 'existing' };
+		}
+	} catch {
+		logInfo('未找到现有数据库');
+	}
+	const policy = resolveEffectiveMissingPolicy(missingResourcePolicy, yes);
+	const action = policy === 'ask' ? await promptMissingResourceAction(`D1 ${binding.binding}`) : policy;
+	if (action === 'fail') {
+		return { type: 'd1', binding: binding.binding, id: '', status: 'pending' };
+	}
+	if (action === 'manual') {
+		return (await selectD1Database(binding, nonInteractive)) || { type: 'd1', binding: binding.binding, id: '', status: 'pending' };
+	}
+	let retries = 3;
+	while (retries > 0) {
+		try {
+			const output = getCommandOutput(['d1', 'create', binding.database_name], 60000);
+			const idMatch = output.match(/([a-f0-9-]{36})/i);
+			if (idMatch) {
+				logSuccess(`D1 创建成功 (${idMatch[1]})`);
+				return { type: 'd1', binding: binding.binding, id: idMatch[1], name: binding.database_name, status: 'created' };
+			}
+			const refreshed = listD1Databases().find((db) => db.name === binding.database_name);
+			if (refreshed) {
+				return { type: 'd1', binding: binding.binding, id: refreshed.uuid, name: refreshed.name, status: 'created' };
+			}
+			break;
+		} catch (error) {
+			retries -= 1;
+			const message = error instanceof Error ? error.message : String(error);
+			if (message.includes('already exists')) {
+				const refreshed = listD1Databases().find((db) => db.name === binding.database_name);
+				if (refreshed) {
+					return { type: 'd1', binding: binding.binding, id: refreshed.uuid, name: refreshed.name, status: 'existing' };
+				}
+			}
+			if (retries > 0) {
+				logWarn(`创建失败，${retries} 次重试...`);
+				await new Promise((resolve) => setTimeout(resolve, 3000));
+			} else {
+				logWarn(`创建失败: ${message}`);
+			}
+		}
+	}
+	return (await selectD1Database(binding, nonInteractive)) || { type: 'd1', binding: binding.binding, id: '', status: 'pending' };
+}
+
+async function createD1DatabaseWithPrompt(defaultName: string): Promise<ResourceInfo | null> {
+	const answer = await inquirer.prompt([
+		{
+			type: 'input',
+			name: 'databaseName',
+			message: '输入要创建的 D1 数据库名称',
+			default: defaultName,
+			validate: (value: string) => (value.trim() ? true : '数据库名称不能为空'),
+		},
+	]);
+	const databaseName = (answer.databaseName as string).trim();
+	try {
+		const output = getCommandOutput(['d1', 'create', databaseName], 60000);
+		const idMatch = output.match(/([a-f0-9-]{36})/i);
+		if (idMatch) {
+			logSuccess(`D1 创建成功 (${idMatch[1]})`);
+			return { type: 'd1', binding: databaseName, id: idMatch[1], name: databaseName, status: 'created' };
+		}
+		const refreshed = listD1Databases().find((db) => db.name === databaseName);
+		if (refreshed) {
+			logSuccess(`D1 创建成功 (${refreshed.uuid})`);
+			return { type: 'd1', binding: databaseName, id: refreshed.uuid, name: refreshed.name, status: 'created' };
+		}
+		logWarn('创建成功但未解析到数据库 ID');
+		return null;
+	} catch (error) {
+		logWarn(`创建 D1 失败: ${error instanceof Error ? error.message : String(error)}`);
+		return null;
+	}
+}
+
+function getCreateOptionLabel(resourceType: 'd1' | 'kv' | 'r2'): string {
+	switch (resourceType) {
+		case 'd1':
+			return '创建新的 D1 数据库';
+		case 'kv':
+			return '创建新的 KV 命名空间';
+		case 'r2':
+			return '创建新的 R2 存储桶';
+	}
+}
+
+function getSelectMessage(resourceType: 'd1' | 'kv' | 'r2', binding: string): string {
+	switch (resourceType) {
+		case 'd1':
+			return `为 ${binding} 选择 D1 数据库`;
+		case 'kv':
+			return `为 ${binding} 选择 KV 命名空间`;
+		case 'r2':
+			return `为 ${binding} 选择 R2 存储桶`;
+	}
+}
+
+async function createKVNamespaceWithPrompt(defaultName: string): Promise<ResourceInfo | null> {
+	const answer = await inquirer.prompt([
+		{
+			type: 'input',
+			name: 'namespaceTitle',
+			message: '输入要创建的 KV 命名空间名称',
+			default: defaultName,
+			validate: (value: string) => (value.trim() ? true : '命名空间名称不能为空'),
+		},
+	]);
+	const namespaceTitle = (answer.namespaceTitle as string).trim();
+	try {
+		const output = getCommandOutput(['kv', 'namespace', 'create', namespaceTitle], 60000);
+		const idMatch = output.match(/([a-f0-9-]{32,36})/i);
+		if (idMatch) {
+			logSuccess(`KV 创建成功 (${idMatch[1]})`);
+			return { type: 'kv', binding: namespaceTitle, id: idMatch[1], status: 'created' };
+		}
+		const refreshed = listKVNamespaces().find((ns) => ns.title === namespaceTitle);
+		if (refreshed) {
+			logSuccess(`KV 创建成功 (${refreshed.id})`);
+			return { type: 'kv', binding: namespaceTitle, id: refreshed.id, status: 'created' };
+		}
+		logWarn('创建成功但未解析到 KV ID');
+		return null;
+	} catch (error) {
+		logWarn(`创建 KV 失败: ${error instanceof Error ? error.message : String(error)}`);
+		return null;
+	}
+}
+
+async function createR2BucketWithPrompt(defaultName: string): Promise<ResourceInfo | null> {
+	const answer = await inquirer.prompt([
+		{
+			type: 'input',
+			name: 'bucketName',
+			message: '输入要创建的 R2 存储桶名称',
+			default: defaultName,
+			validate: (value: string) => (value.trim() ? true : '存储桶名称不能为空'),
+		},
+	]);
+	const bucketName = (answer.bucketName as string).trim();
+	try {
+		getCommandOutput(['r2', 'bucket', 'create', bucketName], 60000);
+		logSuccess(`R2 创建成功 (${bucketName})`);
+		return { type: 'r2', binding: bucketName, id: bucketName, status: 'created' };
+	} catch (error) {
+		logWarn(`创建 R2 失败: ${error instanceof Error ? error.message : String(error)}`);
+		return null;
+	}
+}
+
+async function ensureKVNamespace(binding: KVBindingConfig, missingResourcePolicy: MissingResourcePolicy, yes: boolean, nonInteractive: boolean): Promise<ResourceInfo> {
+	logInfo(`检查 KV: ${binding.binding}`);
+	try {
+		const namespaces = listKVNamespaces();
+		const existing = namespaces.find((ns) => ns.title === binding.binding || ns.id === binding.id);
+		if (existing) {
+			logSuccess(`KV ${binding.binding}: ${existing.id}`);
+			return { type: 'kv', binding: binding.binding, id: existing.id, status: 'existing' };
+		}
+	} catch {
+		logInfo('未找到现有 KV');
+	}
+	const policy = resolveEffectiveMissingPolicy(missingResourcePolicy, yes);
+	const action = policy === 'ask' ? await promptMissingResourceAction(`KV ${binding.binding}`) : policy;
+	if (action === 'fail') {
+		return { type: 'kv', binding: binding.binding, id: '', status: 'pending' };
+	}
+	if (action === 'manual') {
+		return (await selectKVNamespace(binding.binding, nonInteractive)) || { type: 'kv', binding: binding.binding, id: '', status: 'pending' };
+	}
+	let retries = 3;
+	while (retries > 0) {
+		try {
+			const output = getCommandOutput(['kv', 'namespace', 'create', binding.binding], 60000);
+			const idMatch = output.match(/([a-f0-9-]{32,36})/i);
+			if (idMatch) {
+				logSuccess(`KV 创建成功 (${idMatch[1]})`);
+				return { type: 'kv', binding: binding.binding, id: idMatch[1], status: 'created' };
+			}
+			const refreshed = listKVNamespaces().find((ns) => ns.title === binding.binding);
+			if (refreshed) {
+				return { type: 'kv', binding: binding.binding, id: refreshed.id, status: 'created' };
+			}
+			break;
+		} catch (error) {
+			retries -= 1;
+			const message = error instanceof Error ? error.message : String(error);
+			if (retries > 0) {
+				logWarn(`创建失败，${retries} 次重试...`);
+				await new Promise((resolve) => setTimeout(resolve, 3000));
+			} else {
+				logWarn(`创建失败: ${message}`);
+			}
+		}
+	}
+	return (await selectKVNamespace(binding.binding, nonInteractive)) || { type: 'kv', binding: binding.binding, id: '', status: 'pending' };
+}
+
+async function ensureR2Bucket(binding: R2BindingConfig, missingResourcePolicy: MissingResourcePolicy, yes: boolean, nonInteractive: boolean): Promise<ResourceInfo> {
+	logInfo(`检查 R2: ${binding.binding} (${binding.bucket_name})`);
+	try {
+		const buckets = listR2Buckets();
+		const existing = buckets.find((bucket) => bucket.name === binding.bucket_name);
+		if (existing) {
+			logSuccess(`R2 ${binding.binding}: 已存在`);
+			return { type: 'r2', binding: binding.binding, id: existing.name, status: 'existing' };
+		}
+	} catch {
+		logInfo('未找到现有 R2');
+	}
+	const policy = resolveEffectiveMissingPolicy(missingResourcePolicy, yes);
+	const action = policy === 'ask' ? await promptMissingResourceAction(`R2 ${binding.binding}`) : policy;
+	if (action === 'fail') {
+		return { type: 'r2', binding: binding.binding, id: '', status: 'pending' };
+	}
+	if (action === 'manual') {
+		return (await selectR2Bucket(binding, nonInteractive)) || { type: 'r2', binding: binding.binding, id: '', status: 'pending' };
+	}
+	try {
+		getCommandOutput(['r2', 'bucket', 'create', binding.bucket_name], 60000);
+		logSuccess(`R2 创建成功 (${binding.bucket_name})`);
+		return { type: 'r2', binding: binding.binding, id: binding.bucket_name, status: 'created' };
+	} catch (error) {
+		logWarn(`创建失败: ${error instanceof Error ? error.message : String(error)}`);
+	}
+	return (await selectR2Bucket(binding, nonInteractive)) || { type: 'r2', binding: binding.binding, id: '', status: 'pending' };
+}
+
+function getD1Bindings(config: JsonObject): D1BindingConfig[] {
+	if (Array.isArray(config.d1_databases) && config.d1_databases.length > 0) {
+		return (config.d1_databases as JsonValue[])
+			.filter((entry): entry is JsonObject => Boolean(entry) && typeof entry === 'object' && !Array.isArray(entry))
+			.map((entry) => entry as unknown as D1BindingConfig);
+	}
+
+	return [
+		{
+			binding: 'JSONBASE_DB',
+			database_name: 'jsonbase',
+		},
+	];
+}
+
+function getKVBindings(config: JsonObject): KVBindingConfig[] {
+	if (Array.isArray(config.kv_namespaces) && config.kv_namespaces.length > 0) {
+		return (config.kv_namespaces as JsonValue[])
+			.filter((entry): entry is JsonObject => Boolean(entry) && typeof entry === 'object' && !Array.isArray(entry))
+			.map((entry) => entry as unknown as KVBindingConfig);
+	}
+
+	const vars = config.vars;
+	const kvBinding =
+		vars && typeof vars === 'object' && !Array.isArray(vars) && typeof (vars as JsonObject).KV_NAMESPACE === 'string'
+			? ((vars as JsonObject).KV_NAMESPACE as string)
+			: 'JSONBIN';
+
+	return [{ binding: kvBinding }];
+}
+
+function getR2Bindings(config: JsonObject): R2BindingConfig[] {
+	if (!Array.isArray(config.r2_buckets)) return [];
+	return (config.r2_buckets as JsonValue[]).filter((entry): entry is JsonObject => Boolean(entry) && typeof entry === 'object' && !Array.isArray(entry)).map((entry) => entry as unknown as R2BindingConfig);
+}
+
+async function promptResourceBindings(config: JsonObject, storageBackend: StorageBackend, allowCreate: boolean): Promise<ResourceInfo[]> {
+	const resources: ResourceInfo[] = [];
+
+	for (const binding of storageBackend === 'd1' ? getD1Bindings(config) : []) {
+		const databases = listD1Databases();
+		if (databases.length === 0 && !allowCreate) {
+			logWarn(`未找到可选 D1 数据库，预览模式下跳过 ${binding.binding} 绑定选择`);
+			continue;
+		}
+		const defaultDatabase = databases.find((db) => db.uuid === binding.database_id || db.name === binding.database_name);
+		const answers = await inquirer.prompt([
+			{
+				type: 'list',
+				name: 'databaseId',
+				message: getSelectMessage('d1', binding.binding),
+				choices: [
+					...(allowCreate ? [{ name: getCreateOptionLabel('d1'), value: '__create_new__' }] : []),
+					...databases.map((db) => ({ name: `${db.name} (${db.uuid})`, value: db.uuid })),
+				],
+				default: defaultDatabase?.uuid || (allowCreate ? '__create_new__' : databases[0]?.uuid),
+			},
+		]);
+		if (answers.databaseId === '__create_new__') {
+			const created = await createD1DatabaseWithPrompt(binding.database_name);
+			resources.push(created ? { ...created, binding: binding.binding } : { type: 'd1', binding: binding.binding, id: '', status: 'pending' });
+		} else {
+			const selected = databases.find((db) => db.uuid === answers.databaseId);
+			resources.push({ type: 'd1', binding: binding.binding, id: answers.databaseId as string, name: selected?.name || binding.database_name, status: 'existing' });
+		}
+	}
+
+	for (const binding of storageBackend === 'kv' ? getKVBindings(config) : []) {
+		const namespaces = listKVNamespaces();
+		if (namespaces.length === 0 && !allowCreate) {
+			logWarn(`未找到可选 KV 命名空间，预览模式下跳过 ${binding.binding} 绑定选择`);
+			continue;
+		}
+		const defaultNamespace = namespaces.find((ns) => ns.id === binding.id || ns.title === binding.binding);
+		const answers = await inquirer.prompt([
+			{
+				type: 'list',
+				name: 'namespaceId',
+				message: getSelectMessage('kv', binding.binding),
+				choices: [
+					...(allowCreate ? [{ name: getCreateOptionLabel('kv'), value: '__create_new__' }] : []),
+					...namespaces.map((ns) => ({ name: `${ns.title} (${ns.id})`, value: ns.id })),
+				],
+				default: defaultNamespace?.id || (allowCreate ? '__create_new__' : namespaces[0]?.id),
+			},
+		]);
+		if (answers.namespaceId === '__create_new__') {
+			const created = await createKVNamespaceWithPrompt(binding.binding);
+			resources.push(created ? { ...created, binding: binding.binding } : { type: 'kv', binding: binding.binding, id: '', status: 'pending' });
+		} else {
+			resources.push({ type: 'kv', binding: binding.binding, id: answers.namespaceId as string, status: 'existing' });
+		}
+	}
+
+	for (const binding of getR2Bindings(config)) {
+		const buckets = listR2Buckets();
+		if (buckets.length === 0 && !allowCreate) {
+			logWarn(`未找到可选 R2 存储桶，预览模式下跳过 ${binding.binding} 绑定选择`);
+			continue;
+		}
+		const defaultBucket = buckets.find((bucket) => bucket.name === binding.bucket_name);
+		const answers = await inquirer.prompt([
+			{
+				type: 'list',
+				name: 'bucketName',
+				message: getSelectMessage('r2', binding.binding),
+				choices: [
+					...(allowCreate ? [{ name: getCreateOptionLabel('r2'), value: '__create_new__' }] : []),
+					...buckets.map((bucket) => ({ name: bucket.name, value: bucket.name })),
+				],
+				default: defaultBucket?.name || (allowCreate ? '__create_new__' : buckets[0]?.name),
+			},
+		]);
+		if (answers.bucketName === '__create_new__') {
+			const created = await createR2BucketWithPrompt(binding.bucket_name);
+			resources.push(created ? { ...created, binding: binding.binding } : { type: 'r2', binding: binding.binding, id: '', status: 'pending' });
+		} else {
+			resources.push({ type: 'r2', binding: binding.binding, id: answers.bucketName as string, status: 'existing' });
+		}
+	}
+
+	return resources;
+}
+
+async function ensureResources(
+	config: JsonObject,
+	storageBackend: StorageBackend,
+	missingResourcePolicy: MissingResourcePolicy,
+	options: DeployOptions,
+	initialResources: ResourceInfo[] = [],
+): Promise<ResourceInfo[]> {
+	const resources: ResourceInfo[] = [];
+	const yes = parseBooleanFlag(options.yes);
+	const nonInteractive = isNonInteractiveMode(options);
+	const existingKeys = new Set(initialResources.map((resource) => `${resource.type}:${resource.binding}`));
+	resources.push(...initialResources);
+
+	if (storageBackend === 'd1') {
+		for (const entry of getD1Bindings(config)) {
+			if (!existingKeys.has(`d1:${entry.binding}`)) {
+				resources.push(await ensureD1Database(entry, missingResourcePolicy, yes, nonInteractive));
+			}
+		}
+	}
+
+	if (storageBackend === 'kv') {
+		for (const entry of getKVBindings(config)) {
+			if (!existingKeys.has(`kv:${entry.binding}`)) {
+				resources.push(await ensureKVNamespace(entry, missingResourcePolicy, yes, nonInteractive));
+			}
+		}
+	}
+
+	for (const entry of getR2Bindings(config)) {
+		if (!existingKeys.has(`r2:${entry.binding}`)) {
+			resources.push(await ensureR2Bucket(entry, missingResourcePolicy, yes, nonInteractive));
+		}
+	}
+
+	return resources;
+}
+
+function applyResolvedResources(config: JsonObject, resources: ResourceInfo[]): JsonObject {
+	const nextConfig = deepClone(config);
+	const d1Map = new Map(resources.filter((resource) => resource.type === 'd1' && resource.id).map((resource) => [resource.binding, resource.id]));
+	const d1NameMap = new Map(resources.filter((resource) => resource.type === 'd1' && resource.id).map((resource) => [resource.binding, resource.name || 'jsonbase']));
+	const kvMap = new Map(resources.filter((resource) => resource.type === 'kv' && resource.id).map((resource) => [resource.binding, resource.id]));
+	const r2Map = new Map(resources.filter((resource) => resource.type === 'r2' && resource.id).map((resource) => [resource.binding, resource.id]));
+
+	if (Array.isArray(nextConfig.d1_databases)) {
+		nextConfig.d1_databases = (nextConfig.d1_databases as JsonValue[]).map((entry) => {
+			if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return entry;
+			const db = deepClone(entry as JsonObject);
+			const binding = typeof db.binding === 'string' ? db.binding : '';
+			const resourceId = d1Map.get(binding);
+			const resourceName = d1NameMap.get(binding);
+			if (resourceId) {
+				db.database_id = resourceId;
+			}
+			if (resourceName) {
+				db.database_name = resourceName;
+			}
+			return db;
+		});
+	} else if (d1Map.size > 0) {
+		nextConfig.d1_databases = Array.from(d1Map.entries()).map(([binding, id]) => ({
+			binding,
+			database_id: id,
+			database_name: d1NameMap.get(binding) || (binding === 'JSONBASE_DB' ? 'jsonbase' : binding.toLowerCase()),
+		}));
+	}
+
+	if (Array.isArray(nextConfig.kv_namespaces)) {
+		nextConfig.kv_namespaces = (nextConfig.kv_namespaces as JsonValue[]).map((entry) => {
+			if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return entry;
+			const ns = deepClone(entry as JsonObject);
+			const binding = typeof ns.binding === 'string' ? ns.binding : '';
+			const resourceId = kvMap.get(binding);
+			if (resourceId) {
+				ns.id = resourceId;
+			}
+			return ns;
+		});
+	} else if (kvMap.size > 0) {
+		nextConfig.kv_namespaces = Array.from(kvMap.entries()).map(([binding, id]) => ({
+			binding,
+			id,
+			preview_id: id,
+		}));
+	}
+
+	if (!nextConfig.vars || typeof nextConfig.vars !== 'object' || Array.isArray(nextConfig.vars)) {
+		nextConfig.vars = {};
+	}
+	if (kvMap.size > 0) {
+		const firstBinding = kvMap.keys().next().value;
+		if (typeof firstBinding === 'string' && firstBinding) {
+			(nextConfig.vars as JsonObject).KV_NAMESPACE = firstBinding;
+		}
+	}
+	if (d1Map.size > 0) {
+		(nextConfig.vars as JsonObject).D1_BINDING = Array.from(d1Map.keys())[0];
+	}
+
+	if (Array.isArray(nextConfig.r2_buckets)) {
+		nextConfig.r2_buckets = (nextConfig.r2_buckets as JsonValue[]).map((entry) => {
+			if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return entry;
+			const bucket = deepClone(entry as JsonObject);
+			const binding = typeof bucket.binding === 'string' ? bucket.binding : '';
+			const resourceId = r2Map.get(binding);
+			if (resourceId) {
+				bucket.bucket_name = resourceId;
+			}
+			return bucket;
+		});
+	}
+
+	return nextConfig;
+}
+
+function runMigrations(config: JsonObject, envName: string): void {
+	const schemaPath = path.join(WORKDIR, 'src', 'database', 'schema.sql');
+	if (!fs.existsSync(schemaPath)) {
+		logWarn(`迁移文件不存在，跳过: ${path.relative(WORKDIR, schemaPath)}`);
+		return;
+	}
+	const d1Databases = config.d1_databases;
+	if (!Array.isArray(d1Databases) || d1Databases.length === 0) {
+		logWarn('当前配置没有 D1 绑定，跳过迁移');
+		return;
+	}
+	const firstDb = d1Databases[0];
+	if (!firstDb || typeof firstDb !== 'object' || Array.isArray(firstDb)) {
+		logWarn('D1 绑定配置异常，跳过迁移');
+		return;
+	}
+	const databaseName = (firstDb as JsonObject).database_name;
+	if (typeof databaseName !== 'string' || !databaseName.trim()) {
+		logWarn('未找到 D1 database_name，跳过迁移');
+		return;
+	}
+	logInfo(`执行数据库迁移: ${databaseName}`);
+	const result = run(getNpxBin(), ['wrangler', 'd1', 'execute', databaseName, '--remote', `--file=${schemaPath}`, '--env', envName], {
+		timeout: 120000,
+	});
+	if (!result.ok) {
+		console.log(result.stdout);
+		console.log(result.stderr);
+		fail('数据库迁移失败');
+	}
+	logSuccess('数据库迁移完成');
+}
+
+async function runHealthcheck(config: JsonObject): Promise<void> {
+	const workerUrl = `https://${getWorkerName(config)}.workers.dev/._jsondb_/api/health`;
+	logInfo(`执行健康检查: ${workerUrl}`);
+	try {
+		const response = await fetch(workerUrl, { signal: AbortSignal.timeout(15000) });
+		if (!response.ok) {
+			logWarn(`健康检查返回异常状态: ${response.status}`);
+			return;
+		}
+		const payload = (await response.json()) as { status?: string };
+		logSuccess(`健康检查通过${payload.status ? `: ${payload.status}` : ''}`);
+	} catch (error) {
+		logWarn(`健康检查失败: ${error instanceof Error ? error.message : String(error)}`);
+	}
+}
+
 function buildDeployArgs(options: DeployOptions): string[] {
-	const args = ['wrangler', 'deploy'];
+	const args = ['wrangler', 'deploy', '--config', path.join(DEPLOY_DIR, 'config.json')];
 	if (options.dryRun) {
 		args.push('--dry-run');
 	}
@@ -537,6 +1377,10 @@ async function deploy(options: DeployOptions): Promise<void> {
 
 	const baseConfig = parseTomlLite(readText(WRANGLER_TOML_PATH));
 	const envName = await resolveEnvironment(baseConfig, options);
+	const storageBackend = await resolveStorageBackend(baseConfig, options);
+	const missingResourcePolicy = await resolveMissingResourcePolicy(options);
+	const skipMigrate = await resolveSkipMigrate(baseConfig, storageBackend, options);
+	const skipHealthcheck = await resolveSkipHealthcheck(options);
 	let finalConfig = resolveEnvConfig(baseConfig, envName);
 
 	const envVarsFromFiles: Record<string, string> = {};
@@ -547,6 +1391,7 @@ async function deploy(options: DeployOptions): Promise<void> {
 	if (!finalConfig.vars || typeof finalConfig.vars !== 'object' || Array.isArray(finalConfig.vars)) {
 		finalConfig.vars = {};
 	}
+	(finalConfig.vars as JsonObject).STORAGE_BACKEND = storageBackend;
 	for (const [key, value] of Object.entries(envVarsFromFiles)) {
 		(finalConfig.vars as JsonObject)[key] = value;
 	}
@@ -559,6 +1404,14 @@ async function deploy(options: DeployOptions): Promise<void> {
 		const overrides = parseConfigFile(options.confFile);
 		finalConfig = deepMerge(finalConfig, overrides);
 	}
+
+	const preselectedResources = !isNonInteractiveMode(options) ? await promptResourceBindings(finalConfig, storageBackend, true) : [];
+	const resources = !isNonInteractiveMode(options) ? preselectedResources : options.plan || options.dryRun ? [] : await ensureResources(finalConfig, storageBackend, missingResourcePolicy, options, preselectedResources);
+	const missingResources = resources.filter((resource) => !resource.id);
+	if (missingResources.length > 0) {
+		fail(`部署失败: 以下资源缺少 ID: ${missingResources.map((resource) => `${resource.type}.${resource.binding}`).join(', ')}`);
+	}
+	finalConfig = applyResolvedResources(finalConfig, resources);
 
 	delete finalConfig.env;
 
@@ -587,6 +1440,10 @@ async function deploy(options: DeployOptions): Promise<void> {
 	if (options.dryRun) {
 		console.log(chalk.cyan('\n[DRY-RUN] 配置预览 (不会写入文件，不会部署)'));
 		console.log(`环境: ${envName}`);
+		console.log(`存储后端: ${storageBackend}`);
+		console.log(`缺失资源策略: ${missingResourcePolicy}`);
+		console.log(`数据库迁移: ${skipMigrate ? '跳过' : '执行'}`);
+		console.log(`健康检查: ${skipHealthcheck ? '跳过' : '执行'}`);
 		console.log(`计划生成: ${generatedPathRelative}`);
 		console.log('\n--- wrangler.jsonc ---');
 		console.log(toJsonc(finalConfig).trim());
@@ -595,32 +1452,34 @@ async function deploy(options: DeployOptions): Promise<void> {
 		return;
 	}
 
+	if (options.plan) {
+		console.log(chalk.cyan('\n[PLAN] 部署计划'));
+		console.log(`环境: ${envName}`);
+		console.log(`存储后端: ${storageBackend}`);
+		console.log(`缺失资源策略: ${missingResourcePolicy}`);
+		console.log(`数据库迁移: ${skipMigrate ? '跳过' : '执行'}`);
+		console.log(`健康检查: ${skipHealthcheck ? '跳过' : '执行'}`);
+		console.log(`配置: ${generatedPathRelative}`);
+		console.log(`重定向: ${path.relative(WORKDIR, redirectPath)}`);
+		console.log(`命令: ${previewCommand}`);
+		if (resources.length > 0) {
+			console.log(`资源: ${resources.map((resource) => `${resource.type}.${resource.binding}=${resource.id || 'pending'}`).join(', ')}`);
+		}
+		return;
+	}
+
 	const writtenFiles = ensureDeployFiles(envName, finalConfig);
 	logSuccess(`已生成部署配置: ${path.relative(WORKDIR, writtenFiles.generatedPath)}`);
 	logSuccess(`已生成配置重定向: ${path.relative(WORKDIR, writtenFiles.redirectPath)}`);
 
-	if (options.plan) {
-		console.log(chalk.cyan('\n[PLAN] 部署计划'));
-		console.log(`环境: ${envName}`);
-		console.log(`配置: ${generatedPathRelative}`);
-		console.log(`重定向: ${path.relative(WORKDIR, redirectPath)}`);
-		console.log(`命令: ${previewCommand}`);
-		return;
+	const apiKey = await resolveApiKey(options);
+
+	if (!apiKey) {
+		logWarn('未检测到 API_KEY，本次将跳过 API_KEY secret 写入');
 	}
 
-	const apiKey = options.apiKey || process.env.API_KEY;
-	if (!options.nonInteractive && !apiKey) {
-		const answer = await inquirer.prompt([
-			{
-				type: 'confirm',
-				name: 'setSecret',
-				message: '未检测到 API_KEY，是否跳过 API_KEY secret 写入?',
-				default: true,
-			},
-		]);
-		if (!answer.setSecret) {
-			fail('请通过 --api-key 或环境变量 API_KEY 提供密钥');
-		}
+	if (!skipMigrate) {
+		runMigrations(finalConfig, envName);
 	}
 
 	runBuild(Boolean(options.skipBuild));
@@ -635,6 +1494,9 @@ async function deploy(options: DeployOptions): Promise<void> {
 	}
 
 	console.log(deployResult.stdout.trim());
+	if (!skipHealthcheck) {
+		await runHealthcheck(finalConfig);
+	}
 	logSuccess(options.dryRun ? 'dry-run 执行成功' : '部署成功');
 }
 
@@ -663,7 +1525,12 @@ function doctor(): void {
 async function printConfig(options: DeployOptions): Promise<void> {
 	const baseConfig = parseTomlLite(readText(WRANGLER_TOML_PATH));
 	const envName = await resolveEnvironment(baseConfig, options);
+	const storageBackend = await resolveStorageBackend(baseConfig, options);
 	let finalConfig = resolveEnvConfig(baseConfig, envName);
+	if (!finalConfig.vars || typeof finalConfig.vars !== 'object' || Array.isArray(finalConfig.vars)) {
+		finalConfig.vars = {};
+	}
+	(finalConfig.vars as JsonObject).STORAGE_BACKEND = storageBackend;
 	if (options.confFile) {
 		finalConfig = deepMerge(finalConfig, parseConfigFile(options.confFile));
 	}
@@ -682,6 +1549,8 @@ program
 	.command('deploy')
 	.description('生成动态 wrangler 配置并部署')
 	.option('--env <environment>', '部署环境')
+	.option('--storage <backend>', '存储后端: d1|kv')
+	.option('--missing-resource <policy>', '缺失资源策略: ask|auto|manual|fail')
 	.option('--plan', '只输出执行计划，不执行部署')
 	.option('--dry-run', '执行 wrangler deploy --dry-run')
 	.option('--conf-file <path>', '覆盖生成配置的 wrangler.jsonc/json/toml 文件')
@@ -690,6 +1559,8 @@ program
 	.option('--keep-vars', '部署时启用 --keep-vars')
 	.option('--non-interactive', '禁用交互模式')
 	.option('--yes', '使用推荐默认值')
+	.option('--skip-migrate', '跳过数据库迁移')
+	.option('--skip-healthcheck', '跳过健康检查')
 	.option('--skip-build', '跳过构建')
 	.option('--api-key <key>', '写入 API_KEY secret')
 	.action(async (options: DeployOptions) => {
@@ -702,6 +1573,7 @@ program
 	.command('print-config')
 	.description('打印最终生成的部署配置')
 	.option('--env <environment>', '部署环境')
+	.option('--storage <backend>', '存储后端: d1|kv')
 	.option('--conf-file <path>', '覆盖生成配置的 wrangler.jsonc/json/toml 文件')
 	.option('--non-interactive', '禁用交互模式')
 	.action(async (options: DeployOptions) => {
