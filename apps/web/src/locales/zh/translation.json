@@ -1,0 +1,202 @@
+{
+  "login": {
+    "loading": "加载中...",
+    "title": "JSON Base",
+    "subtitle": "Cloudflare Workers JSON 存储服务",
+    "apiKeyRequired": "请输入 API Key",
+    "loginFailed": "登录失败，请检查 API Key 后重试",
+    "apiKeyLabel": "API Key",
+    "placeholder": "请输入您的 API Key",
+    "submit": "验证并登录",
+    "footer": "输入 API Key 以访问管理控制台"
+  },
+  "auth": {
+    "apiKeyRequired": "API Key 不能为空",
+    "apiKeyInvalid": "API Key 无效",
+    "apiKeyValid": "API Key 有效",
+    "unknownErrorRetry": "未知错误，请稍后重试"
+  },
+  "layout": {
+    "consoleTitle": "JSON Base 管理控制台",
+    "navConsole": "控制台",
+    "navData": "数据管理",
+    "navPermissions": "权限管理",
+    "openMenu": "打开菜单",
+    "refresh": "刷新",
+    "languageMenu": "切换语言",
+    "languages": {
+      "zh": "中文",
+      "en": "English"
+    },
+    "logout": "退出",
+    "createData": "创建数据",
+    "editData": "编辑数据",
+    "createSuccess": "创建成功",
+    "createFailed": "创建失败",
+    "updateSuccess": "更新成功",
+    "updateFailed": "更新失败",
+    "binaryReplaceOnly": "请重新上传文件以替换当前资源"
+  },
+  "console": {
+    "stats": {
+      "totalCount": "数据总数",
+      "totalSize": "存储大小",
+      "pageCount": "总页数"
+    },
+    "actions": {
+      "create": { "title": "创建数据", "description": "快速创建新的 JSON 数据" },
+      "storeText": { "title": "存储文本", "description": "存储纯文本内容" },
+      "upload": { "title": "上传文件", "description": "存储二进制文件数据" },
+      "manage": { "title": "数据管理", "description": "查看和管理所有数据" }
+    },
+    "apiTestTitle": "API 测试工具",
+    "apiTestDescription": "在数据管理中使用创建和查询功能来测试 API。",
+    "quickApiExample": "快速 API 示例",
+    "quickApiSample": "创建数据:\nPOST /data/example\nAuthorization: Bearer YOUR_API_KEY\n{\"name\": \"example\", \"value\": \"data\"}\n\n获取数据:\nGET /data/example\nAuthorization: Bearer YOUR_API_KEY\n-> {\"name\": \"example\", \"value\": \"data\"}\n"
+  },
+  "api": {
+    "consoleStatsFailed": "获取控制台统计失败"
+  },
+  "permissions": {
+    "title": "权限管理",
+    "description": "按路径规则控制资源的公开读写权限，支持 * 与 ** 通配匹配。",
+    "searchPlaceholder": "搜索路径规则或说明...",
+    "search": "查询",
+    "create": "新增规则",
+    "createTitle": "新增权限规则",
+    "editTitle": "编辑权限规则",
+    "save": "保存",
+    "cancel": "取消",
+    "delete": "删除",
+    "deleteTitle": "删除权限规则",
+    "deleteConfirm": "确定要删除规则 {{pattern}} 吗？",
+    "filters": {
+      "all": "全部",
+      "enabled": "仅启用",
+      "disabled": "仅禁用"
+    },
+    "table": {
+      "pattern": "匹配规则",
+      "mode": "权限模式",
+      "priority": "优先级",
+      "status": "状态",
+      "description": "说明",
+      "actions": "操作"
+    },
+    "status": {
+      "enabled": "已启用",
+      "disabled": "已禁用"
+    },
+    "operations": {
+      "enable": "启用",
+      "disable": "禁用"
+    },
+    "actions": {
+      "read": "读",
+      "write": "写"
+    },
+    "modes": {
+      "private_rw": "私有读写",
+      "public_rw": "公开读写",
+      "private_read_public_write": "私有读 / 公开写",
+      "public_read_private_write": "公开读 / 私有写"
+    },
+    "messages": {
+      "loadFailed": "获取权限规则失败",
+      "createSuccess": "权限规则创建成功",
+      "createFailed": "创建权限规则失败",
+      "updateSuccess": "权限规则更新成功",
+      "updateFailed": "更新权限规则失败",
+      "saveFailed": "保存权限规则失败",
+      "enabled": "规则已启用",
+      "disabled": "规则已禁用",
+      "statusFailed": "切换规则状态失败",
+      "deleteSuccess": "权限规则已删除",
+      "deleteFailed": "删除权限规则失败",
+      "evaluateFailed": "权限规则测试失败"
+    },
+    "tester": {
+      "title": "路径测试器",
+      "description": "输入路径和操作类型，查看当前启用规则下的最终权限结果。",
+      "run": "开始测试",
+      "publicAccess": "当前操作为公开访问",
+      "privateAccess": "当前操作需要私有访问",
+      "matchedRule": "命中规则：",
+      "defaultRule": "未命中规则，使用默认 private_rw",
+      "placeholder": "输入路径并开始测试后，在这里查看命中规则与最终权限结果。"
+    },
+    "form": {
+      "pattern": "匹配规则",
+      "patternHint": "支持 /foo/*、/foo/**、/**/*.png 这类路径匹配规则。",
+      "mode": "权限模式",
+      "priority": "优先级",
+      "priorityHint": "数值越大优先级越高，多条规则命中时先应用高优先级规则。",
+      "enabled": "启用状态",
+      "description": "说明"
+    }
+  },
+  "data": {
+    "title": "数据管理",
+    "search": "搜索",
+    "create": "创建数据",
+    "searchPlaceholder": "搜索数据...",
+    "replaceFile": "替换文件",
+    "edit": "编辑",
+    "pagination": "共 {{total}} 条数据，第 {{page}} 页",
+    "table": {
+      "icon": "类型",
+      "path": "路径",
+      "type": "类型",
+      "size": "大小",
+      "updatedAt": "更新时间",
+      "actions": "操作",
+      "pathContextHint": "右键打开菜单"
+    },
+    "contextMenu": {
+      "openFileInNewTab": "新标签页打开文件",
+      "openDataInNewTab": "新标签页打开数据"
+    },
+    "delete": {
+      "confirmTitle": "确认删除",
+      "confirmText": "确定要删除 \"{{id}}\" 吗？",
+      "confirmHint": "此操作不可撤销，数据将被永久删除。",
+      "cancel": "取消",
+      "submit": "删除",
+      "failed": "删除数据时发生错误",
+      "failedTitle": "删除失败",
+      "confirm": "确定"
+    }
+  },
+  "modal": {
+    "pathRequired": "请输入路径",
+    "uploadRequired": "请上传文件",
+    "binaryEditDisabled": "二进制文件不支持直接编辑",
+    "contentRequired": "请输入数据内容",
+    "jsonInvalid": "JSON 格式错误，请检查数据格式",
+    "unknownError": "未知错误",
+    "binaryReplaceHint": "重新上传文件后会覆盖当前资源内容。",
+    "kbUnit": "KB",
+    "fileProcessing": "文件处理中...",
+    "fileDropHint": "点击或拖拽文件到此处上传",
+    "fileSupportHint": "支持任意文件格式",
+    "fileReplaceStorageHint": "上传新文件后会替换当前资源内容。",
+    "fileStorageHint": "文件将在后端自动转换为 Base64 编码存储",
+    "jsonSwitchToEdit": "切换到编辑",
+    "jsonSwitchToPreview": "切换到预览",
+    "jsonCompact": "压缩 JSON",
+    "jsonFormat": "格式化 JSON",
+    "jsonPlaceholder": "输入 JSON 数据，例如: {\"key\": \"value\"}",
+    "textPlaceholder": "输入文本内容",
+    "path": "路径",
+    "pathPlaceholder": "/example/data",
+    "pathHint": "建议使用路径格式，如 /demo/user/profile",
+    "type": "数据类型",
+    "typeJson": "JSON 数据",
+    "typeText": "文本内容",
+    "typeBinary": "二进制文件",
+    "content": "数据内容",
+    "cancel": "取消",
+    "create": "创建",
+    "update": "更新"
+  }
+}

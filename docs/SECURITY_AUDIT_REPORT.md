@@ -258,3 +258,7 @@ JSON Base v2.0.0 demonstrates solid security fundamentals with proper input vali
 
 **Report Generated**: January 25, 2025  
 **Next Review Date**: July 25, 2025
+# Historical Security Audit Note
+
+This report targets the pre-monorepo legacy source tree and is retained only for historical reference.
+The current implementation lives under `apps/api`, `apps/web`, and `packages/shared`; root `src` paths referenced here no longer represent the active architecture.

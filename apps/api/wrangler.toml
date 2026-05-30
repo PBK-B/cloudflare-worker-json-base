@@ -1,0 +1,29 @@
+name = "worker-json-base"
+main = "dist/index.js"
+compatibility_date = "2024-05-02"
+compatibility_flags = ["nodejs_compat"]
+
+[build]
+command = "npm run build --prefix ../.."
+watch_dir = "../../apps/api/src"
+
+[vars]
+ENVIRONMENT = "development"
+VERSION = "3.0.0"
+STORAGE_BACKEND = "d1"
+WEB_BASE_PATH = "/dash"
+API_BASE_PATH = "/._jsondb_/api"
+RESOURCE_BASE_PATH = "/"
+
+[[d1_databases]]
+binding = "JSONBASE_DB"
+database_name = "jsonbase"
+
+[[kv_namespaces]]
+binding = "JSONBIN"
+id = "__REPLACE_IN_DEPLOY__"
+
+[assets]
+directory = "../../dist/web/dash"
+binding = "WEBUI"
+run_worker_first = true

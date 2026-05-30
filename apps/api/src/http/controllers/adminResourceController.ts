@@ -1,0 +1,1 @@
+export { adminResourceController } from './resourceController';

@@ -61,7 +61,8 @@ interface R2BindingConfig {
 }
 
 const WORKDIR = process.cwd();
-const WRANGLER_TOML_PATH = path.join(WORKDIR, 'wrangler.toml');
+const WRANGLER_TOML_PATH = path.join(WORKDIR, 'apps', 'api', 'wrangler.toml');
+const WRANGLER_CONFIG_DIR = path.dirname(WRANGLER_TOML_PATH);
 const WRANGLER_SCHEMA_PATH = path.join(WORKDIR, 'node_modules', 'wrangler', 'config-schema.json');
 const DEPLOY_DIR = path.join(WORKDIR, '.wrangler', 'deploy');
 const SENSITIVE_VAR_KEYS = new Set(['API_KEY']);
@@ -602,8 +603,8 @@ async function promptMissingResourceAction(resourceLabel: string): Promise<'auto
 	return answer.action as 'auto' | 'manual' | 'fail';
 }
 
-function resolveEffectiveMissingPolicy(basePolicy: MissingResourcePolicy, yes: boolean): MissingResourcePolicy {
-	if (basePolicy === 'ask' && yes) {
+function resolveEffectiveMissingPolicy(basePolicy: MissingResourcePolicy, yes: boolean, nonInteractive = false): MissingResourcePolicy {
+	if (basePolicy === 'ask' && (yes || nonInteractive)) {
 		return 'auto';
 	}
 	return basePolicy;
@@ -648,8 +649,10 @@ function assertRequiredFields(config: JsonObject): void {
 	}
 }
 
-function validateGeneratedConfig(config: JsonObject): string[] {
+function validateGeneratedConfig(config: JsonObject, options: { skipBuild?: boolean; baseDir?: string } = {}): string[] {
 	const errors: string[] = [];
+	const skipBuild = Boolean(options.skipBuild);
+	const baseDir = options.baseDir || WORKDIR;
 
 	const compatibilityDate = config.compatibility_date;
 	if (typeof compatibilityDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(compatibilityDate)) {
@@ -657,18 +660,18 @@ function validateGeneratedConfig(config: JsonObject): string[] {
 	}
 
 	const main = config.main;
-	if (typeof main === 'string') {
-		const mainPath = path.isAbsolute(main) ? main : path.join(WORKDIR, main);
+	if (!skipBuild && typeof main === 'string') {
+		const mainPath = path.isAbsolute(main) ? main : path.join(baseDir, main);
 		if (!fs.existsSync(mainPath)) {
 			errors.push(`main 指向的文件不存在: ${main}`);
 		}
 	}
 
 	const assets = config.assets;
-	if (assets && typeof assets === 'object' && !Array.isArray(assets)) {
+	if (!skipBuild && assets && typeof assets === 'object' && !Array.isArray(assets)) {
 		const directory = (assets as JsonObject).directory;
 		if (typeof directory === 'string') {
-			const dirPath = path.isAbsolute(directory) ? directory : path.join(WORKDIR, directory);
+			const dirPath = path.isAbsolute(directory) ? directory : path.join(baseDir, directory);
 			if (!fs.existsSync(dirPath)) {
 				errors.push(`assets.directory 不存在: ${directory}`);
 			}
@@ -687,12 +690,12 @@ function toPosixPath(filePath: string): string {
 	return filePath.replace(/\\/g, '/');
 }
 
-function toGeneratedRelativePath(rawPath: string, generatedDir: string): string {
+function toGeneratedRelativePath(rawPath: string, generatedDir: string, baseDir = WORKDIR): string {
 	if (!rawPath.trim()) return rawPath;
 	if (path.isAbsolute(rawPath)) {
 		return toPosixPath(rawPath);
 	}
-	const absoluteTarget = path.join(WORKDIR, rawPath);
+	const absoluteTarget = path.join(baseDir, rawPath);
 	let relativeTarget = path.relative(generatedDir, absoluteTarget);
 	if (!relativeTarget.startsWith('.')) {
 		relativeTarget = `./${relativeTarget}`;
@@ -700,27 +703,30 @@ function toGeneratedRelativePath(rawPath: string, generatedDir: string): string 
 	return toPosixPath(relativeTarget);
 }
 
-function rewriteConfigPathsForGeneratedFile(config: JsonObject, generatedDir: string): JsonObject {
+function rewriteConfigPathsForGeneratedFile(config: JsonObject, generatedDir: string, baseDir = WORKDIR): JsonObject {
 	const rewritten = deepClone(config);
 
 	const stringPathKeys: Array<keyof JsonObject> = ['main', 'tsconfig', 'base_dir'];
 	for (const key of stringPathKeys) {
 		if (typeof rewritten[key] === 'string') {
-			rewritten[key] = toGeneratedRelativePath(rewritten[key] as string, generatedDir);
+			rewritten[key] = toGeneratedRelativePath(rewritten[key] as string, generatedDir, baseDir);
 		}
 	}
 
 	const build = rewritten.build;
 	if (build && typeof build === 'object' && !Array.isArray(build)) {
 		const buildObj = build as JsonObject;
+		if (typeof buildObj.command === 'string' && buildObj.command.includes('--prefix ../..')) {
+			buildObj.command = buildObj.command.replace('--prefix ../..', '--prefix .');
+		}
 		if (typeof buildObj.cwd === 'string') {
-			buildObj.cwd = toGeneratedRelativePath(buildObj.cwd as string, generatedDir);
+			buildObj.cwd = toGeneratedRelativePath(buildObj.cwd as string, generatedDir, baseDir);
 		}
 		if (typeof buildObj.watch_dir === 'string') {
-			buildObj.watch_dir = toGeneratedRelativePath(buildObj.watch_dir as string, generatedDir);
+			buildObj.watch_dir = toGeneratedRelativePath(buildObj.watch_dir as string, generatedDir, baseDir);
 		} else if (Array.isArray(buildObj.watch_dir)) {
 			buildObj.watch_dir = (buildObj.watch_dir as JsonArray).map((entry) =>
-				typeof entry === 'string' ? toGeneratedRelativePath(entry, generatedDir) : entry,
+				typeof entry === 'string' ? toGeneratedRelativePath(entry, generatedDir, baseDir) : entry,
 			);
 		}
 	}
@@ -729,7 +735,7 @@ function rewriteConfigPathsForGeneratedFile(config: JsonObject, generatedDir: st
 	if (assets && typeof assets === 'object' && !Array.isArray(assets)) {
 		const assetsObj = assets as JsonObject;
 		if (typeof assetsObj.directory === 'string') {
-			assetsObj.directory = toGeneratedRelativePath(assetsObj.directory as string, generatedDir);
+			assetsObj.directory = toGeneratedRelativePath(assetsObj.directory as string, generatedDir, baseDir);
 		}
 	}
 
@@ -741,7 +747,7 @@ function rewriteConfigPathsForGeneratedFile(config: JsonObject, generatedDir: st
 			}
 			const db = deepClone(entry as JsonObject);
 			if (typeof db.migrations_dir === 'string') {
-				db.migrations_dir = toGeneratedRelativePath(db.migrations_dir as string, generatedDir);
+				db.migrations_dir = toGeneratedRelativePath(db.migrations_dir as string, generatedDir, baseDir);
 			}
 			return db;
 		});
@@ -1007,7 +1013,7 @@ async function ensureD1Database(
 	} catch {
 		logStep('D1 资源检查', '未找到现有数据库');
 	}
-	const policy = resolveEffectiveMissingPolicy(missingResourcePolicy, yes);
+	const policy = resolveEffectiveMissingPolicy(missingResourcePolicy, yes, nonInteractive);
 	const action = policy === 'ask' ? await promptMissingResourceAction(`D1 ${binding.binding}`) : policy;
 	if (action === 'fail') {
 		return { type: 'd1', binding: binding.binding, id: '', status: 'pending' };
@@ -1211,7 +1217,7 @@ async function ensureKVNamespace(
 	} catch {
 		logStep('KV 资源检查', '未找到现有命名空间');
 	}
-	const policy = resolveEffectiveMissingPolicy(missingResourcePolicy, yes);
+	const policy = resolveEffectiveMissingPolicy(missingResourcePolicy, yes, nonInteractive);
 	const action = policy === 'ask' ? await promptMissingResourceAction(`KV ${binding.binding}`) : policy;
 	if (action === 'fail') {
 		return { type: 'kv', binding: binding.binding, id: '', status: 'pending' };
@@ -1266,7 +1272,7 @@ async function ensureR2Bucket(
 	} catch {
 		logStep('R2 资源检查', '未找到现有存储桶');
 	}
-	const policy = resolveEffectiveMissingPolicy(missingResourcePolicy, yes);
+	const policy = resolveEffectiveMissingPolicy(missingResourcePolicy, yes, nonInteractive);
 	const action = policy === 'ask' ? await promptMissingResourceAction(`R2 ${binding.binding}`) : policy;
 	if (action === 'fail') {
 		return { type: 'r2', binding: binding.binding, id: '', status: 'pending' };
@@ -1315,6 +1321,14 @@ function getKVBindings(config: JsonObject): KVBindingConfig[] {
 	return [{ binding: kvBinding }];
 }
 
+function getRequiredKVBindings(config: JsonObject, storageBackend: StorageBackend): KVBindingConfig[] {
+	if (Array.isArray(config.kv_namespaces) && config.kv_namespaces.length > 0) {
+		return getKVBindings(config);
+	}
+
+	return storageBackend === 'kv' ? getKVBindings(config) : [];
+}
+
 function getR2Bindings(config: JsonObject): R2BindingConfig[] {
 	if (!Array.isArray(config.r2_buckets)) return [];
 	return (config.r2_buckets as JsonValue[])
@@ -1322,38 +1336,68 @@ function getR2Bindings(config: JsonObject): R2BindingConfig[] {
 		.map((entry) => entry as unknown as R2BindingConfig);
 }
 
-async function resolveForcedResources(config: JsonObject, storageBackend: StorageBackend, options: DeployOptions): Promise<ResourceInfo[]> {
+async function resolveForcedResources(
+	config: JsonObject,
+	storageBackend: StorageBackend,
+	options: DeployOptions,
+	settings: { allowOfflineFallback?: boolean } = {},
+): Promise<ResourceInfo[]> {
 	const resources: ResourceInfo[] = [];
 	if (storageBackend === 'd1') {
 		const forced = getForcedD1Value(options);
 		if (forced) {
 			const binding = getD1Bindings(config)[0] || { binding: 'JSONBASE_DB', database_name: forced };
-			const databases = listD1Databases();
-			const existing = databases.find((db) => db.uuid === forced || db.name === forced);
-			if (existing) {
-				logDone('D1 资源指定', `${binding.binding} -> ${existing.name} (${existing.uuid})`);
-				resources.push({ type: 'd1', binding: binding.binding, id: existing.uuid, name: existing.name, status: 'existing' });
-			} else if (looksLikeUuid(forced)) {
-				fail(`未找到指定的 D1 数据库: ${forced}`);
-			} else {
-				resources.push(await createD1DatabaseByName(forced, binding.binding));
+			try {
+				const databases = listD1Databases();
+				const existing = databases.find((db) => db.uuid === forced || db.name === forced);
+				if (existing) {
+					logDone('D1 资源指定', `${binding.binding} -> ${existing.name} (${existing.uuid})`);
+					resources.push({ type: 'd1', binding: binding.binding, id: existing.uuid, name: existing.name, status: 'existing' });
+				} else if (looksLikeUuid(forced)) {
+					fail(`未找到指定的 D1 数据库: ${forced}`);
+				} else {
+					resources.push(await createD1DatabaseByName(forced, binding.binding));
+				}
+			} catch (error) {
+				if (!settings.allowOfflineFallback) {
+					throw error;
+				}
+				logWarn(`D1 资源解析降级为离线模式: ${error instanceof Error ? error.message : String(error)}`);
+				resources.push({
+					type: 'd1',
+					binding: binding.binding,
+					id: looksLikeUuid(forced) ? forced : '',
+					name: looksLikeUuid(forced) ? binding.database_name : forced,
+					status: 'pending',
+				});
 			}
 		}
 	}
-	if (storageBackend === 'kv') {
-		const forced = getForcedKVValue(options);
-		if (forced) {
-			const binding = getKVBindings(config)[0] || { binding: 'JSONBIN' };
+	const forcedKV = getForcedKVValue(options);
+	if (forcedKV) {
+		const binding = getKVBindings(config)[0] || { binding: 'JSONBIN' };
+		try {
 			const namespaces = listKVNamespaces();
-			const existing = namespaces.find((ns) => ns.id === forced || ns.title === forced);
+			const existing = namespaces.find((ns) => ns.id === forcedKV || ns.title === forcedKV);
 			if (existing) {
 				logDone('KV 资源指定', `${binding.binding} -> ${existing.title} (${existing.id})`);
 				resources.push({ type: 'kv', binding: binding.binding, id: existing.id, status: 'existing' });
-			} else if (looksLikeUuid(forced)) {
-				fail(`未找到指定的 KV 命名空间: ${forced}`);
+			} else if (looksLikeUuid(forcedKV)) {
+				fail(`未找到指定的 KV 命名空间: ${forcedKV}`);
 			} else {
-				resources.push(await createKVNamespaceByName(forced, binding.binding));
+				resources.push(await createKVNamespaceByName(forcedKV, binding.binding));
 			}
+		} catch (error) {
+			if (!settings.allowOfflineFallback) {
+				throw error;
+			}
+			logWarn(`KV 资源解析降级为离线模式: ${error instanceof Error ? error.message : String(error)}`);
+			resources.push({
+				type: 'kv',
+				binding: binding.binding,
+				id: looksLikeUuid(forcedKV) ? forcedKV : '',
+				status: 'pending',
+			});
 		}
 	}
 	return resources;
@@ -1398,7 +1442,7 @@ async function promptResourceBindings(config: JsonObject, storageBackend: Storag
 		}
 	}
 
-	for (const binding of storageBackend === 'kv' ? getKVBindings(config) : []) {
+	for (const binding of getRequiredKVBindings(config, storageBackend)) {
 		const namespaces = listKVNamespaces();
 		if (namespaces.length === 0 && !allowCreate) {
 			logWarn(`未找到可选 KV 命名空间，预览模式下跳过 ${binding.binding} 绑定选择`);
@@ -1480,11 +1524,9 @@ async function ensureResources(
 		}
 	}
 
-	if (storageBackend === 'kv') {
-		for (const entry of getKVBindings(config)) {
-			if (!existingKeys.has(`kv:${entry.binding}`)) {
-				resources.push(await ensureKVNamespace(entry, missingResourcePolicy, yes, nonInteractive));
-			}
+	for (const entry of getRequiredKVBindings(config, storageBackend)) {
+		if (!existingKeys.has(`kv:${entry.binding}`)) {
+			resources.push(await ensureKVNamespace(entry, missingResourcePolicy, yes, nonInteractive));
 		}
 	}
 
@@ -1503,9 +1545,7 @@ function applyResolvedResources(config: JsonObject, resources: ResourceInfo[]): 
 		resources.filter((resource) => resource.type === 'd1' && resource.id).map((resource) => [resource.binding, resource.id]),
 	);
 	const d1NameMap = new Map(
-		resources
-			.filter((resource) => resource.type === 'd1' && resource.id)
-			.map((resource) => [resource.binding, resource.name || 'jsonbase']),
+		resources.filter((resource) => resource.type === 'd1' && resource.name).map((resource) => [resource.binding, resource.name || 'jsonbase']),
 	);
 	const kvMap = new Map(
 		resources.filter((resource) => resource.type === 'kv' && resource.id).map((resource) => [resource.binding, resource.id]),
@@ -1586,7 +1626,7 @@ function applyResolvedResources(config: JsonObject, resources: ResourceInfo[]): 
 }
 
 function runMigrations(config: JsonObject, generatedConfigPath: string): void {
-	const schemaPath = path.join(WORKDIR, 'src', 'database', 'schema.sql');
+	const schemaPath = path.join(WORKDIR, 'apps', 'api', 'database', 'schema.sql');
 	if (!fs.existsSync(schemaPath)) {
 		logSkip('数据库迁移', `迁移文件不存在 - ${path.relative(WORKDIR, schemaPath)}`);
 		return;
@@ -1620,20 +1660,53 @@ function runMigrations(config: JsonObject, generatedConfigPath: string): void {
 	logDone('数据库迁移', '完成');
 }
 
-async function runHealthcheck(config: JsonObject): Promise<void> {
-	const workerUrl = `https://${getWorkerName(config)}.workers.dev/._jsondb_/api/health`;
-	logStep('健康检查', workerUrl);
+function resolveWorkerOrigin(config: JsonObject, deployOutput = ''): string {
+	const urlMatch = deployOutput.match(/https:\/\/[^\s]+\.workers\.dev/);
+	if (urlMatch) {
+		return urlMatch[0].replace(/\/$/, '');
+	}
+
+	return `https://${getWorkerName(config)}.workers.dev`;
+}
+
+async function runHealthcheck(config: JsonObject, deployOutput = ''): Promise<void> {
+	const origin = resolveWorkerOrigin(config, deployOutput);
+	const vars = config.vars && typeof config.vars === 'object' && !Array.isArray(config.vars) ? config.vars as JsonObject : {};
+	const apiBasePath = normalizeRouteBase(typeof vars.API_BASE_PATH === 'string' ? vars.API_BASE_PATH : '/._jsondb_/api') || '/';
+	const webBasePath = normalizeRouteBase(typeof vars.WEB_BASE_PATH === 'string' ? vars.WEB_BASE_PATH : '/dash') || '/dash';
+	const apiHealthUrl = `${origin}${apiBasePath}/health`;
+	const dashUrl = `${origin}${webBasePath}`;
+	logStep('健康检查', `${apiHealthUrl} + ${dashUrl}`);
 	try {
-		const response = await fetch(workerUrl, { signal: AbortSignal.timeout(15000) });
+		const response = await fetch(apiHealthUrl, { signal: AbortSignal.timeout(15000) });
 		if (!response.ok) {
-			logSkip('健康检查', `返回状态 ${response.status}`);
+			logSkip('API 健康检查', `返回状态 ${response.status}`);
 			return;
 		}
-		const payload = (await response.json()) as { status?: string };
-		logDone('健康检查', payload.status || '通过');
+		const payload = (await response.json()) as { status?: string; data?: { status?: string } };
+		logDone('API 健康检查', payload.data?.status || payload.status || '通过');
 	} catch (error) {
-		logSkip('健康检查', `失败 - ${error instanceof Error ? error.message : String(error)}`);
+		logSkip('API 健康检查', `失败 - ${error instanceof Error ? error.message : String(error)}`);
+		return;
 	}
+
+	try {
+		const response = await fetch(dashUrl, { redirect: 'manual', signal: AbortSignal.timeout(15000) });
+		if (response.ok || response.status === 301 || response.status === 302) {
+			logDone('WebUI 健康检查', '/dash 可访问');
+			return;
+		}
+
+		logSkip('WebUI 健康检查', `返回状态 ${response.status}`);
+	} catch (error) {
+		logSkip('WebUI 健康检查', `失败 - ${error instanceof Error ? error.message : String(error)}`);
+	}
+}
+
+function normalizeRouteBase(routePath: string): string {
+	const trimmed = routePath.trim();
+	if (!trimmed || trimmed === '/') return '';
+	return `/${trimmed.replace(/^\/+|\/+$/g, '')}`;
 }
 
 function buildDeployArgs(options: DeployOptions, generatedConfigPath: string): string[] {
@@ -1685,7 +1758,7 @@ async function deploy(options: DeployOptions): Promise<void> {
 		finalConfig = deepMerge(finalConfig, overrides);
 	}
 
-	const forcedResources = await resolveForcedResources(finalConfig, storageBackend, options);
+	const forcedResources = await resolveForcedResources(finalConfig, storageBackend, options, { allowOfflineFallback: true });
 	const preselectedResources =
 		forcedResources.length > 0
 			? forcedResources
@@ -1715,7 +1788,7 @@ async function deploy(options: DeployOptions): Promise<void> {
 	const generatedDir = path.dirname(generatedPath);
 	const redirectPath = path.join(DEPLOY_DIR, 'config.json');
 	const generatedPathRelative = path.relative(WORKDIR, generatedPath);
-	const deployConfig = rewriteConfigPathsForGeneratedFile(finalConfig, generatedDir);
+	const deployConfig = rewriteConfigPathsForGeneratedFile(finalConfig, generatedDir, WRANGLER_CONFIG_DIR);
 
 	const deployArgs = buildDeployArgs(options, generatedPath);
 	const previewCommand = formatWranglerCommand(deployArgs);
@@ -1752,7 +1825,7 @@ async function deploy(options: DeployOptions): Promise<void> {
 	}
 
 	runBuild(Boolean(options.skipBuild));
-	const validationErrors = validateGeneratedConfig(finalConfig);
+	const validationErrors = validateGeneratedConfig(finalConfig, { skipBuild: Boolean(options.skipBuild), baseDir: WRANGLER_CONFIG_DIR });
 	if (validationErrors.length > 0) {
 		for (const message of validationErrors) {
 			logError(message);
@@ -1788,7 +1861,7 @@ async function deploy(options: DeployOptions): Promise<void> {
 
 	console.log(deployResult.stdout.trim());
 	if (!skipHealthcheck) {
-		await runHealthcheck(finalConfig);
+		await runHealthcheck(finalConfig, deployResult.stdout);
 	}
 	logDone('Worker 部署', options.dryRun ? 'dry-run 执行成功' : '部署成功');
 }
@@ -1829,7 +1902,7 @@ async function printConfig(options: DeployOptions): Promise<void> {
 	if (options.confFile) {
 		finalConfig = deepMerge(finalConfig, parseConfigFile(options.confFile));
 	}
-	const forcedResources = await resolveForcedResources(finalConfig, storageBackend, options);
+	const forcedResources = await resolveForcedResources(finalConfig, storageBackend, options, { allowOfflineFallback: true });
 	if (forcedResources.length > 0) {
 		finalConfig = applyResolvedResources(finalConfig, forcedResources);
 	}
@@ -1958,6 +2031,7 @@ export const __testing = {
 	ensureResources,
 	applyResolvedResources,
 	runMigrations,
+	resolveWorkerOrigin,
 	runHealthcheck,
 	buildDeployArgs,
 	getWorkerName,

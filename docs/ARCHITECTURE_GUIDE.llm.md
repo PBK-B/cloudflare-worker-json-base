@@ -452,3 +452,7 @@ Before committing code:
 ---
 
 **Last Updated**: January 25, 2025
+# Historical Architecture Note
+
+This document describes the pre-monorepo legacy architecture and is retained only for historical reference.
+The current implementation lives under `apps/api`, `apps/web`, and `packages/shared`; do not use the root `src` references in this file as implementation guidance.

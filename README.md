@@ -117,14 +117,15 @@ curl -X DELETE https://your-worker.workers.dev/myapp/config \
 
 ### Business Resource API
 
-Use `/*` paths as your application-facing resource endpoints.
+Use root paths as your application-facing resource endpoints.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/{bucket}/{key}` | Create a resource |
-| GET | `/{bucket}/{key}` | Read a resource |
-| PUT | `/{bucket}/{key}` | Replace a resource |
-| DELETE | `/{bucket}/{key}` | Delete a resource |
+| POST | `/{path...}` | Create a resource |
+| GET | `/{path...}` | Read a resource |
+| HEAD | `/{path...}` | Read resource headers |
+| PUT | `/{path...}` | Replace a resource |
+| DELETE | `/{path...}` | Delete a resource |
 
 These endpoints return the resource itself and are intended for application use.
 
@@ -135,12 +136,13 @@ Use `/._jsondb_/api/*` for WebUI and management flows.
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/._jsondb_/api/health` | Validate API key and inspect health |
-| GET | `/._jsondb_/api/data` | List resources for the console |
-| GET | `/._jsondb_/api/data/{path}` | Read resource metadata/value for the console |
-| POST | `/._jsondb_/api/data/{path}` | Create JSON/text/binary resources |
-| PUT | `/._jsondb_/api/data/{path}` | Update JSON/text or replace binary resources |
-| DELETE | `/._jsondb_/api/data/{path}` | Delete a resource from the console |
-| GET | `/._jsondb_/api/console/*` | Console stats, config, and health |
+| GET | `/._jsondb_/api/admin/resources` | List resources for the console |
+| GET | `/._jsondb_/api/admin/resources/{path...}` | Read resource metadata/value for the console |
+| POST | `/._jsondb_/api/admin/resources/{path...}` | Create JSON/text/binary resources |
+| PUT | `/._jsondb_/api/admin/resources/{path...}` | Update JSON/text or replace binary resources |
+| DELETE | `/._jsondb_/api/admin/resources/{path...}` | Delete a resource from the console |
+| GET | `/._jsondb_/api/admin/console/*` | Console stats, config, and health |
+| GET/POST/PUT/PATCH/DELETE | `/._jsondb_/api/admin/permissions/*` | Permission rule management and evaluation |
 
 ## WebUI Console
 
@@ -148,7 +150,7 @@ Visit `https://your-worker.workers.dev/dash/` for web management.
 
 ## Configuration
 
-Configure defaults in `wrangler.toml`:
+Configure defaults in `apps/api/wrangler.toml`:
 
 ```toml
 name = "your-worker"
@@ -158,6 +160,9 @@ compatibility_date = "2024-05-02"
 [vars]
 ENVIRONMENT = "production"
 STORAGE_BACKEND = "d1"
+WEB_BASE_PATH = "/dash"
+API_BASE_PATH = "/._jsondb_/api"
+RESOURCE_BASE_PATH = "/"
 
 [[d1_databases]]
 binding = "JSONBASE_DB"

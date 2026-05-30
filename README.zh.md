@@ -117,14 +117,15 @@ curl -X DELETE https://your-worker.workers.dev/myapp/config \
 
 ### 业务资源 API
 
-`/*` 路径用于业务侧直接读写资源。
+根路径用于业务侧直接读写资源。
 
 | 方法 | 端点 | 说明 |
 |------|------|------|
-| POST | `/{bucket}/{key}` | 创建资源 |
-| GET | `/{bucket}/{key}` | 获取资源 |
-| PUT | `/{bucket}/{key}` | 完整替换资源 |
-| DELETE | `/{bucket}/{key}` | 删除资源 |
+| POST | `/{path...}` | 创建资源 |
+| GET | `/{path...}` | 获取资源 |
+| HEAD | `/{path...}` | 获取资源响应头 |
+| PUT | `/{path...}` | 完整替换资源 |
+| DELETE | `/{path...}` | 删除资源 |
 
 这些接口返回资源本体，适合业务系统直接调用。
 
@@ -135,12 +136,13 @@ curl -X DELETE https://your-worker.workers.dev/myapp/config \
 | 方法 | 端点 | 说明 |
 |------|------|------|
 | GET | `/._jsondb_/api/health` | 校验 API Key 与服务健康状态 |
-| GET | `/._jsondb_/api/data` | 控制台资源列表 |
-| GET | `/._jsondb_/api/data/{path}` | 获取控制台资源详情 |
-| POST | `/._jsondb_/api/data/{path}` | 创建 JSON、文本或文件资源 |
-| PUT | `/._jsondb_/api/data/{path}` | 更新 JSON、文本或替换文件资源 |
-| DELETE | `/._jsondb_/api/data/{path}` | 删除控制台资源 |
-| GET | `/._jsondb_/api/console/*` | 控制台统计、配置和健康状态 |
+| GET | `/._jsondb_/api/admin/resources` | 控制台资源列表 |
+| GET | `/._jsondb_/api/admin/resources/{path...}` | 获取控制台资源详情 |
+| POST | `/._jsondb_/api/admin/resources/{path...}` | 创建 JSON、文本或文件资源 |
+| PUT | `/._jsondb_/api/admin/resources/{path...}` | 更新 JSON、文本或替换文件资源 |
+| DELETE | `/._jsondb_/api/admin/resources/{path...}` | 删除控制台资源 |
+| GET | `/._jsondb_/api/admin/console/*` | 控制台统计、配置和健康状态 |
+| GET/POST/PUT/PATCH/DELETE | `/._jsondb_/api/admin/permissions/*` | 权限规则管理和权限评估 |
 
 ## WebUI 控制台
 
@@ -148,7 +150,7 @@ curl -X DELETE https://your-worker.workers.dev/myapp/config \
 
 ## 配置
 
-在 `wrangler.toml` 中配置默认值：
+在 `apps/api/wrangler.toml` 中配置默认值：
 
 ```toml
 name = "your-worker"
@@ -158,6 +160,9 @@ compatibility_date = "2024-05-02"
 [vars]
 ENVIRONMENT = "production"
 STORAGE_BACKEND = "d1"
+WEB_BASE_PATH = "/dash"
+API_BASE_PATH = "/._jsondb_/api"
+RESOURCE_BASE_PATH = "/"
 
 [[d1_databases]]
 binding = "JSONBASE_DB"
