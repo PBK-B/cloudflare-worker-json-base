@@ -178,7 +178,7 @@ export function createMockEnv(overrides: Partial<WorkerEnv> = {}): WorkerEnv {
 		JSONBIN: new MockKVNamespace() as unknown as KVNamespace,
 		WEBUI: {
 			fetch: async () => new Response('web asset', { status: 200 })
-		},
+		} as unknown as Fetcher,
 		API_KEY: 'test-api-key',
 		ENVIRONMENT: 'test',
 		VERSION: '3.0.0',
