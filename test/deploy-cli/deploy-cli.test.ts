@@ -6,6 +6,9 @@ const promptMock = jest.fn<any>()
 const spawnSyncMock = jest.fn<any>()
 const chalkProxy = new Proxy({}, { get: () => (value: string) => value })
 
+const formatConsoleOutput = (calls: readonly unknown[][]) => calls.map((call) => call.join(' ')).join('\n')
+const hasSpawnArg = (calls: readonly unknown[][], value: string) => calls.some((call) => String(call[1]).includes(value))
+
 jest.mock('chalk', () => ({ __esModule: true, default: chalkProxy }))
 jest.mock('inquirer', () => ({ __esModule: true, default: { prompt: promptMock } }))
 jest.mock('child_process', () => ({ __esModule: true, spawnSync: (...args: unknown[]) => spawnSyncMock(...args) }))
@@ -443,10 +446,10 @@ describe('deploy-cli', () => {
 		const originalReadText = fs.readFileSync(path.join(process.cwd(), 'jest.deploy-cli.config.json'), 'utf8')
     const missingToml = path.join(process.cwd(), 'apps', 'api', 'wrangler.toml')
     const renamedToml = path.join(process.cwd(), 'apps', 'api', 'wrangler.toml.bak-test')
-    fs.renameSync(missingToml, renamedToml)
+      fs.renameSync(missingToml, renamedToml)
     try {
       testing.doctor()
-      expect(consoleLogSpy.mock.calls.map((call) => call.join(' ')).join('\n')).toContain('检查失败: wrangler.toml')
+      expect(formatConsoleOutput(consoleLogSpy.mock.calls)).toContain('检查失败: wrangler.toml')
       expect(originalReadText.length).toBeGreaterThan(0)
     } finally {
       fs.renameSync(renamedToml, missingToml)
@@ -471,7 +474,7 @@ describe('deploy-cli', () => {
     fs.writeFileSync(envPath, 'name = "override-name"\n')
     try {
       await testing.printConfig({ env: 'development', storage: 'd1', d1: 'jsonbase', confFile: envPath })
-      const output = consoleLogSpy.mock.calls.map((call) => call.join(' ')).join('\n')
+      const output = formatConsoleOutput(consoleLogSpy.mock.calls)
       expect(output).toContain('"name": "override-name"')
       expect(output).toContain('"database_name": "jsonbase"')
       expect(promptMock).not.toHaveBeenCalled()
@@ -490,7 +493,7 @@ describe('deploy-cli', () => {
 
   it('deploy plan in non-interactive mode prints plan and uses generated config path', async () => {
     await testing.deploy({ plan: true, nonInteractive: true, env: 'development', storage: 'd1', d1: 'jsonbase' })
-    const output = consoleLogSpy.mock.calls.map((call) => call.join(' ')).join('\n')
+    const output = formatConsoleOutput(consoleLogSpy.mock.calls)
     expect(output).toContain('[PLAN] 部署计划')
     expect(output).toContain('.wrangler/deploy/generated/development/wrangler.jsonc')
     expect(output).toContain('命令: ')
@@ -498,7 +501,7 @@ describe('deploy-cli', () => {
 
   it('deploy plan prints resolved resources when ensureResources is used in non-interactive mode without forced overrides', async () => {
     await testing.deploy({ plan: true, nonInteractive: true, env: 'development', storage: 'd1' })
-    const output = consoleLogSpy.mock.calls.map((call) => call.join(' ')).join('\n')
+    const output = formatConsoleOutput(consoleLogSpy.mock.calls)
     expect(output).toContain('[PLAN] 部署计划')
   })
 
@@ -712,27 +715,27 @@ describe('deploy-cli', () => {
 
   it('deploy dry-run stays aligned with deploy flow without asking API key when not needed', async () => {
     await testing.deploy({ dryRun: true, nonInteractive: true, env: 'development', storage: 'd1', d1: 'jsonbase' })
-    const output = consoleLogSpy.mock.calls.map((call) => call.join(' ')).join('\n')
+    const output = formatConsoleOutput(consoleLogSpy.mock.calls)
     expect(output).toContain('[DRY-RUN] 配置预览')
     expect(output).toContain('"database_name": "jsonbase"')
   })
 
   it('deploy skips secret write when requested', async () => {
     await testing.deploy({ nonInteractive: true, env: 'development', storage: 'd1', d1: 'jsonbase', skipSecret: true, skipBuild: true, skipHealthcheck: true, skipMigrate: true })
-    const output = consoleLogSpy.mock.calls.map((call) => call.join(' ')).join('\n')
+    const output = formatConsoleOutput(consoleLogSpy.mock.calls)
     expect(output).toContain('API_KEY Secret: 已跳过 (--skip-secret)')
-    expect(spawnSyncMock.mock.calls.some((call) => String(call[1]).includes('secret'))).toBe(false)
+    expect(hasSpawnArg(spawnSyncMock.mock.calls, 'secret')).toBe(false)
   })
 
   it('deploy skips migration when backend is kv', async () => {
     await expect(testing.deploy({ nonInteractive: true, env: 'development', storage: 'kv', kv: 'jsonbase', skipSecret: true, skipBuild: true, skipHealthcheck: true })).resolves.toBeUndefined()
-    const output = consoleLogSpy.mock.calls.map((call) => call.join(' ')).join('\n')
+    const output = formatConsoleOutput(consoleLogSpy.mock.calls)
     expect(output).not.toContain('数据库迁移')
   })
 
   it('deploy logs missing API key when secret is not skipped', async () => {
     await expect(testing.deploy({ nonInteractive: true, env: 'development', storage: 'd1', d1: 'jsonbase', skipMigrate: true, skipBuild: true, skipHealthcheck: true })).resolves.toBeUndefined()
-    const output = consoleLogSpy.mock.calls.map((call) => call.join(' ')).join('\n')
+    const output = formatConsoleOutput(consoleLogSpy.mock.calls)
     expect(output).toContain('API_KEY Secret: 未检测到 API_KEY，跳过写入')
   })
 

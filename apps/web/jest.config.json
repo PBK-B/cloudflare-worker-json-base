@@ -3,7 +3,7 @@
 	"testEnvironment": "jsdom",
 	"setupFilesAfterEnv": ["<rootDir>/test/setup.ts"],
 	"transform": {
-		"^.+\\.(ts|tsx)$": ["ts-jest", { "tsconfig": "tsconfig.json" }]
+		"^.+\\.(ts|tsx)$": ["ts-jest", { "tsconfig": "test/tsconfig.json" }]
 	},
 	"testMatch": ["<rootDir>/test/**/*.test.(ts|tsx)"],
 	"moduleNameMapper": {

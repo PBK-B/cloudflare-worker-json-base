@@ -3,8 +3,8 @@ import { createMockEnv } from '../helpers/mocks';
 
 const authHeader = { Authorization: 'Bearer test-api-key', 'Content-Type': 'application/json' };
 
-async function json(response: Response): Promise<any> {
-	return response.json();
+async function json<T = any>(response: Response): Promise<T> {
+	return response.json() as Promise<T>;
 }
 
 describe('new api router', () => {
@@ -19,7 +19,7 @@ describe('new api router', () => {
 		const env = createMockEnv();
 		const response = await worker.fetch(new Request('https://example.com/._jsondb_/api/health'), env);
 		expect(response.status).toBe(200);
-		const payload = await response.json();
+		const payload = await json(response);
 		expect(payload.success).toBe(true);
 		expect(payload.data.status).toBe('healthy');
 	});
@@ -46,7 +46,7 @@ describe('new api router', () => {
 		);
 
 		expect(listResponse.status).toBe(200);
-		const listPayload = await listResponse.json();
+		const listPayload = await json(listResponse);
 		expect(listPayload.data.items).toHaveLength(1);
 		expect(listPayload.data.items[0].path).toBe('/my/config');
 	});
@@ -104,7 +104,7 @@ describe('new api router', () => {
 		);
 
 		expect(evaluateResponse.status).toBe(200);
-		const evaluatePayload = await evaluateResponse.json();
+		const evaluatePayload = await json(evaluateResponse);
 		expect(evaluatePayload.data.allowed).toBe(true);
 		expect(evaluatePayload.data.access).toBe('public');
 	});
@@ -170,7 +170,7 @@ describe('new api router', () => {
 			env
 		);
 		expect(searchResponse.status).toBe(200);
-		const searchPayload = await searchResponse.json();
+		const searchPayload = await json(searchResponse);
 		expect(searchPayload.data.items).toHaveLength(1);
 		expect(searchPayload.data.items[0].path).toBe('/a/items/small.txt');
 
@@ -181,7 +181,7 @@ describe('new api router', () => {
 			env
 		);
 		expect(sortedResponse.status).toBe(200);
-		const sortedPayload = await sortedResponse.json();
+		const sortedPayload = await json(sortedResponse);
 		expect(sortedPayload.data.items[0].path).toBe('/b/items/large.txt');
 	});
 
@@ -209,7 +209,7 @@ describe('new api router', () => {
 		);
 
 		expect(getResponse.status).toBe(200);
-		const payload = await getResponse.json();
+		const payload = await json(getResponse);
 		expect(payload.data.path).toBe('/uploads/photo.png');
 		expect(payload.data.type).toBe('binary');
 		expect(payload.data.contentType).toBe('image/png');
@@ -377,6 +377,132 @@ describe('new api router', () => {
 
 		const publicDelete = await worker.fetch(new Request('https://example.com/public/notes.txt', { method: 'DELETE' }), env);
 		expect(publicDelete.status).toBe(204);
+	});
+
+	it('runs end-to-end public JSON, text, and binary resource flows', async () => {
+		const env = createMockEnv();
+
+		const ruleResponse = await worker.fetch(
+			new Request('https://example.com/._jsondb_/api/admin/permissions/rules', {
+				method: 'POST',
+				headers: authHeader,
+				body: JSON.stringify({ pattern: '/e2e/**', mode: 'public_rw', priority: 100 })
+			}),
+			env
+		);
+		expect(ruleResponse.status).toBe(201);
+
+		const createJson = await worker.fetch(
+			new Request('https://example.com/e2e/config.json', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ enabled: true, nested: { version: 1 } })
+			}),
+			env
+		);
+		expect(createJson.status).toBe(200);
+		expect(createJson.headers.get('Content-Type')).toBe('application/json');
+		expect(await createJson.json()).toEqual({ enabled: true, nested: { version: 1 } });
+
+		const updateJson = await worker.fetch(
+			new Request('https://example.com/e2e/config.json', {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ enabled: false, nested: { version: 2 } })
+			}),
+			env
+		);
+		expect(updateJson.status).toBe(200);
+		expect(await updateJson.json()).toEqual({ enabled: false, nested: { version: 2 } });
+
+		const readJson = await worker.fetch(new Request('https://example.com/e2e/config.json'), env);
+		expect(readJson.status).toBe(200);
+		expect(readJson.headers.get('Content-Length')).toBe('40');
+		expect(await readJson.json()).toEqual({ enabled: false, nested: { version: 2 } });
+
+		const headJson = await worker.fetch(new Request('https://example.com/e2e/config.json', { method: 'HEAD' }), env);
+		expect(headJson.status).toBe(200);
+		expect(headJson.headers.get('Content-Type')).toBe('application/json');
+		expect(headJson.headers.get('Content-Length')).toBe('40');
+		expect(await headJson.text()).toBe('');
+
+		const createText = await worker.fetch(
+			new Request('https://example.com/e2e/readme.txt', {
+				method: 'POST',
+				headers: { 'Content-Type': 'text/plain' },
+				body: 'hello public text'
+			}),
+			env
+		);
+		expect(createText.status).toBe(200);
+		expect(createText.headers.get('Content-Type')).toBe('text/plain');
+		expect(await createText.text()).toBe('hello public text');
+
+		const updateText = await worker.fetch(
+			new Request('https://example.com/e2e/readme.txt', {
+				method: 'PUT',
+				headers: { 'Content-Type': 'text/plain' },
+				body: 'updated public text'
+			}),
+			env
+		);
+		expect(updateText.status).toBe(200);
+		expect(await updateText.text()).toBe('updated public text');
+
+		const readText = await worker.fetch(new Request('https://example.com/e2e/readme.txt'), env);
+		expect(readText.status).toBe(200);
+		expect(readText.headers.get('Content-Length')).toBe('19');
+		expect(await readText.text()).toBe('updated public text');
+
+		const headText = await worker.fetch(new Request('https://example.com/e2e/readme.txt', { method: 'HEAD' }), env);
+		expect(headText.status).toBe(200);
+		expect(headText.headers.get('Content-Type')).toBe('text/plain');
+		expect(headText.headers.get('Content-Length')).toBe('19');
+		expect(await headText.text()).toBe('');
+
+		const firstBinaryUpload = new FormData();
+		firstBinaryUpload.append('file', new Blob(['binary-one'], { type: 'application/octet-stream' }), 'file.bin');
+		const createBinary = await worker.fetch(
+			new Request('https://example.com/e2e/file.bin', {
+				method: 'POST',
+				body: firstBinaryUpload
+			}),
+			env
+		);
+		expect(createBinary.status).toBe(200);
+		expect(createBinary.headers.get('Content-Type')).toBe('application/octet-stream');
+		expect(await createBinary.text()).toBe('binary-one');
+
+		const secondBinaryUpload = new FormData();
+		secondBinaryUpload.append('file', new Blob(['binary-two!!'], { type: 'application/octet-stream' }), 'file.bin');
+		const updateBinary = await worker.fetch(
+			new Request('https://example.com/e2e/file.bin', {
+				method: 'PUT',
+				body: secondBinaryUpload
+			}),
+			env
+		);
+		expect(updateBinary.status).toBe(200);
+		expect(await updateBinary.text()).toBe('binary-two!!');
+
+		const readBinary = await worker.fetch(new Request('https://example.com/e2e/file.bin'), env);
+		expect(readBinary.status).toBe(200);
+		expect(readBinary.headers.get('Content-Length')).toBe('12');
+		expect(await readBinary.text()).toBe('binary-two!!');
+
+		const headBinary = await worker.fetch(new Request('https://example.com/e2e/file.bin', { method: 'HEAD' }), env);
+		expect(headBinary.status).toBe(200);
+		expect(headBinary.headers.get('Content-Type')).toBe('application/octet-stream');
+		expect(headBinary.headers.get('Content-Length')).toBe('12');
+		expect(await headBinary.text()).toBe('');
+
+		for (const path of ['config.json', 'readme.txt', 'file.bin']) {
+			const deleteResponse = await worker.fetch(new Request(`https://example.com/e2e/${path}`, { method: 'DELETE' }), env);
+			expect(deleteResponse.status).toBe(204);
+
+			const readDeleted = await worker.fetch(new Request(`https://example.com/e2e/${path}`), env);
+			expect(readDeleted.status).toBe(404);
+		}
 	});
 
 	it('runs permission rule lifecycle and observes resource access changes', async () => {
