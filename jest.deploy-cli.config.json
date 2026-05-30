@@ -1,0 +1,22 @@
+{
+	"preset": "ts-jest",
+	"testEnvironment": "node",
+	"transform": {
+		"^.+\\.(ts|tsx)$": ["ts-jest", {
+			"tsconfig": {
+				"target": "ES2022",
+				"module": "CommonJS",
+				"moduleResolution": "node",
+				"esModuleInterop": true,
+				"allowSyntheticDefaultImports": true,
+				"skipLibCheck": true,
+				"types": ["node", "jest"]
+			}
+		}]
+	},
+	"testMatch": [
+		"<rootDir>/test/deploy-cli/deploy-cli.test.ts",
+		"<rootDir>/test/deploy-cli/deploy-cli.wrangler.test.ts"
+	],
+	"moduleFileExtensions": ["ts", "tsx", "js", "json", "node"]
+}

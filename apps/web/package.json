@@ -1,0 +1,23 @@
+{
+	"name": "@jsonbase/web",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"build": "vite build",
+		"dev": "vite",
+		"type-check": "tsc -p tsconfig.json --noEmit",
+		"test": "npx jest --config jest.config.json"
+	},
+	"dependencies": {
+		"@jsonbase/shared": "0.0.0",
+		"axios": "^1.13.2",
+		"i18next": "^25.6.0",
+		"lucide-react": "^0.563.0",
+		"mobx": "^6.15.0",
+		"mobx-react-lite": "^4.1.1",
+		"react-i18next": "^16.3.5",
+		"rsuite": "^5.83.4",
+		"sass": "^1.97.3"
+	}
+}

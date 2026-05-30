@@ -1,0 +1,202 @@
+{
+  "login": {
+    "loading": "Loading...",
+    "title": "JSON Base",
+    "subtitle": "Cloudflare Workers JSON storage service",
+    "apiKeyRequired": "Please enter API Key",
+    "loginFailed": "Login failed, please verify the API Key and try again",
+    "apiKeyLabel": "API Key",
+    "placeholder": "Enter your API Key",
+    "submit": "Validate and Login",
+    "footer": "Enter API Key to access the admin console"
+  },
+  "auth": {
+    "apiKeyRequired": "API Key is required",
+    "apiKeyInvalid": "Invalid API Key",
+    "apiKeyValid": "API Key is valid",
+    "unknownErrorRetry": "Unknown error, please try again later"
+  },
+  "layout": {
+    "consoleTitle": "JSON Base Admin Console",
+    "navConsole": "Console",
+    "navData": "Data Management",
+    "navPermissions": "Permissions",
+    "openMenu": "Open menu",
+    "refresh": "Refresh",
+    "languageMenu": "Switch language",
+    "languages": {
+      "zh": "Chinese",
+      "en": "English"
+    },
+    "logout": "Logout",
+    "createData": "Create Data",
+    "editData": "Edit Data",
+    "createSuccess": "Created successfully",
+    "createFailed": "Create failed",
+    "updateSuccess": "Updated successfully",
+    "updateFailed": "Update failed",
+    "binaryReplaceOnly": "Please upload a file again to replace the current resource"
+  },
+  "console": {
+    "stats": {
+      "totalCount": "Total Count",
+      "totalSize": "Storage Size",
+      "pageCount": "Page Count"
+    },
+    "actions": {
+      "create": { "title": "Create Data", "description": "Quickly create new JSON data" },
+      "storeText": { "title": "Store Text", "description": "Store plain text content" },
+      "upload": { "title": "Upload File", "description": "Store binary file data" },
+      "manage": { "title": "Data Management", "description": "View and manage all data" }
+    },
+    "apiTestTitle": "API Test Tool",
+    "apiTestDescription": "Use creation and query features in data management to test API.",
+    "quickApiExample": "Quick API Example",
+    "quickApiSample": "Create data:\nPOST /data/example\nAuthorization: Bearer YOUR_API_KEY\n{\"name\": \"example\", \"value\": \"data\"}\n\nGet data:\nGET /data/example\nAuthorization: Bearer YOUR_API_KEY\n-> {\"name\": \"example\", \"value\": \"data\"}\n"
+  },
+  "api": {
+    "consoleStatsFailed": "Failed to load console stats"
+  },
+  "permissions": {
+    "title": "Permissions",
+    "description": "Control public read/write access by path rules with * and ** matching.",
+    "searchPlaceholder": "Search path rules or descriptions...",
+    "search": "Search",
+    "create": "New Rule",
+    "createTitle": "Create Permission Rule",
+    "editTitle": "Edit Permission Rule",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "deleteTitle": "Delete Permission Rule",
+    "deleteConfirm": "Delete rule {{pattern}}?",
+    "filters": {
+      "all": "All",
+      "enabled": "Enabled",
+      "disabled": "Disabled"
+    },
+    "table": {
+      "pattern": "Pattern",
+      "mode": "Mode",
+      "priority": "Priority",
+      "status": "Status",
+      "description": "Description",
+      "actions": "Actions"
+    },
+    "status": {
+      "enabled": "Enabled",
+      "disabled": "Disabled"
+    },
+    "operations": {
+      "enable": "Enable",
+      "disable": "Disable"
+    },
+    "actions": {
+      "read": "Read",
+      "write": "Write"
+    },
+    "modes": {
+      "private_rw": "Private read/write",
+      "public_rw": "Public read/write",
+      "private_read_public_write": "Private read / Public write",
+      "public_read_private_write": "Public read / Private write"
+    },
+    "messages": {
+      "loadFailed": "Failed to load permission rules",
+      "createSuccess": "Permission rule created",
+      "createFailed": "Failed to create permission rule",
+      "updateSuccess": "Permission rule updated",
+      "updateFailed": "Failed to update permission rule",
+      "saveFailed": "Failed to save permission rule",
+      "enabled": "Rule enabled",
+      "disabled": "Rule disabled",
+      "statusFailed": "Failed to update rule status",
+      "deleteSuccess": "Permission rule deleted",
+      "deleteFailed": "Failed to delete permission rule",
+      "evaluateFailed": "Failed to evaluate permission rule"
+    },
+    "tester": {
+      "title": "Path Tester",
+      "description": "Enter a path and action to see the final permission result under active rules.",
+      "run": "Run Test",
+      "publicAccess": "This action is public",
+      "privateAccess": "This action requires private access",
+      "matchedRule": "Matched rule:",
+      "defaultRule": "No rule matched, using default private_rw",
+      "placeholder": "Run a test to inspect matched rules and the resulting permission decision."
+    },
+    "form": {
+      "pattern": "Pattern",
+      "patternHint": "Supports rules like /foo/*, /foo/**, and /**/*.png.",
+      "mode": "Permission Mode",
+      "priority": "Priority",
+      "priorityHint": "Higher numbers win when multiple rules match.",
+      "enabled": "Enabled",
+      "description": "Description"
+    }
+  },
+  "data": {
+    "title": "Data Management",
+    "search": "Search",
+    "create": "Create Data",
+    "searchPlaceholder": "Search data...",
+    "replaceFile": "Replace file",
+    "edit": "Edit",
+    "pagination": "{{total}} items, page {{page}}",
+    "table": {
+      "icon": "Type",
+      "path": "Path",
+      "type": "Type",
+      "size": "Size",
+      "updatedAt": "Updated At",
+      "actions": "Actions",
+      "pathContextHint": "Right click to open menu"
+    },
+    "contextMenu": {
+      "openFileInNewTab": "Open file in new tab",
+      "openDataInNewTab": "Open data in new tab"
+    },
+    "delete": {
+      "confirmTitle": "Confirm Delete",
+      "confirmText": "Delete \"{{id}}\"?",
+      "confirmHint": "This action is permanent.",
+      "cancel": "Cancel",
+      "submit": "Delete",
+      "failed": "Failed to delete data",
+      "failedTitle": "Delete Failed",
+      "confirm": "OK"
+    }
+  },
+  "modal": {
+    "pathRequired": "Path is required",
+    "uploadRequired": "Please upload a file",
+    "binaryEditDisabled": "Binary files cannot be edited directly",
+    "contentRequired": "Please enter content",
+    "jsonInvalid": "Invalid JSON format",
+    "unknownError": "Unknown error",
+    "binaryReplaceHint": "Uploading a new file will replace the current resource.",
+    "kbUnit": "KB",
+    "fileProcessing": "Processing file...",
+    "fileDropHint": "Click or drop a file here to upload",
+    "fileSupportHint": "All file formats are supported",
+    "fileReplaceStorageHint": "Uploading a new file will replace the current resource.",
+    "fileStorageHint": "Files will be stored as binary content on the backend",
+    "jsonSwitchToEdit": "Switch to edit",
+    "jsonSwitchToPreview": "Switch to preview",
+    "jsonCompact": "Compact JSON",
+    "jsonFormat": "Format JSON",
+    "jsonPlaceholder": "Enter JSON, e.g. {\"key\": \"value\"}",
+    "textPlaceholder": "Enter text content",
+    "path": "Path",
+    "pathPlaceholder": "/example/data",
+    "pathHint": "Use a path like /demo/user/profile",
+    "type": "Data Type",
+    "typeJson": "JSON",
+    "typeText": "Text",
+    "typeBinary": "Binary file",
+    "content": "Content",
+    "cancel": "Cancel",
+    "create": "Create",
+    "update": "Update"
+  }
+}

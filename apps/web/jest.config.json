@@ -1,0 +1,14 @@
+{
+	"preset": "ts-jest",
+	"testEnvironment": "jsdom",
+	"setupFilesAfterEnv": ["<rootDir>/test/setup.ts"],
+	"transform": {
+		"^.+\\.(ts|tsx)$": ["ts-jest", { "tsconfig": "tsconfig.json" }]
+	},
+	"testMatch": ["<rootDir>/test/**/*.test.(ts|tsx)"],
+	"moduleNameMapper": {
+		"^@jsonbase/shared$": "<rootDir>/../../packages/shared/src/index.ts",
+		"\\.(css|less|scss|sass)$": "identity-obj-proxy"
+	},
+	"moduleFileExtensions": ["ts", "tsx", "js", "json", "node"]
+}

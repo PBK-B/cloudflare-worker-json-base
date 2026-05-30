@@ -1,0 +1,12 @@
+{
+	"extends": "../../tsconfig.base.json",
+	"compilerOptions": {
+		"rootDir": "src",
+		"outDir": "dist",
+		"baseUrl": "src",
+		"paths": {
+			"@jsonbase/shared": ["../../../packages/shared/dist/index.d.ts"]
+		}
+	},
+	"include": ["src/**/*"]
+}
